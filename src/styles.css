@@ -1,0 +1,151 @@
+@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--green);
+  --color-primary-foreground: #000;
+  --color-secondary: var(--surface2);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface2);
+  --color-muted-foreground: var(--text-2);
+  --color-accent: var(--surface3);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--red);
+  --color-destructive-foreground: var(--text);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--green);
+  --font-sans: "Syne", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+:root {
+  --bg: #080808;
+  --surface: #0f0f0f;
+  --surface2: #161616;
+  --surface3: #1e1e1e;
+  --border: #262626;
+  --border2: #333333;
+  --green: #76b900;
+  --green-dim: rgba(118, 185, 0, 0.12);
+  --green-glow: rgba(118, 185, 0, 0.25);
+  --text: #f5f5f5;
+  --text-2: #a0a0a0;
+  --text-3: #606060;
+  --red: #ef4444;
+  --yellow: #eab308;
+  --orange: #f97316;
+  --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Syne", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono { font-family: "JetBrains Mono", monospace; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes bounce-dot { 0%, 100% { transform: translateY(0); opacity: 0.5; } 50% { transform: translateY(-6px); opacity: 1; } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 var(--green-glow); } 70% { box-shadow: 0 0 0 10px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes slide-up-toast { from { opacity: 0; transform: translate(-50%, 30px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+.fade-up { animation: fadeUp 0.4s ease forwards; }
+.fade-in { animation: fadeIn 0.3s ease forwards; }
+.pulse-ring { animation: pulse-ring 2s infinite; }
+
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(118, 185, 0, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(118, 185, 0, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.gp-input {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  color: var(--text);
+  font-family: "Syne", sans-serif;
+  font-size: 15px;
+  width: 100%;
+  outline: none;
+  transition: all 0.15s ease;
+}
+.gp-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-dim); }
+.gp-input::placeholder { color: var(--text-3); }
+
+.gp-btn {
+  background: var(--green);
+  color: #000;
+  font-weight: 700;
+  height: 52px;
+  border-radius: 10px;
+  font-size: 16px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: "Syne", sans-serif;
+}
+.gp-btn:hover:not(:disabled) { background: #8fd400; transform: scale(1.01); }
+.gp-btn:active:not(:disabled) { transform: scale(0.99); }
+.gp-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.gp-btn-outline {
+  background: transparent;
+  color: var(--green);
+  border: 1px solid var(--green);
+}
+.gp-btn-outline:hover:not(:disabled) { background: var(--green-dim); transform: scale(1.01); }
+
+.gp-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+.gp-spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(0,0,0,0.25);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.gp-spinner-green {
+  border: 2px solid rgba(118,185,0,0.25);
+  border-top-color: var(--green);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+}
