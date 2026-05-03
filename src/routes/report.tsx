@@ -10,7 +10,6 @@ import {
   humanizeLabel,
   initials,
   scoreToColor,
-  scoreAxisLabel,
   stageLabel,
 } from "@/lib/ghost-utils";
 
@@ -399,7 +398,7 @@ function RoundAccordion({
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <MiniBar label="Clarity" value={evaluation.clarity} />
-            <MiniBar label={scoreAxisLabel(roleProfile)} value={evaluation.role_skill_depth} />
+            <MiniBar label={evaluation.middle_label ?? "Tech Depth"} value={evaluation.technical_depth} />
             <MiniBar label="Structure" value={evaluation.structure} />
             <MiniBar label="Overall" value={evaluation.overall} />
           </div>

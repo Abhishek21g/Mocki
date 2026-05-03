@@ -12,6 +12,17 @@ import {
 } from "./agents.server";
 import { getLogs, pushLog, withSessionLog } from "./agent-log.server";
 import { createSession, getInterviewerById, getSession, updateSession } from "./sessions.server";
+import { getUserIdForToken } from "./supabase.server";
+import {
+  buildUpdatedMemoryFromReport,
+  emptyLearnerMemory,
+  getLearnerMemoryForUser,
+  memoryToPromptBlock,
+  persistInterviewSession,
+  setLearnerMemoryForUser,
+  type InterviewSessionPayload,
+  type LearnerMemory,
+} from "./history.server";
 
 const TOTAL_TURNS = 6;
 
@@ -21,6 +32,7 @@ const StartSchema = z.object({
   jobDescription: z.string().min(1).max(20000),
   interview_type: z.enum(["technical", "behavioral", "mixed"]),
   resume: z.string().min(1).max(20000),
+  accessToken: z.string().min(10).max(8000).optional(),
 });
 
 export const startInterview = createServerFn({ method: "POST" })
@@ -42,11 +54,45 @@ export const startInterview = createServerFn({ method: "POST" })
         meta: roleProfile,
       });
 
+      let userId: string | null = null;
+      let learnerMemory: LearnerMemory = emptyLearnerMemory();
+      let learnerMemoryPrompt: string | null = null;
+
+      if (data.accessToken) {
+        userId = await getUserIdForToken(data.accessToken);
+        if (userId) {
+          try {
+            learnerMemory = await getLearnerMemoryForUser(data.accessToken);
+          } catch (err) {
+            pushLog(sessionId, {
+              agent: "Memory",
+              phase: "error",
+              message: "Failed to load learner memory",
+              meta: { error: err instanceof Error ? err.message : String(err) },
+            });
+          }
+          learnerMemoryPrompt = memoryToPromptBlock(learnerMemory) || null;
+          pushLog(sessionId, {
+            agent: "Memory",
+            phase: "info",
+            message: learnerMemory.totalSessions
+              ? `Loaded learner memory from ${learnerMemory.totalSessions} prior sessions`
+              : "No prior learner memory; starting fresh for this user",
+            meta: {
+              totalSessions: learnerMemory.totalSessions,
+              weakTopics: learnerMemory.weakTopics.slice(0, 6),
+              strongTopics: learnerMemory.strongTopics.slice(0, 6),
+            },
+          });
+        }
+      }
+
       const candidateContext = await generateCandidateContext(
         data.role,
         data.company,
         data.resume,
         data.jobDescription,
+        learnerMemoryPrompt,
       );
       pushLog(sessionId, {
         agent: "CandidateContext",
@@ -80,8 +126,10 @@ export const startInterview = createServerFn({ method: "POST" })
         });
       });
 
+      const { accessToken: _accessToken, ...persistableInput } = data;
+      void _accessToken;
       createSession(sessionId, {
-        ...data,
+        ...persistableInput,
         interviewers,
         activeInterviewerId: interviewers[0].id,
         panelType: "structured",
@@ -89,6 +137,8 @@ export const startInterview = createServerFn({ method: "POST" })
         candidateContext,
         totalRounds: TOTAL_TURNS,
         currentStage: "intro",
+        userId,
+        learnerMemoryPrompt,
       });
 
       const session = getSession(sessionId)!;
@@ -304,7 +354,10 @@ export const submitAnswer = createServerFn({ method: "POST" })
     });
   });
 
-const ReportSchema = z.object({ sessionId: z.string().min(1).max(100) });
+const ReportSchema = z.object({
+  sessionId: z.string().min(1).max(100),
+  accessToken: z.string().min(10).max(8000).optional(),
+});
 
 export const generateReport = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => ReportSchema.parse(d))
@@ -320,8 +373,10 @@ export const generateReport = createServerFn({ method: "POST" })
         phase: "info",
         message: `Report ready · ${report.hire_decision}`,
       });
-      return {
+
+      const reportPayload: InterviewSessionPayload = {
         ...report,
+        sessionId: data.sessionId,
         rounds: session.rounds,
         role: session.role,
         company: session.company,
@@ -330,6 +385,63 @@ export const generateReport = createServerFn({ method: "POST" })
         panelType: session.panelType,
         totalRounds: session.totalRounds,
         roleProfile: session.roleProfile,
+      };
+
+      let persistedId: string | null = null;
+      if (data.accessToken) {
+        const userId = session.userId ?? (await getUserIdForToken(data.accessToken));
+        if (userId) {
+          try {
+            const stored = await persistInterviewSession(data.accessToken, userId, reportPayload, {
+              interview_type: session.interview_type,
+              roleDomainLabel: session.roleProfile.roleDomainLabel,
+              coreSkillsLabel: session.roleProfile.coreSkillsLabel,
+            });
+            if (stored) {
+              persistedId = stored.id;
+              pushLog(data.sessionId, {
+                agent: "History",
+                phase: "info",
+                message: "Saved interview to your history",
+                meta: { storedId: stored.id },
+              });
+            }
+          } catch (err) {
+            pushLog(data.sessionId, {
+              agent: "History",
+              phase: "error",
+              message: "Failed to save interview history",
+              meta: { error: err instanceof Error ? err.message : String(err) },
+            });
+          }
+
+          try {
+            const prior = await getLearnerMemoryForUser(data.accessToken);
+            const updated = buildUpdatedMemoryFromReport(prior, reportPayload);
+            await setLearnerMemoryForUser(data.accessToken, userId, updated);
+            pushLog(data.sessionId, {
+              agent: "Memory",
+              phase: "info",
+              message: `Updated learner memory · ${updated.totalSessions} session(s)`,
+              meta: {
+                weakTopics: updated.weakTopics.slice(0, 6),
+                strongTopics: updated.strongTopics.slice(0, 6),
+              },
+            });
+          } catch (err) {
+            pushLog(data.sessionId, {
+              agent: "Memory",
+              phase: "error",
+              message: "Failed to update learner memory",
+              meta: { error: err instanceof Error ? err.message : String(err) },
+            });
+          }
+        }
+      }
+
+      return {
+        ...reportPayload,
+        storedSessionId: persistedId,
       };
     });
   });
