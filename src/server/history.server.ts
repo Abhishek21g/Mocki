@@ -138,6 +138,26 @@ export async function setLearnerMemoryForUser(
   }
 }
 
+export async function clearLearnerMemoryForUser(
+  accessToken: string,
+  userId: string,
+): Promise<void> {
+  await setLearnerMemoryForUser(accessToken, userId, emptyLearnerMemory());
+}
+
+export async function deleteInterviewSessionRow(
+  accessToken: string,
+  sessionId: string,
+): Promise<boolean> {
+  const client = createServerClientForUser(accessToken);
+  const { error } = await client.from("interview_sessions").delete().eq("id", sessionId);
+  if (error) {
+    console.error("deleteInterviewSessionRow error", error);
+    return false;
+  }
+  return true;
+}
+
 export function mergeLearnerMemory(value: unknown): LearnerMemory {
   if (!value || typeof value !== "object") return emptyLearnerMemory();
   const v = value as Partial<LearnerMemory>;
