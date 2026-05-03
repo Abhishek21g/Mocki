@@ -14,6 +14,7 @@ import { Route as InterviewRouteImport } from './routes/interview'
 import { Route as HistoryRouteImport } from './routes/history'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as ApiSttRouteImport } from './routes/api/stt'
 
 const ReportRoute = ReportRouteImport.update({
   id: '/report',
@@ -40,12 +41,18 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSttRoute = ApiSttRouteImport.update({
+  id: '/api/stt',
+  path: '/api/stt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/history': typeof HistoryRoute
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRoute
+  '/api/stt': typeof ApiSttRoute
   '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/history': typeof HistoryRoute
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRoute
+  '/api/stt': typeof ApiSttRoute
   '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRoutesById {
@@ -61,19 +69,33 @@ export interface FileRoutesById {
   '/history': typeof HistoryRoute
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRoute
+  '/api/stt': typeof ApiSttRoute
   '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/history' | '/interview' | '/report' | '/auth/callback'
+  fullPaths:
+    | '/'
+    | '/history'
+    | '/interview'
+    | '/report'
+    | '/api/stt'
+    | '/auth/callback'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/history' | '/interview' | '/report' | '/auth/callback'
+  to:
+    | '/'
+    | '/history'
+    | '/interview'
+    | '/report'
+    | '/api/stt'
+    | '/auth/callback'
   id:
     | '__root__'
     | '/'
     | '/history'
     | '/interview'
     | '/report'
+    | '/api/stt'
     | '/auth/callback'
   fileRoutesById: FileRoutesById
 }
@@ -82,6 +104,7 @@ export interface RootRouteChildren {
   HistoryRoute: typeof HistoryRoute
   InterviewRoute: typeof InterviewRoute
   ReportRoute: typeof ReportRoute
+  ApiSttRoute: typeof ApiSttRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
 }
 
@@ -122,6 +145,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/stt': {
+      id: '/api/stt'
+      path: '/api/stt'
+      fullPath: '/api/stt'
+      preLoaderRoute: typeof ApiSttRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -130,6 +160,7 @@ const rootRouteChildren: RootRouteChildren = {
   HistoryRoute: HistoryRoute,
   InterviewRoute: InterviewRoute,
   ReportRoute: ReportRoute,
+  ApiSttRoute: ApiSttRoute,
   AuthCallbackRoute: AuthCallbackRoute,
 }
 export const routeTree = rootRouteImport
