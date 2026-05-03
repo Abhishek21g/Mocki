@@ -17,7 +17,7 @@ import { getHireBg, getHireColor, scoreToColor } from "@/lib/ghost-utils";
 
 export const Route = createFileRoute("/history")({
   head: () => ({
-    meta: [{ title: "History · Mockpilot" }],
+    meta: [{ title: "History · Mocki" }],
   }),
   component: HistoryPage,
 });

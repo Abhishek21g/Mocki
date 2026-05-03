@@ -11,7 +11,7 @@ import { startInterview } from "@/server/interview.functions";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "🧭 Mockpilot — AI Mock Interviews" },
+      { title: "Mocki — AI Mock Interviews" },
       {
         name: "description",
         content:
