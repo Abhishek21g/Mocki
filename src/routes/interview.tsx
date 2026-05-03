@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
-import { Mic, Volume2, VolumeX } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Mic, RotateCw, Volume2, VolumeX } from "lucide-react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -135,6 +135,31 @@ function InterviewPage() {
   const activeVoice = state.activeInterviewer?.voice;
   const sessionId = state.sessionId;
   const speakingBlocked = loadingAnswer || loadingNext || generating || isHoldingTalk;
+
+  const handleReplayQuestion = useCallback(() => {
+    if (!ttsEnabled || !currentQuestion?.trim() || !activeVoice || !activeInterviewerId) return;
+    if (loadingNext || generating || loadingAnswer || isHoldingTalk) return;
+    primeAudio();
+    const key = `${activeInterviewerId}::${currentQuestion}`;
+    void ttsRef.current?.speak(currentQuestion, activeVoice, sessionId).then(
+      () => {
+        lastSuccessfullySpokenKeyRef.current = key;
+      },
+      () => {
+        /* errors surface via TtsController onError toast */
+      },
+    );
+  }, [
+    activeInterviewerId,
+    activeVoice,
+    currentQuestion,
+    generating,
+    isHoldingTalk,
+    loadingAnswer,
+    loadingNext,
+    sessionId,
+    ttsEnabled,
+  ]);
 
   useEffect(() => {
     if (!ttsEnabled) {
@@ -380,8 +405,13 @@ function InterviewPage() {
           <section className="flex flex-col gap-5">
             <SpeakerSpotlight
               interviewer={activeInterviewer}
+              loadingAnswer={loadingAnswer}
               loadingNext={loadingNext}
+              generating={generating}
+              holdingTalk={isHoldingTalk}
               lastClarification={state.lastClarification}
+              onReplayQuestion={handleReplayQuestion}
+              ttsEnabled={ttsEnabled}
               ttsStatus={ttsStatus}
             />
 
@@ -848,18 +878,34 @@ function FlowCard({
 
 function SpeakerSpotlight({
   interviewer,
+  loadingAnswer,
   loadingNext,
+  generating,
+  holdingTalk,
   lastClarification,
+  onReplayQuestion,
+  ttsEnabled,
   ttsStatus,
 }: {
   interviewer: Persona;
+  loadingAnswer: boolean;
   loadingNext: boolean;
+  generating: boolean;
+  holdingTalk: boolean;
   lastClarification: string | null;
+  onReplayQuestion: () => void;
+  ttsEnabled: boolean;
   ttsStatus: TtsStatus;
 }) {
   const speaking = ttsStatus === "playing";
   const loadingTts = ttsStatus === "loading";
   const indicatorActive = loadingNext || speaking || loadingTts;
+  const replayDisabled =
+    loadingTts ||
+    loadingNext ||
+    generating ||
+    loadingAnswer ||
+    holdingTalk;
 
   return (
     <div className="gp-card p-6 fade-up">
@@ -894,23 +940,56 @@ function SpeakerSpotlight({
           {interviewer.focus}
         </span>
       </div>
-      <div className="mt-4 flex items-center gap-2 text-xs mono" style={{ color: "var(--text-2)" }}>
-        <span
-          className="h-2 w-2 rounded-full"
-          style={{
-            background: indicatorActive ? "var(--green)" : "var(--text-3)",
-            animation: indicatorActive ? "bounce-dot 1s infinite" : "none",
-          }}
-        />
-        {loadingNext
-          ? "Planning the next conversational move"
-          : speaking
-            ? "Speaking the question"
-            : loadingTts
-              ? "Synthesizing voice"
-              : lastClarification
-                ? "Continuing the same answer with clarification"
-                : "Listening for your answer"}
+      <div className="mt-4 flex flex-col gap-2">
+        <div
+          className="flex flex-wrap items-center justify-between gap-3 text-xs mono"
+          style={{ color: "var(--text-2)" }}
+        >
+          <span className="inline-flex min-w-0 flex-1 items-center gap-2">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{
+                background: indicatorActive ? "var(--green)" : "var(--text-3)",
+                animation: indicatorActive ? "bounce-dot 1s infinite" : "none",
+              }}
+            />
+            <span>
+              {loadingNext
+                ? "Planning the next conversational move"
+                : speaking
+                  ? "Speaking the question"
+                  : loadingTts
+                    ? "Synthesizing voice"
+                    : lastClarification
+                      ? "Continuing the same answer with clarification"
+                      : "Listening for your answer"}
+            </span>
+          </span>
+          {ttsEnabled ? (
+            <button
+              type="button"
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 font-sans text-[11px] font-semibold transition-opacity",
+              )}
+              style={{
+                borderColor: replayDisabled ? "var(--border)" : "rgba(118,185,0,0.45)",
+                color: replayDisabled ? "var(--text-3)" : "var(--green)",
+                opacity: replayDisabled ? 0.65 : 1,
+              }}
+              disabled={replayDisabled}
+              onClick={() => onReplayQuestion()}
+              aria-label="Replay question audio"
+            >
+              <RotateCw className="size-3.5" aria-hidden />
+              Replay audio
+            </button>
+          ) : null}
+        </div>
+        {ttsEnabled ? (
+          <p className="text-[11px] leading-snug font-sans" style={{ color: "var(--text-3)" }}>
+            If nothing plays on load, tap Replay audio — browsers require a gesture for audio.
+          </p>
+        ) : null}
       </div>
     </div>
   );
