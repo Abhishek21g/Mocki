@@ -41,6 +41,13 @@ export type Persona = {
   years: number;
   personality: string;
   focus: string;
+  /**
+   * Magpie TTS voice id used to synthesize this interviewer's lines (e.g.
+   * `Magpie-Multilingual.EN-US.Aria`). Picked deterministically from a
+   * gendered pool keyed on the persona's archetype + name so the panel always
+   * has voice variety and the same name maps to the same voice across runs.
+   */
+  voice: string;
 };
 
 export type CandidateContext = {

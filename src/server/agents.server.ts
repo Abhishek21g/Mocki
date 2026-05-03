@@ -15,6 +15,50 @@ import type {
 } from "./sessions.server";
 
 const PANEL_ARCHETYPES: InterviewerId[] = ["practitioner", "hiring_manager", "recruiter"];
+
+/**
+ * Gendered voice pools for Magpie TTS Multilingual (en-US).
+ *
+ * Verified live against the deployed NVCF checkpoint via the bridge's
+ * `GET /voices` endpoint. EN-US speakers in the catalog: Mia, Aria, Sofia
+ * (female), Jason, Leo, Ray (male). We use the `.Neutral` emotion variant
+ * for every voice because it's the calm, professional delivery an
+ * interviewer should sound like — the bare-name form (e.g. just `Aria`)
+ * dispatches a default style mix that can come out flat or off-tone.
+ *
+ * If you change the function-id, re-run `curl http://127.0.0.1:8788/voices`
+ * and update this list.
+ *
+ * Each archetype is anchored to a gender so the panel always has at least
+ * one male and one female regardless of what names PanelGen invents.
+ */
+const VOICE_POOLS: Record<"female" | "male", string[]> = {
+  female: [
+    "Magpie-Multilingual.EN-US.Aria.Neutral",
+    "Magpie-Multilingual.EN-US.Sofia.Neutral",
+    "Magpie-Multilingual.EN-US.Mia.Neutral",
+  ],
+  male: [
+    "Magpie-Multilingual.EN-US.Jason.Neutral",
+    "Magpie-Multilingual.EN-US.Leo.Neutral",
+    "Magpie-Multilingual.EN-US.Ray.Neutral",
+  ],
+};
+
+const ARCHETYPE_VOICE_GENDER: Record<InterviewerId, "female" | "male"> = {
+  practitioner: "female",
+  hiring_manager: "male",
+  recruiter: "female",
+};
+
+function pickVoice(personaName: string, gender: "female" | "male"): string {
+  const pool = VOICE_POOLS[gender];
+  let hash = 0;
+  for (let i = 0; i < personaName.length; i += 1) {
+    hash = (hash * 31 + personaName.charCodeAt(i)) >>> 0;
+  }
+  return pool[hash % pool.length];
+}
 const SOFTWARE_QUESTION_TYPES = new Set<QuestionType>([
   "project_deep_dive",
   "technical_design",
@@ -462,12 +506,14 @@ function normalizePersona(
       ? fallbackFocus
       : parsedFocus;
 
+  const name =
+    typeof value.name === "string" && value.name.trim()
+      ? value.name.trim()
+      : defaults.fallbackName;
+
   return {
     id: interviewerId,
-    name:
-      typeof value.name === "string" && value.name.trim()
-        ? value.name.trim()
-        : defaults.fallbackName,
+    name,
     title,
     company:
       typeof value.company === "string" && value.company.trim() ? value.company.trim() : company,
@@ -482,6 +528,7 @@ function normalizePersona(
         ? value.personality.trim()
         : "direct, thoughtful, high-signal",
     focus,
+    voice: pickVoice(name, ARCHETYPE_VOICE_GENDER[interviewerId]),
   };
 }
 
