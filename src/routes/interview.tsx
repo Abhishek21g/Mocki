@@ -74,7 +74,8 @@ function InterviewPage() {
     return stored === null ? true : stored === "true";
   });
   const [ttsStatus, setTtsStatus] = useState<TtsStatus>("idle");
-  const lastSpokenKeyRef = useRef<string | null>(null);
+  /** Dedupes automatic playback only **after** a question audibly succeeds; avoids locking out retries on transient TTS/play failures (first prompt often hit this). */
+  const lastSuccessfullySpokenKeyRef = useRef<string | null>(null);
   const controlsDisabled = loadingAnswer || loadingNext || generating;
 
   useEffect(() => {
@@ -138,7 +139,7 @@ function InterviewPage() {
   useEffect(() => {
     if (!ttsEnabled) {
       ttsRef.current?.stop();
-      // Keep lastSpokenKeyRef populated so re-enabling doesn't replay the
+      // Keep lastSuccessfullySpokenKeyRef populated so re-enabling doesn't replay the
       // current question; voice-on means "start hearing future questions".
       return;
     }
@@ -146,10 +147,42 @@ function InterviewPage() {
     if (speakingBlocked) return;
 
     const key = `${activeInterviewerId}::${currentQuestion}`;
-    if (lastSpokenKeyRef.current === key) return;
-    lastSpokenKeyRef.current = key;
+    if (lastSuccessfullySpokenKeyRef.current === key) return;
 
-    void ttsRef.current?.speak(currentQuestion, activeVoice, sessionId);
+    let cancelled = false;
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, ms);
+      });
+
+    const run = async () => {
+      const tts = ttsRef.current;
+      if (!tts) return;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (cancelled) return;
+        try {
+          await tts.speak(currentQuestion, activeVoice, sessionId);
+          if (!cancelled) lastSuccessfullySpokenKeyRef.current = key;
+          return;
+        } catch (e) {
+          if (cancelled) return;
+          const msg = e instanceof Error ? e.message : String(e);
+          // Playback permission / decoder start — retrying loop won't help until user interacts.
+          if (
+            msg.includes("Browser blocked auto-play") ||
+            msg.includes("Could not start audio playback")
+          )
+            return;
+          if (attempt >= 1) return;
+          await sleep(550);
+        }
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, [
     ttsEnabled,
     currentQuestion,
