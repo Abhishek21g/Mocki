@@ -9,19 +9,19 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "🧭 Mockpilot — AI Mock Interviews" },
+      { title: "Mocki — AI Mock Interviews" },
       {
         name: "description",
         content:
           "Multi-agent AI interviews that make you genuinely better. Powered by NVIDIA Nemotron.",
       },
-      { property: "og:title", content: "🧭 Mockpilot — AI Mock Interviews" },
+      { property: "og:title", content: "Mocki — AI Mock Interviews" },
       {
         property: "og:description",
         content:
           "Multi-agent AI interviews that make you genuinely better. Powered by NVIDIA Nemotron.",
       },
-      { name: "twitter:title", content: "🧭 Mockpilot — AI Mock Interviews" },
+      { name: "twitter:title", content: "Mocki — AI Mock Interviews" },
       {
         name: "twitter:description",
         content:

@@ -25,9 +25,10 @@ export function HomeLogo({
         className,
       )}
       style={{ color: "var(--green)" }}
-      aria-label="Go to Mockpilot home"
+      aria-label="Go to Mocki home"
     >
-      🧭 Mockpilot
+      <img src="/Mocki.png" alt="Mocki" className="inline-block h-[1.4em] w-auto mr-2 align-middle" />
+      Mocki
     </button>
   );
 }
