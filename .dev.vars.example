@@ -1,0 +1,3 @@
+# Copy this file to .dev.vars and add your real key (never commit .dev.vars).
+# Get a key from NVIDIA NIM / API dashboard.
+NVIDIA_API_KEY=paste_your_key_here
