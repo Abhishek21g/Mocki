@@ -30,7 +30,6 @@ import type { AgentEvent } from "@/components/agent-dashboard/types";
 
 const TTS_ENABLED_STORAGE_KEY = "mockpilot:ttsEnabled";
 
-
 export const Route = createFileRoute("/interview")({
   head: () => ({
     meta: [{ title: "Interview · Mockpilot" }],
