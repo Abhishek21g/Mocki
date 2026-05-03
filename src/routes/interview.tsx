@@ -10,7 +10,6 @@ import {
   humanizeLabel,
   initials,
   scoreToColor,
-  scoreAxisLabel,
   stageLabel,
 } from "@/lib/ghost-utils";
 import { cn } from "@/lib/utils";
@@ -638,7 +637,8 @@ function EvaluationCard({
 }: {
   ev: {
     clarity: number;
-    role_skill_depth: number;
+    technical_depth: number;
+    middle_label?: string;
     structure: number;
     overall: number;
     strengths: string[];
@@ -689,7 +689,7 @@ function EvaluationCard({
       </p>
       <div className="flex flex-col gap-3">
         <ScoreBar label="Clarity" score={ev.clarity} delay={0} />
-        <ScoreBar label={scoreAxisLabel(roleProfile)} score={ev.role_skill_depth} delay={120} />
+        <ScoreBar label={ev.middle_label ?? "Technical Depth"} score={ev.technical_depth} delay={120} />
         <ScoreBar label="Structure" score={ev.structure} delay={240} />
       </div>
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
