@@ -5,6 +5,8 @@ import { showToast } from "@/components/ghost/Toaster";
 import { store } from "@/lib/ghost-store";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import {
+  clearLearnerMemory,
+  deleteInterviewSession,
   fetchInterviewHistory,
   fetchInterviewSession,
   fetchLearnerMemory,
@@ -26,6 +28,8 @@ function HistoryPage() {
   const [items, setItems] = useState<HistoryListItem[] | null>(null);
   const [memory, setMemory] = useState<LearnerMemory | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [clearingMemory, setClearingMemory] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -80,6 +84,63 @@ function HistoryPage() {
       navigate({ to: "/report" });
     } finally {
       setLoadingId(null);
+    }
+  }
+
+  async function deleteSession(item: HistoryListItem) {
+    const accessToken = getAccessToken();
+    if (!accessToken) return;
+    if (
+      !window.confirm(
+        `Delete this interview (${item.role || "Untitled"} @ ${item.company || "—"})? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingId(item.id);
+    try {
+      const res = await deleteInterviewSession({
+        data: { accessToken, sessionId: item.id },
+      });
+      if (!res.ok) {
+        showToast("Could not delete that interview");
+        return;
+      }
+      setItems((prev) => (prev ? prev.filter((i) => i.id !== item.id) : prev));
+      showToast("Interview deleted");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleClearMemory() {
+    const accessToken = getAccessToken();
+    if (!accessToken) return;
+    if (
+      !window.confirm(
+        "Clear learner memory? Future interviews will start fresh and won't be biased by your prior weak/strong areas. Past sessions stay saved.",
+      )
+    ) {
+      return;
+    }
+    setClearingMemory(true);
+    try {
+      const res = await clearLearnerMemory({ data: { accessToken } });
+      if (!res.ok) {
+        showToast("Could not clear memory");
+        return;
+      }
+      setMemory({
+        weakTopics: [],
+        strongTopics: [],
+        lastSummary: null,
+        lastRoles: [],
+        totalSessions: 0,
+        updatedAt: null,
+      });
+      showToast("Learner memory cleared");
+    } finally {
+      setClearingMemory(false);
     }
   }
 
@@ -140,15 +201,22 @@ function HistoryPage() {
 
   return (
     <div className="grid-bg min-h-screen pb-24">
-      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 pt-8">
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 pt-6 pr-[260px]">
         <HomeLogo className="text-base" />
-        <div className="mono text-xs" style={{ color: "var(--text-3)" }}>
-          INTERVIEW HISTORY
-        </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-6 pt-12">
-        <MemoryCard memory={memory} />
+      <main className="mx-auto max-w-5xl px-6 pt-10">
+        <div
+          className="mono mb-6 text-[11px] uppercase tracking-wider"
+          style={{ color: "var(--text-3)" }}
+        >
+          Interview history
+        </div>
+        <MemoryCard
+          memory={memory}
+          onClear={handleClearMemory}
+          clearing={clearingMemory}
+        />
 
         <div className="mt-10 flex items-end justify-between">
           <div>
@@ -201,7 +269,9 @@ function HistoryPage() {
                 <HistoryRow
                   item={item}
                   loading={loadingId === item.id}
+                  deleting={deletingId === item.id}
                   onClick={() => openSession(item)}
+                  onDelete={() => deleteSession(item)}
                 />
               </li>
             ))}
@@ -215,11 +285,15 @@ function HistoryPage() {
 function HistoryRow({
   item,
   loading,
+  deleting,
   onClick,
+  onDelete,
 }: {
   item: HistoryListItem;
   loading: boolean;
+  deleting: boolean;
   onClick: () => void;
+  onDelete: () => void;
 }) {
   const dateLabel = useMemo(() => {
     try {
@@ -230,14 +304,18 @@ function HistoryRow({
   }, [item.createdAt]);
 
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={loading}
-      className="gp-card w-full p-5 text-left transition hover:border-white/30 disabled:opacity-60"
+    <div
+      className={`gp-card w-full p-5 transition hover:border-white/30 ${
+        loading || deleting ? "opacity-60" : ""
+      }`}
     >
       <div className="flex items-center justify-between gap-4">
-        <div>
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={loading || deleting}
+          className="flex-1 text-left"
+        >
           <div className="text-base font-semibold">
             {item.role || "Untitled role"} <span style={{ color: "var(--text-3)" }}>@</span>{" "}
             {item.company || "—"}
@@ -246,7 +324,7 @@ function HistoryRow({
             {dateLabel}
             {item.interviewType ? ` · ${item.interviewType}` : ""}
           </div>
-        </div>
+        </button>
         <div className="flex items-center gap-3">
           {typeof item.overallScore === "number" && (
             <span
@@ -271,14 +349,41 @@ function HistoryRow({
               {item.hireDecision}
             </span>
           )}
-          <span style={{ color: "var(--text-3)" }}>{loading ? "…" : "→"}</span>
+          <button
+            type="button"
+            onClick={onDelete}
+            disabled={loading || deleting}
+            title="Delete this interview"
+            className="rounded-md border border-white/10 px-2 py-1 text-xs transition hover:border-white/30 disabled:opacity-50"
+            style={{ color: "var(--text-3)" }}
+          >
+            {deleting ? "…" : "Delete"}
+          </button>
+          <button
+            type="button"
+            onClick={onClick}
+            disabled={loading || deleting}
+            className="text-base disabled:opacity-50"
+            style={{ color: "var(--text-3)" }}
+            aria-label="Open interview"
+          >
+            {loading ? "…" : "→"}
+          </button>
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
-function MemoryCard({ memory }: { memory: LearnerMemory | null }) {
+function MemoryCard({
+  memory,
+  onClear,
+  clearing,
+}: {
+  memory: LearnerMemory | null;
+  onClear: () => void;
+  clearing: boolean;
+}) {
   if (!memory || memory.totalSessions === 0) {
     return (
       <section className="gp-card p-6">
@@ -297,15 +402,27 @@ function MemoryCard({ memory }: { memory: LearnerMemory | null }) {
 
   return (
     <section className="gp-card p-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div
           className="mono text-[11px] uppercase tracking-wider"
           style={{ color: "var(--text-3)" }}
         >
           Learner Memory
         </div>
-        <div className="mono text-[11px]" style={{ color: "var(--green)" }}>
-          {memory.totalSessions} session{memory.totalSessions === 1 ? "" : "s"} indexed
+        <div className="flex items-center gap-3">
+          <div className="mono text-[11px]" style={{ color: "var(--green)" }}>
+            {memory.totalSessions} session{memory.totalSessions === 1 ? "" : "s"} indexed
+          </div>
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={clearing}
+            className="rounded-md border border-white/10 px-2 py-1 text-[11px] transition hover:border-white/30 disabled:opacity-50"
+            style={{ color: "var(--text-3)" }}
+            title="Wipe weak/strong topics; past sessions stay"
+          >
+            {clearing ? "Clearing…" : "Clear memory"}
+          </button>
         </div>
       </div>
       {memory.lastSummary && (

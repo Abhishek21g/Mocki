@@ -23,7 +23,9 @@ export async function getBrowserSupabase(): Promise<SupabaseClient | null> {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        flowType: "pkce",
+        // Implicit flow avoids the PKCE-verifier-in-storage problem that bites
+        // us with full-page OAuth round trips in this SPA + server-fn setup.
+        flowType: "implicit",
       },
     });
     return cachedClient;

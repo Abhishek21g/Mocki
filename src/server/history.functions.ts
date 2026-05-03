@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+  clearLearnerMemoryForUser,
+  deleteInterviewSessionRow,
   getInterviewSessionRow,
   getLearnerMemoryForUser,
   listInterviewSessions,
@@ -73,4 +75,29 @@ export const fetchLearnerMemory = createServerFn({ method: "POST" })
     }
     const memory: LearnerMemory = await getLearnerMemoryForUser(data.accessToken);
     return { ok: true as const, memory };
+  });
+
+export const clearLearnerMemory = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => TokenSchema.parse(d))
+  .handler(async ({ data }) => {
+    const userId = await getUserIdForToken(data.accessToken);
+    if (!userId) {
+      return { ok: false as const, reason: "unauthorized" as const };
+    }
+    await clearLearnerMemoryForUser(data.accessToken, userId);
+    return { ok: true as const };
+  });
+
+export const deleteInterviewSession = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => SessionFetchSchema.parse(d))
+  .handler(async ({ data }) => {
+    const userId = await getUserIdForToken(data.accessToken);
+    if (!userId) {
+      return { ok: false as const, reason: "unauthorized" as const };
+    }
+    const success = await deleteInterviewSessionRow(data.accessToken, data.sessionId);
+    if (!success) {
+      return { ok: false as const, reason: "delete_failed" as const };
+    }
+    return { ok: true as const };
   });
