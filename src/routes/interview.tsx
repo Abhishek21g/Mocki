@@ -1,5 +1,6 @@
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { Mic } from "lucide-react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -13,6 +14,13 @@ import {
   scoreAxisLabel,
   stageLabel,
 } from "@/lib/ghost-utils";
+import {
+  createSpeechRecognitionController,
+  isAudioCaptureSupported,
+  isSpeechRecognitionSupported,
+  type SpeechEngine,
+  type SpeechRecognitionStatus,
+} from "@/lib/speech";
 import { cn } from "@/lib/utils";
 import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview.functions";
 import type { InterviewStage, Persona, RoleProfile, TurnType } from "@/server/sessions.server";
@@ -38,13 +46,22 @@ function InterviewPage() {
   const nav = useNavigate();
   const isMobile = useIsMobile();
   const [answer, setAnswer] = useState("");
+  const [inputMode, setInputMode] = useState<"typing" | "hold_to_talk">("typing");
+  const [speechStatus, setSpeechStatus] = useState<SpeechRecognitionStatus>("idle");
+  const [interimTranscript, setInterimTranscript] = useState("");
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [isHoldingTalk, setIsHoldingTalk] = useState(false);
+  const [sttEngine, setSttEngine] = useState<SpeechEngine | null>(null);
   const [loadingAnswer, setLoadingAnswer] = useState(false);
   const [loadingNext, setLoadingNext] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [showAgents, setShowAgents] = useState(false);
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [canInlineAgents, setCanInlineAgents] = useState(false);
+  const recognitionRef = useRef<ReturnType<typeof createSpeechRecognitionController> | null>(null);
   const sinceRef = useRef(0);
+  const sttProxyUrl = (import.meta.env.VITE_STT_PROXY_URL as string | undefined)?.trim();
+  const controlsDisabled = loadingAnswer || loadingNext || generating;
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 1280px)");
@@ -53,6 +70,32 @@ function InterviewPage() {
     mediaQuery.addEventListener("change", sync);
     return () => mediaQuery.removeEventListener("change", sync);
   }, []);
+
+  useEffect(() => {
+    const recognition = createSpeechRecognitionController({
+      proxyUrl: sttProxyUrl,
+      onStatus: setSpeechStatus,
+      onPartial: setInterimTranscript,
+      onFinal: (text) =>
+        setAnswer((prev) => {
+          const prefix = prev.trim();
+          return prefix ? `${prefix} ${text}` : text;
+        }),
+      onError: (message) => {
+        showToast(message);
+        setIsHoldingTalk(false);
+      },
+    });
+    recognitionRef.current = recognition;
+    setSpeechSupported(recognition.supported);
+    setSttEngine(recognition.engine);
+    if (!recognition.supported) setInputMode("typing");
+
+    return () => {
+      recognition.destroy();
+      recognitionRef.current = null;
+    };
+  }, [sttProxyUrl]);
 
   useEffect(() => {
     if (!state.sessionId) return;
@@ -79,6 +122,14 @@ function InterviewPage() {
     };
   }, [state.sessionId]);
 
+  useEffect(() => {
+    if (inputMode === "typing") {
+      setInterimTranscript("");
+      setIsHoldingTalk(false);
+      recognitionRef.current?.stop();
+    }
+  }, [inputMode]);
+
   if (!state.sessionId || !state.setupData || !state.activeInterviewer || !state.roleProfile) {
     return <Navigate to="/" />;
   }
@@ -90,7 +141,7 @@ function InterviewPage() {
   const showDrawerAgents = showAgents && !canInlineAgents;
 
   async function handleSubmit() {
-    if (!answer.trim() || loadingAnswer || loadingNext) return;
+    if (!answer.trim() || controlsDisabled) return;
     setLoadingAnswer(true);
     try {
       const res = await submitAnswer({
@@ -104,6 +155,7 @@ function InterviewPage() {
           lastClarification: res.follow_up!,
         });
         setAnswer("");
+        setInterimTranscript("");
         setLoadingAnswer(false);
         return;
       }
@@ -145,12 +197,29 @@ function InterviewPage() {
           currentRound: res.round!,
         });
         setAnswer("");
+        setInterimTranscript("");
         setLoadingNext(false);
       }, 1600);
     } catch (e) {
       showToast(e instanceof Error ? e.message : "Failed to submit answer");
       setLoadingAnswer(false);
     }
+  }
+
+  function startHoldToTalk() {
+    if (controlsDisabled) return;
+    if (!speechSupported) {
+      showToast("Voice input is not supported in this browser.");
+      setInputMode("typing");
+      return;
+    }
+    setIsHoldingTalk(true);
+    recognitionRef.current?.start();
+  }
+
+  function stopHoldToTalk() {
+    setIsHoldingTalk(false);
+    recognitionRef.current?.stop();
   }
 
   return (
@@ -256,6 +325,49 @@ function InterviewPage() {
               >
                 Your Answer
               </div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div
+                  className="inline-flex rounded-full border p-1"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  <button
+                    className="rounded-full px-3 py-1.5 text-xs font-semibold"
+                    style={{
+                      background: inputMode === "typing" ? "var(--green-dim)" : "transparent",
+                      color: inputMode === "typing" ? "var(--green)" : "var(--text-2)",
+                    }}
+                    onClick={() => setInputMode("typing")}
+                    disabled={controlsDisabled}
+                  >
+                    Typing
+                  </button>
+                  <button
+                    className="rounded-full px-3 py-1.5 text-xs font-semibold"
+                    style={{
+                      background: inputMode === "hold_to_talk" ? "var(--green-dim)" : "transparent",
+                      color: inputMode === "hold_to_talk" ? "var(--green)" : "var(--text-2)",
+                    }}
+                    onClick={() => {
+                      if (!speechSupported) {
+                        showToast("Voice input is not supported in this browser.");
+                        return;
+                      }
+                      setInputMode("hold_to_talk");
+                    }}
+                    disabled={controlsDisabled || !speechSupported}
+                  >
+                    Hold to talk
+                  </button>
+                </div>
+                <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
+                  STT:{" "}
+                  {speechSupported
+                    ? capitalize(sttEngine ?? "browser")
+                    : isAudioCaptureSupported() || isSpeechRecognitionSupported()
+                      ? "Needs setup"
+                      : "Unavailable"}
+                </span>
+              </div>
               <div className="relative">
                 <textarea
                   className="gp-input"
@@ -266,24 +378,71 @@ function InterviewPage() {
                     paddingBottom: 30,
                   }}
                   placeholder="Answer as if you were in the room: give context, explain your reasoning, and make your tradeoffs concrete."
-                  value={answer}
-                  onChange={(e) => setAnswer(e.target.value)}
-                  disabled={loadingAnswer || loadingNext || generating}
+                  value={
+                    inputMode === "typing"
+                      ? answer
+                      : [answer, interimTranscript].filter(Boolean).join(" ")
+                  }
+                  onChange={(e) => {
+                    if (inputMode !== "typing") return;
+                    setAnswer(e.target.value);
+                  }}
+                  readOnly={inputMode === "hold_to_talk"}
+                  disabled={controlsDisabled}
                 />
                 <div
                   className="mono pointer-events-none absolute bottom-2 right-3 text-xs"
                   style={{ color: "var(--text-3)" }}
                 >
-                  {answer.length} chars
+                  {answer.length + (inputMode === "hold_to_talk" ? interimTranscript.length : 0)} chars
                 </div>
               </div>
+              {inputMode === "hold_to_talk" && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    className="flex h-11 w-11 items-center justify-center rounded-full border"
+                    style={{
+                      borderColor: isHoldingTalk ? "var(--green)" : "var(--border)",
+                      background: isHoldingTalk ? "var(--green-dim)" : "var(--surface2)",
+                      color: isHoldingTalk ? "var(--green)" : "var(--text)",
+                    }}
+                    onPointerDown={startHoldToTalk}
+                    onPointerUp={stopHoldToTalk}
+                    onPointerLeave={stopHoldToTalk}
+                    onPointerCancel={stopHoldToTalk}
+                    disabled={controlsDisabled || !speechSupported}
+                    aria-label={isHoldingTalk ? "Release to stop recording" : "Hold to talk"}
+                    title={isHoldingTalk ? "Release to stop recording" : "Hold to talk"}
+                  >
+                    <Mic size={18} />
+                  </button>
+                  <button
+                    className="rounded-full border px-3 py-2 text-xs font-semibold"
+                    style={{
+                      borderColor: "var(--border)",
+                      background: "var(--surface2)",
+                      color: "var(--text-2)",
+                    }}
+                    onClick={() => {
+                      setAnswer("");
+                      setInterimTranscript("");
+                    }}
+                    disabled={controlsDisabled}
+                  >
+                    Clear transcript
+                  </button>
+                  <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
+                    Mic: {humanizeLabel(speechStatus)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {!generating && (
               <button
                 className="gp-btn w-full"
                 onClick={handleSubmit}
-                disabled={!answer.trim() || loadingAnswer || loadingNext}
+                disabled={!answer.trim() || controlsDisabled}
               >
                 {loadingAnswer ? (
                   <>
