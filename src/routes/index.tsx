@@ -1,8 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
 import { store } from "@/lib/ghost-store";
+import { extractPdfText, PdfExtractionError } from "@/lib/pdf";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import { primeAudio } from "@/lib/tts";
 import { startInterview } from "@/server/interview.functions";
@@ -170,14 +171,11 @@ function SetupPage() {
               </select>
             </Field>
             <Field label="Your Resume">
-              <textarea
-                className="gp-input"
-                rows={7}
-                style={{ resize: "vertical", lineHeight: 1.6 }}
-                placeholder="Paste your resume text here — the panel uses this to personalize questions and evaluate your answers against your actual experience."
-                value={resume}
-                onChange={(e) => setResume(e.target.value)}
+              <ResumeDropzone
                 disabled={loading}
+                onParsed={(text) => {
+                  setResume(text);
+                }}
               />
             </Field>
             <button type="submit" className="gp-btn w-full" disabled={!valid || loading}>
@@ -196,6 +194,184 @@ function SetupPage() {
           Powered by NVIDIA Nemotron
         </footer>
       </div>
+    </div>
+  );
+}
+
+function ResumeDropzone({
+  disabled,
+  onParsed,
+}: {
+  disabled: boolean;
+  onParsed: (text: string) => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
+  const [fileName, setFileName] = useState<string | null>(null);
+  const [pages, setPages] = useState<number | null>(null);
+  const [charCount, setCharCount] = useState<number | null>(null);
+  const [truncated, setTruncated] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function parseFile(file: File) {
+    if (disabled || isParsing) return;
+    setError(null);
+    setIsParsing(true);
+    try {
+      const parsed = await extractPdfText(file);
+      setFileName(file.name);
+      setPages(parsed.pages);
+      setCharCount(parsed.text.length);
+      setTruncated(parsed.truncated);
+      onParsed(parsed.text);
+    } catch (err) {
+      if (err instanceof PdfExtractionError) {
+        setError(err.message);
+      } else {
+        setError("Could not process this file. Please try a different PDF.");
+      }
+      setFileName(null);
+      setPages(null);
+      setCharCount(null);
+      setTruncated(false);
+      onParsed("");
+    } finally {
+      setIsParsing(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label
+        className="rounded-xl border-2 border-dashed p-5 transition-all duration-200"
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        style={{
+          borderColor: isDragging ? "var(--green)" : "var(--border)",
+          background: isDragging ? "rgba(118,185,0,0.07)" : "var(--surface2)",
+          opacity: disabled ? 0.7 : 1,
+          cursor: disabled || isParsing ? "not-allowed" : "pointer",
+          boxShadow: isDragging
+            ? "0 0 0 3px rgba(118,185,0,0.15)"
+            : isPressed
+              ? "0 0 0 2px rgba(118,185,0,0.12)"
+              : "none",
+          transform: isPressed ? "scale(0.995)" : "scale(1)",
+        }}
+        onClick={(event) => {
+          if (disabled || isParsing) return;
+          if (event.target instanceof HTMLInputElement) return;
+          fileInputRef.current?.click();
+        }}
+        onKeyDown={(event) => {
+          if (disabled || isParsing) return;
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
+        onMouseDown={() => {
+          if (!disabled && !isParsing) setIsPressed(true);
+        }}
+        onMouseUp={() => setIsPressed(false)}
+        onMouseLeave={() => setIsPressed(false)}
+        onDragOver={(event) => {
+          if (disabled) return;
+          event.preventDefault();
+          setIsDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (disabled) return;
+          event.preventDefault();
+          setIsDragging(false);
+        }}
+        onDrop={(event) => {
+          if (disabled) return;
+          event.preventDefault();
+          setIsDragging(false);
+          const file = event.dataTransfer.files?.[0];
+          if (file) {
+            void parseFile(file);
+          }
+        }}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf"
+          disabled={disabled || isParsing}
+          className="hidden"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            if (file) {
+              void parseFile(file);
+            }
+            event.currentTarget.value = "";
+          }}
+        />
+        <div className="text-sm">
+          {!fileName && !isParsing && (
+            <>
+              <p className="font-medium">Drop your resume PDF here</p>
+              <p className="mt-1 text-xs" style={{ color: "var(--text-3)" }}>
+                PDF only - max 10MB
+              </p>
+              <div className="mt-3">
+                <span
+                  className="inline-flex rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
+                  style={{
+                    borderColor: "rgba(118,185,0,0.45)",
+                    color: "var(--green)",
+                    background: "rgba(118,185,0,0.08)",
+                  }}
+                >
+                  Click to choose PDF
+                </span>
+              </div>
+            </>
+          )}
+
+          {isParsing && (
+            <p className="flex items-center gap-2 font-medium">
+              <span className="gp-spinner" /> Parsing {fileName ?? "resume.pdf"}...
+            </p>
+          )}
+
+          {!isParsing && fileName && (
+            <div>
+              <p className="font-medium">{fileName}</p>
+              <p className="mt-1 text-xs" style={{ color: "var(--text-3)" }}>
+                {pages} page{pages === 1 ? "" : "s"} parsed - {charCount} chars extracted
+              </p>
+              <div className="mt-3">
+                <span
+                  className="inline-flex rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
+                  style={{
+                    borderColor: "var(--border)",
+                    color: "var(--text-2)",
+                    background: "var(--surface3)",
+                  }}
+                >
+                  Click to replace PDF
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+      </label>
+
+      {truncated && (
+        <p className="text-xs" style={{ color: "#fde68a" }}>
+          Resume text was truncated to 20,000 characters.
+        </p>
+      )}
+      {error && (
+        <p className="text-xs" style={{ color: "#fca5a5" }}>
+          {error}
+        </p>
+      )}
     </div>
   );
 }
