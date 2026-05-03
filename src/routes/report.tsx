@@ -15,7 +15,7 @@ import {
 
 export const Route = createFileRoute("/report")({
   head: () => ({
-    meta: [{ title: "Debrief Report · Mockpilot" }],
+    meta: [{ title: "Debrief Report · Mocki" }],
   }),
   component: ReportPage,
 });
@@ -489,7 +489,7 @@ function CopyReportButton() {
   function copy() {
     if (!state.report) return;
     const report = state.report;
-    const text = `Mockpilot Debrief — ${report.role} @ ${report.company}
+    const text = `Mocki Debrief — ${report.role} @ ${report.company}
 Overall: ${report.overall_score.toFixed(1)}/10 (${report.hire_decision})
 
 PANEL:

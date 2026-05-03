@@ -13,7 +13,7 @@ function normalizeNextPath(rawNext: string | null) {
 
 export const Route = createFileRoute("/auth/callback")({
   head: () => ({
-    meta: [{ title: "Signing you in… · Mockpilot" }],
+    meta: [{ title: "Signing you in… · Mocki" }],
   }),
   component: AuthCallback,
 });
