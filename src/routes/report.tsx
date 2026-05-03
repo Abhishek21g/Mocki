@@ -1,5 +1,6 @@
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { store, useAppState } from "@/lib/ghost-store";
 import {
   capitalize,
@@ -9,6 +10,7 @@ import {
   humanizeLabel,
   initials,
   scoreToColor,
+  stageLabel,
 } from "@/lib/ghost-utils";
 
 export const Route = createFileRoute("/report")({
@@ -27,9 +29,7 @@ function ReportPage() {
   return (
     <div className="grid-bg min-h-screen pb-24">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 pt-8">
-        <div className="font-bold" style={{ color: "var(--green)" }}>
-          🧭 Mockpilot
-        </div>
+        <HomeLogo className="text-base" />
         <div className="mono text-xs" style={{ color: "var(--text-3)" }}>
           PANEL DEBRIEF
         </div>
@@ -92,7 +92,12 @@ function ReportPage() {
           <h2 className="mb-4 text-lg font-semibold">Session Breakdown</h2>
           <div className="flex flex-col gap-2">
             {report.rounds.map((round, index) => (
-              <RoundAccordion key={index} index={index} round={round} />
+              <RoundAccordion
+                key={index}
+                index={index}
+                round={round}
+                roleProfile={report.roleProfile}
+              />
             ))}
           </div>
         </section>
@@ -275,9 +280,11 @@ function DrillCard({ index, text }: { index: number; text: string }) {
 function RoundAccordion({
   index,
   round,
+  roleProfile,
 }: {
   index: number;
   round: import("@/server/sessions.server").Round;
+  roleProfile: import("@/server/sessions.server").RoleProfile;
 }) {
   const [open, setOpen] = useState(false);
   const evaluation = round.evaluation;
@@ -299,7 +306,7 @@ function RoundAccordion({
             className="rounded-full px-2 py-0.5 text-[11px]"
             style={{ background: "var(--surface3)", color: "var(--text-2)" }}
           >
-            {humanizeLabel(round.stage)}
+            {stageLabel(round.stage)}
           </span>
           <span
             className="rounded-full px-2 py-0.5 text-[11px]"

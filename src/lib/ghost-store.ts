@@ -4,6 +4,7 @@ import type {
   Evaluation,
   InterviewStage,
   Persona,
+  RoleProfile,
   Round,
   TurnType,
 } from "@/server/sessions.server";
@@ -14,6 +15,7 @@ export type SetupData = {
   jobDescription: string;
   interview_type: string;
   resume: string;
+  roleProfile: RoleProfile;
 };
 
 export type ReportState = Report & {
@@ -24,6 +26,7 @@ export type ReportState = Report & {
   interviewers: Persona[];
   panelType: string;
   totalRounds: number;
+  roleProfile: RoleProfile;
 };
 
 export type AppState = {
@@ -32,6 +35,7 @@ export type AppState = {
   interviewers: Persona[];
   activeInterviewer: Persona | null;
   panelType: string | null;
+  roleProfile: RoleProfile | null;
   currentQuestion: string;
   currentFocus: string;
   currentDifficulty: string;
@@ -52,6 +56,7 @@ const initial: AppState = {
   interviewers: [],
   activeInterviewer: null,
   panelType: null,
+  roleProfile: null,
   currentQuestion: "",
   currentFocus: "",
   currentDifficulty: "",
