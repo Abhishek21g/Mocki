@@ -25,17 +25,10 @@ import { cn } from "@/lib/utils";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview.functions";
 import type { InterviewStage, Persona, RoleProfile, TurnType } from "@/server/sessions.server";
+import { AgentDashboard } from "@/components/agent-dashboard";
+import type { AgentEvent } from "@/components/agent-dashboard/types";
 
 const TTS_ENABLED_STORAGE_KEY = "mockpilot:ttsEnabled";
-
-type AgentEvent = {
-  id: string;
-  ts: number;
-  agent: string;
-  phase: string;
-  message: string;
-  meta?: Record<string, unknown>;
-};
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
@@ -620,7 +613,15 @@ function InterviewPage() {
             )}
           </section>
 
-          {showInlineAgents && <AgentPanel events={events} mode="inline" open={showAgents} />}
+          {showInlineAgents && (
+            <AgentPanel
+              events={events}
+              mode="inline"
+              open={showAgents}
+              totalTurns={state.totalRounds}
+              sessionId={state.sessionId}
+            />
+          )}
         </div>
       </main>
 
@@ -633,7 +634,13 @@ function InterviewPage() {
       )}
 
       {showDrawerAgents && (
-        <AgentPanel events={events} mode={isMobile ? "drawer" : "drawer"} open />
+        <AgentPanel
+          events={events}
+          mode={isMobile ? "drawer" : "drawer"}
+          open
+          totalTurns={state.totalRounds}
+          sessionId={state.sessionId}
+        />
       )}
     </div>
   );
@@ -1121,39 +1128,26 @@ function FloatingAgentToggle({
   );
 }
 
-function agentColor(agent: string): string {
-  const map: Record<string, string> = {
-    System: "#94a3b8",
-    PanelGen: "#a78bfa",
-    CandidateContext: "#f59e0b",
-    Coordinator: "#38bdf8",
-    Interviewer: "#76b900",
-    Clarifier: "#eab308",
-    Evaluator: "#f97316",
-    Reporter: "#ec4899",
-    Speaker: "#22d3ee",
-  };
-  return map[agent] ?? "#888";
-}
-
 function AgentPanel({
   events,
   mode,
   open,
+  totalTurns,
+  sessionId,
 }: {
   events: AgentEvent[];
   mode: "inline" | "drawer";
   open: boolean;
+  totalTurns: number;
+  sessionId: string | null;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [events, open]);
-
   if (!open) return null;
+
+  // Encoded popout link. Threading totalTurns through the search params
+  // means a fresh tab still shows "Turn n / 6" instead of "Turn n / 1".
+  const popoutHref = sessionId
+    ? `/agents/${encodeURIComponent(sessionId)}?totalTurns=${totalTurns}`
+    : null;
 
   return (
     <aside
@@ -1173,46 +1167,45 @@ function AgentPanel({
         className="flex items-center justify-between border-b px-4 py-3"
         style={{ borderColor: "var(--border)" }}
       >
-        <div className="text-sm font-bold">🧠 Agent Activity</div>
-        <div className="mono text-[10px]" style={{ color: "var(--text-3)" }}>
-          LIVE
+        <div className="flex items-center gap-2 text-sm font-bold">
+          <span>Agent Trace</span>
+          <span
+            className="mono rounded-sm px-1.5 py-[1px] text-[9px] uppercase tracking-wider"
+            style={{ background: "rgba(118,185,0,0.15)", color: "var(--green)" }}
+          >
+            multi-agent
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {popoutHref && (
+            <a
+              href={popoutHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mono rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider transition-colors hover:bg-[rgba(255,255,255,0.04)]"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text-2)",
+                background: "rgba(0,0,0,0.4)",
+              }}
+              title="Open in dedicated mission control tab"
+            >
+              pop out ↗
+            </a>
+          )}
+          <div className="mono flex items-center gap-1.5 text-[10px]" style={{ color: "var(--text-3)" }}>
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{
+                background: "var(--green)",
+                animation: "bounce-dot 1.2s infinite",
+              }}
+            />
+            LIVE
+          </div>
         </div>
       </div>
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-2">
-        {events.length === 0 && (
-          <div className="mono p-3 text-xs" style={{ color: "var(--text-3)" }}>
-            Waiting for agents...
-          </div>
-        )}
-        {events.map((event) => (
-          <div
-            key={event.id}
-            className="mb-2 rounded-lg p-2.5"
-            style={{
-              background: "var(--surface2)",
-              borderLeft: `3px solid ${agentColor(event.agent)}`,
-            }}
-          >
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="mono font-bold" style={{ color: agentColor(event.agent) }}>
-                {event.agent}
-              </span>
-              <span className="mono" style={{ color: "var(--text-3)" }}>
-                {event.phase} · {new Date(event.ts).toLocaleTimeString().slice(0, 8)}
-              </span>
-            </div>
-            <div className="mt-1 text-[12px]">{event.message}</div>
-            {event.meta && Object.keys(event.meta).length > 0 && (
-              <pre
-                className="mono mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded-lg p-2 text-[10px]"
-                style={{ background: "rgba(255,255,255,0.02)", color: "var(--text-3)" }}
-              >
-                {JSON.stringify(event.meta, null, 2)}
-              </pre>
-            )}
-          </div>
-        ))}
-      </div>
+      <AgentDashboard events={events} totalTurns={totalTurns} variant={mode} />
     </aside>
   );
 }
