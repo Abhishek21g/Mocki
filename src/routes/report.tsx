@@ -391,7 +391,7 @@ function RoundAccordion({
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <MiniBar label="Clarity" value={evaluation.clarity} />
-            <MiniBar label="Tech Depth" value={evaluation.technical_depth} />
+            <MiniBar label={evaluation.middle_label ?? "Tech Depth"} value={evaluation.technical_depth} />
             <MiniBar label="Structure" value={evaluation.structure} />
             <MiniBar label="Overall" value={evaluation.overall} />
           </div>
