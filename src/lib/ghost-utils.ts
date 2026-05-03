@@ -36,6 +36,12 @@ export function difficultyColor(d: string) {
 export function capitalize(str: string) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
 }
+export function humanizeLabel(value: string) {
+  return value
+    .split("_")
+    .map((part) => capitalize(part))
+    .join(" ");
+}
 export function initials(name: string) {
   return name
     .split(" ")
