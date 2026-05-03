@@ -701,7 +701,11 @@ export async function generateCandidateContext(
   company: string,
   resume: string,
   jobDescription: string,
+  learnerMemoryPrompt?: string | null,
 ): Promise<CandidateContext> {
+  const memoryBlock = learnerMemoryPrompt
+    ? `\n\nReturning Candidate Memory (from prior mock interviews on this account):\n${learnerMemoryPrompt}`
+    : "";
   const raw = await callNemotron(
     CANDIDATE_CONTEXT_SYSTEM,
     `Role: ${role}
@@ -711,9 +715,9 @@ Resume:
 ${resume.slice(0, 3000)}
 
 Job Description:
-${jobDescription.slice(0, 3000)}
+${jobDescription.slice(0, 3000)}${memoryBlock}
 
-Generate compact interview context. Output JSON only.`,
+Generate compact interview context. If returning candidate memory is provided, lean experienceGaps and targetSkills toward areas the candidate has previously struggled with so this interview pushes on those gaps. Output JSON only.`,
     0.3,
     350,
     "CandidateContext",
@@ -772,6 +776,10 @@ Turn ${index + 1}:
     ? "project_deep_dive, technical_design, debugging, tradeoffs"
     : "role_execution, customer_scenario, process, judgment";
 
+  const memorySection = session.learnerMemoryPrompt
+    ? `\n${session.learnerMemoryPrompt}\nWhen helpful, push on the recurring weak areas above so this interview challenges them.\n`
+    : "";
+
   const userMessage = `
 Job Role: ${session.role}
 Company: ${session.company}
@@ -792,7 +800,7 @@ Candidate Context:
 - Target Skills: ${session.candidateContext.targetSkills.join(" | ")}
 - Experience Gaps: ${session.candidateContext.experienceGaps.join(" | ")}
 - Likely Motivators: ${session.candidateContext.likelyMotivators.join(" | ")}
-
+${memorySection}
 Panel Roster:
 ${interviewerRoster}
 
@@ -870,6 +878,10 @@ Recent Turn ${index + 1}:
     )
     .join("\n");
 
+  const memorySection = session.learnerMemoryPrompt
+    ? `\nReturning Candidate Memory:\n${session.learnerMemoryPrompt}\n`
+    : "";
+
   const userMessage = `
 You are ${persona.name}, ${persona.title} at ${persona.company}.
 Your style: ${persona.personality}
@@ -897,7 +909,7 @@ Candidate Context:
 - Target Skills: ${session.candidateContext.targetSkills.join(" | ")}
 - Experience Gaps: ${session.candidateContext.experienceGaps.join(" | ")}
 - Likely Motivators: ${session.candidateContext.likelyMotivators.join(" | ")}
-
+${memorySection}
 Resume:
 ${session.resume.slice(0, 1800)}
 
@@ -980,6 +992,10 @@ Turn ${index + 1}:
     )
     .join("\n");
 
+  const memorySection = session.learnerMemoryPrompt
+    ? `\nReturning Candidate Memory (use this to make the study_plan and drill_questions feel personalized across sessions):\n${session.learnerMemoryPrompt}\n`
+    : "";
+
   const userMessage = `
 Job Role: ${session.role} at ${session.company}
 Interview Type: ${session.interview_type}
@@ -990,7 +1006,7 @@ Role Profile:
 Resume Highlights: ${session.candidateContext.resumeHighlights.join(" | ")}
 Target Skills: ${session.candidateContext.targetSkills.join(" | ")}
 Experience Gaps: ${session.candidateContext.experienceGaps.join(" | ")}
-
+${memorySection}
 Interview Transcript Summary:
 ${roundsSummary}
 

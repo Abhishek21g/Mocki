@@ -14,6 +14,7 @@ import {
   stageLabel,
 } from "@/lib/ghost-utils";
 import { cn } from "@/lib/utils";
+import { useSupabaseAuth } from "@/lib/supabase-context";
 import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview.functions";
 import type { InterviewStage, Persona, RoleProfile, TurnType } from "@/server/sessions.server";
 
@@ -37,6 +38,7 @@ function InterviewPage() {
   const state = useAppState();
   const nav = useNavigate();
   const isMobile = useIsMobile();
+  const { getAccessToken } = useSupabaseAuth();
   const [answer, setAnswer] = useState("");
   const [loadingAnswer, setLoadingAnswer] = useState(false);
   const [loadingNext, setLoadingNext] = useState(false);
@@ -119,8 +121,12 @@ function InterviewPage() {
         setLoadingAnswer(false);
         setGenerating(true);
         try {
+          const accessToken = getAccessToken();
           const report = await generateReport({
-            data: { sessionId: state.sessionId! },
+            data: {
+              sessionId: state.sessionId!,
+              ...(accessToken ? { accessToken } : {}),
+            },
           });
           store.set({ report });
           nav({ to: "/report" });

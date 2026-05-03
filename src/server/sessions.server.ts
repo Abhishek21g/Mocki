@@ -117,6 +117,18 @@ export type Session = {
   lastPlan: Plan | null;
   lastClarified: boolean;
   createdAt: number;
+  /**
+   * Optional Supabase user id (set when the interview was started while signed
+   * in). Used to scope persistence and learner-memory updates.
+   */
+  userId: string | null;
+  /**
+   * Optional pre-rendered prompt block describing what we know about this
+   * candidate from their prior mock interviews. Injected into coordinator,
+   * candidate-context, interviewer, and report prompts to make the panel feel
+   * like it remembers previous sessions.
+   */
+  learnerMemoryPrompt: string | null;
 };
 
 const g = globalThis as unknown as { __mockpilot_sessions?: Map<string, Session> };
@@ -127,8 +139,16 @@ export function createSession(
   id: string,
   data: Omit<
     Session,
-    "rounds" | "currentRound" | "lastQuestion" | "lastPlan" | "lastClarified" | "createdAt"
-  >,
+    | "rounds"
+    | "currentRound"
+    | "lastQuestion"
+    | "lastPlan"
+    | "lastClarified"
+    | "createdAt"
+    | "userId"
+    | "learnerMemoryPrompt"
+  > &
+    Partial<Pick<Session, "userId" | "learnerMemoryPrompt">>,
 ) {
   sessions.set(id, {
     ...data,
@@ -138,6 +158,8 @@ export function createSession(
     lastPlan: null,
     lastClarified: false,
     createdAt: Date.now(),
+    userId: data.userId ?? null,
+    learnerMemoryPrompt: data.learnerMemoryPrompt ?? null,
   });
 }
 
