@@ -1,6 +1,12 @@
 import { useSyncExternalStore } from "react";
 import type { Report } from "@/server/agents.server";
-import type { Evaluation, Persona, Round } from "@/server/sessions.server";
+import type {
+  Evaluation,
+  InterviewStage,
+  Persona,
+  Round,
+  TurnType,
+} from "@/server/sessions.server";
 
 export type SetupData = {
   role: string;
@@ -17,6 +23,7 @@ export type ReportState = Report & {
   jobDescription: string;
   interviewers: Persona[];
   panelType: string;
+  totalRounds: number;
 };
 
 export type AppState = {
@@ -26,9 +33,11 @@ export type AppState = {
   activeInterviewer: Persona | null;
   panelType: string | null;
   currentQuestion: string;
-  currentTopic: string;
+  currentFocus: string;
   currentDifficulty: string;
   currentCoordinatorReason: string;
+  currentStage: InterviewStage;
+  currentTurnType: TurnType;
   currentRound: number;
   totalRounds: number;
   rounds: Round[];
@@ -44,11 +53,13 @@ const initial: AppState = {
   activeInterviewer: null,
   panelType: null,
   currentQuestion: "",
-  currentTopic: "",
+  currentFocus: "",
   currentDifficulty: "",
   currentCoordinatorReason: "",
+  currentStage: "intro",
+  currentTurnType: "new_question",
   currentRound: 1,
-  totalRounds: 5,
+  totalRounds: 6,
   rounds: [],
   lastEvaluation: null,
   lastClarification: null,

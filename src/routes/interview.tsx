@@ -3,10 +3,16 @@ import { useEffect, useRef, useState } from "react";
 import { showToast } from "@/components/ghost/Toaster";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { store, useAppState } from "@/lib/ghost-store";
+import {
+  capitalize,
+  difficultyColor,
+  humanizeLabel,
+  initials,
+  scoreToColor,
+} from "@/lib/ghost-utils";
 import { cn } from "@/lib/utils";
-import { capitalize, difficultyColor, initials, scoreToColor } from "@/lib/ghost-utils";
 import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview.functions";
-import type { Persona } from "@/server/sessions.server";
+import type { InterviewStage, Persona, TurnType } from "@/server/sessions.server";
 
 type AgentEvent = {
   id: string;
@@ -90,6 +96,7 @@ function InterviewPage() {
       if (res.clarification) {
         store.set({
           currentQuestion: res.follow_up!,
+          currentTurnType: "clarification",
           lastClarification: res.follow_up!,
         });
         setAnswer("");
@@ -126,9 +133,11 @@ function InterviewPage() {
         store.set({
           activeInterviewer: res.nextInterviewer!,
           currentQuestion: res.next_question!,
-          currentTopic: res.topic!,
+          currentFocus: res.focus!,
           currentDifficulty: res.difficulty!,
           currentCoordinatorReason: res.coordinatorReason!,
+          currentStage: res.stage!,
+          currentTurnType: res.turnType!,
           currentRound: res.round!,
         });
         setAnswer("");
@@ -152,11 +161,11 @@ function InterviewPage() {
       <main className="mx-auto max-w-[1600px] px-5 pb-16 pt-24 md:px-8">
         <SessionStrip
           activeInterviewer={activeInterviewer}
-          topic={state.currentTopic}
-          difficulty={state.currentDifficulty}
+          stage={state.currentStage}
+          turnType={state.currentTurnType}
+          focus={state.currentFocus}
           round={state.currentRound}
           totalRounds={state.totalRounds}
-          panelType={state.panelType ?? "standard"}
           showAgents={showAgents}
           canInlineAgents={canInlineAgents}
           onToggleAgents={() => setShowAgents((value) => !value)}
@@ -186,14 +195,12 @@ function InterviewPage() {
               </div>
             </div>
 
-            <div className="gp-card p-5">
-              <div className="mono text-[11px] uppercase tracking-wider text-[color:var(--text-3)]">
-                Coordinator
-              </div>
-              <p className="mt-3 text-sm leading-7" style={{ color: "var(--text-2)" }}>
-                {state.currentCoordinatorReason}
-              </p>
-            </div>
+            <FlowCard
+              stage={state.currentStage}
+              turnType={state.currentTurnType}
+              focus={state.currentFocus}
+              reason={state.currentCoordinatorReason}
+            />
           </section>
 
           <section className="flex flex-col gap-5">
@@ -206,11 +213,9 @@ function InterviewPage() {
             <div className="flex flex-col gap-3">
               <div
                 className="mono flex items-center gap-2 text-[11px] uppercase tracking-wider"
-                style={{
-                  color: state.lastClarification ? "var(--yellow)" : "var(--text-3)",
-                }}
+                style={{ color: state.lastClarification ? "var(--yellow)" : "var(--text-3)" }}
               >
-                {state.lastClarification ? "↳ Follow-up" : "Question"}
+                {state.lastClarification ? "↳ Clarification" : "Current Turn"}
               </div>
               {loadingNext ? (
                 <TypingIndicator />
@@ -229,25 +234,14 @@ function InterviewPage() {
                 </div>
               )}
               <div className="flex flex-wrap gap-3">
-                <span
-                  className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[13px]"
-                  style={{
-                    background: "var(--surface3)",
-                    borderColor: "var(--border)",
-                  }}
-                >
-                  📊 {state.currentTopic}
-                </span>
-                <span
-                  className="inline-flex items-center rounded-full px-3 py-1.5 text-[13px] font-medium"
-                  style={{
-                    color: difficultyColor(state.currentDifficulty),
-                    background: `${difficultyColor(state.currentDifficulty)}22`,
-                    border: `1px solid ${difficultyColor(state.currentDifficulty)}55`,
-                  }}
-                >
-                  {capitalize(state.currentDifficulty)}
-                </span>
+                <FlowBadge label="Stage" value={state.currentStage} accent="var(--green)" />
+                <FlowBadge label="Turn" value={state.currentTurnType} accent="var(--text-2)" />
+                <FlowBadge label="Focus" value={state.currentFocus} accent="var(--text)" />
+                <FlowBadge
+                  label="Difficulty"
+                  value={state.currentDifficulty}
+                  accent={difficultyColor(state.currentDifficulty)}
+                />
               </div>
             </div>
 
@@ -267,7 +261,7 @@ function InterviewPage() {
                     lineHeight: 1.7,
                     paddingBottom: 30,
                   }}
-                  placeholder="Type your answer here. Speak your mind clearly, walk through your reasoning, and make your tradeoffs explicit."
+                  placeholder="Answer as if you were in the room: give context, explain your reasoning, and make your tradeoffs concrete."
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
                   disabled={loadingAnswer || loadingNext || generating}
@@ -293,10 +287,10 @@ function InterviewPage() {
                   </>
                 ) : loadingNext ? (
                   <>
-                    <span className="gp-spinner" /> Handing off to next panelist...
+                    <span className="gp-spinner" /> Planning the next turn...
                   </>
                 ) : (
-                  <>Submit Answer →</>
+                  <>Send Answer →</>
                 )}
               </button>
             )}
@@ -315,7 +309,11 @@ function InterviewPage() {
             )}
 
             {state.lastEvaluation && state.rounds.length > 0 && (
-              <EvaluationCard ev={state.lastEvaluation} round={state.rounds.length} />
+              <EvaluationCard
+                ev={state.lastEvaluation}
+                round={state.rounds.length}
+                stage={state.rounds[state.rounds.length - 1].stage}
+              />
             )}
           </section>
 
@@ -384,7 +382,7 @@ function TopBar({
           })}
         </div>
         <div className="mono text-xs" style={{ color: "var(--text-2)" }}>
-          Round {round} of {total}
+          Turn {round} of {total}
         </div>
       </div>
     </header>
@@ -393,21 +391,21 @@ function TopBar({
 
 function SessionStrip({
   activeInterviewer,
-  topic,
-  difficulty,
+  stage,
+  turnType,
+  focus,
   round,
   totalRounds,
-  panelType,
   showAgents,
   canInlineAgents,
   onToggleAgents,
 }: {
   activeInterviewer: Persona;
-  topic: string;
-  difficulty: string;
+  stage: InterviewStage;
+  turnType: TurnType;
+  focus: string;
   round: number;
   totalRounds: number;
-  panelType: string;
   showAgents: boolean;
   canInlineAgents: boolean;
   onToggleAgents: () => void;
@@ -415,11 +413,11 @@ function SessionStrip({
   return (
     <section className="gp-card flex flex-col gap-4 p-5 xl:flex-row xl:items-center xl:justify-between">
       <div className="flex flex-wrap gap-3">
-        <StripPill label="Panel" value={panelType} accent="var(--green)" />
-        <StripPill label="Active" value={activeInterviewer.name} accent="var(--green)" />
-        <StripPill label="Competency" value={topic} accent="var(--text-2)" />
-        <StripPill label="Difficulty" value={difficulty} accent={difficultyColor(difficulty)} />
-        <StripPill label="Progress" value={`${round}/${totalRounds}`} accent="var(--text-2)" />
+        <FlowBadge label="Flow" value={stage} accent="var(--green)" />
+        <FlowBadge label="Move" value={turnType} accent="var(--text-2)" />
+        <FlowBadge label="Active" value={activeInterviewer.name} accent="var(--text)" />
+        <FlowBadge label="Focus" value={focus} accent="var(--text)" />
+        <FlowBadge label="Progress" value={`${round}/${totalRounds}`} accent="var(--text-2)" />
       </div>
 
       {canInlineAgents && (
@@ -439,7 +437,7 @@ function SessionStrip({
   );
 }
 
-function StripPill({ label, value, accent }: { label: string; value: string; accent: string }) {
+function FlowBadge({ label, value, accent }: { label: string; value: string; accent: string }) {
   return (
     <div
       className="rounded-full border px-3 py-2"
@@ -449,7 +447,7 @@ function StripPill({ label, value, accent }: { label: string; value: string; acc
         {label}
       </div>
       <div className="text-sm font-medium" style={{ color: accent }}>
-        {capitalize(value)}
+        {humanizeLabel(value)}
       </div>
     </div>
   );
@@ -509,6 +507,44 @@ function PanelCard({ interviewer, active }: { interviewer: Persona; active: bool
   );
 }
 
+function FlowCard({
+  stage,
+  turnType,
+  focus,
+  reason,
+}: {
+  stage: InterviewStage;
+  turnType: TurnType;
+  focus: string;
+  reason: string;
+}) {
+  return (
+    <div className="gp-card p-5">
+      <div className="mono text-[11px] uppercase tracking-wider text-[color:var(--text-3)]">
+        Interview Flow
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <span
+          className="rounded-full px-3 py-1 text-xs font-medium"
+          style={{ background: "var(--green-dim)", color: "var(--green)" }}
+        >
+          {humanizeLabel(stage)}
+        </span>
+        <span
+          className="rounded-full px-3 py-1 text-xs font-medium"
+          style={{ background: "var(--surface3)", color: "var(--text-2)" }}
+        >
+          {humanizeLabel(turnType)}
+        </span>
+      </div>
+      <div className="mt-3 text-sm font-medium">{focus}</div>
+      <p className="mt-2 text-sm leading-7" style={{ color: "var(--text-2)" }}>
+        {reason}
+      </p>
+    </div>
+  );
+}
+
 function SpeakerSpotlight({
   interviewer,
   loadingNext,
@@ -557,10 +593,10 @@ function SpeakerSpotlight({
           }}
         />
         {loadingNext
-          ? "Handing off to the next panelist"
+          ? "Planning the next conversational move"
           : lastClarification
-            ? "Clarifier requested a follow-up"
-            : "Waiting for your answer"}
+            ? "Continuing the same answer with clarification"
+            : "Listening for your answer"}
       </div>
     </div>
   );
@@ -585,7 +621,7 @@ function TypingIndicator() {
         ))}
       </div>
       <div className="mono mt-2 text-xs" style={{ color: "var(--text-3)" }}>
-        Coordinator is routing the next question...
+        The panel is deciding how to continue the conversation...
       </div>
     </div>
   );
@@ -594,6 +630,7 @@ function TypingIndicator() {
 function EvaluationCard({
   ev,
   round,
+  stage,
 }: {
   ev: {
     clarity: number;
@@ -603,8 +640,11 @@ function EvaluationCard({
     strengths: string[];
     weaknesses: string[];
     missed_concepts: string[];
+    answer_summary: string;
+    unresolved_follow_ups: string[];
   };
   round: number;
+  stage: InterviewStage;
 }) {
   const items = [
     ...(ev.strengths ?? []).map((text) => ({ kind: "s" as const, text })),
@@ -630,7 +670,7 @@ function EvaluationCard({
     <div className="gp-card fade-up p-6">
       <div className="mb-4 flex items-end justify-between">
         <div className="text-sm font-semibold" style={{ color: "var(--text-2)" }}>
-          Round {round} · Live evaluation
+          Turn {round} · {humanizeLabel(stage)}
         </div>
         <div className="mono text-3xl font-bold" style={{ color: scoreToColor(ev.overall) }}>
           {overallShown.toFixed(1)}
@@ -639,6 +679,9 @@ function EvaluationCard({
           </span>
         </div>
       </div>
+      <p className="mb-4 text-sm leading-7" style={{ color: "var(--text-2)" }}>
+        {ev.answer_summary}
+      </p>
       <div className="flex flex-col gap-3">
         <ScoreBar label="Clarity" score={ev.clarity} delay={0} />
         <ScoreBar label="Technical Depth" score={ev.technical_depth} delay={120} />
@@ -687,12 +730,12 @@ function EvaluationCard({
           </ul>
         </div>
       </div>
-      {ev.missed_concepts?.length > 0 && revealed >= items.length && (
+      {ev.unresolved_follow_ups?.length > 0 && revealed >= items.length && (
         <div className="mt-4 flex flex-wrap items-center gap-2 fade-up">
           <span className="mono text-[11px]" style={{ color: "var(--yellow)" }}>
-            MISSED:
+            NEXT PROBES:
           </span>
-          {ev.missed_concepts.map((concept, index) => (
+          {ev.unresolved_follow_ups.map((probe, index) => (
             <span
               key={index}
               className="rounded-full px-2.5 py-1 text-xs"
@@ -702,7 +745,7 @@ function EvaluationCard({
                 border: "1px solid rgba(234,179,8,0.3)",
               }}
             >
-              {concept}
+              {probe}
             </span>
           ))}
         </div>
@@ -765,6 +808,7 @@ function agentColor(agent: string): string {
   const map: Record<string, string> = {
     System: "#94a3b8",
     PanelGen: "#a78bfa",
+    CandidateContext: "#f59e0b",
     Coordinator: "#38bdf8",
     Interviewer: "#76b900",
     Clarifier: "#eab308",

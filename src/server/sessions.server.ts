@@ -1,6 +1,14 @@
 export type InterviewerId = "senior_engineer" | "hiring_manager" | "recruiter";
 export type InterviewType = "technical" | "behavioral" | "mixed";
 export type Difficulty = "easy" | "medium" | "hard";
+export type InterviewStage =
+  | "intro"
+  | "resume_walkthrough"
+  | "core_technical"
+  | "core_behavioral"
+  | "candidate_questions"
+  | "wrap_up";
+export type TurnType = "new_question" | "follow_up" | "challenge" | "clarification" | "transition";
 
 export type Persona = {
   id: InterviewerId;
@@ -12,6 +20,13 @@ export type Persona = {
   focus: string;
 };
 
+export type CandidateContext = {
+  resumeHighlights: string[];
+  targetSkills: string[];
+  experienceGaps: string[];
+  likelyMotivators: string[];
+};
+
 export type Evaluation = {
   clarity: number;
   technical_depth: number;
@@ -21,16 +36,29 @@ export type Evaluation = {
   weaknesses: string[];
   correct: boolean;
   missed_concepts: string[];
+  answer_summary: string;
+  unresolved_follow_ups: string[];
+  follow_up_topics: string[];
+  resume_alignment: string;
+  job_requirement_alignment: string;
 };
 
 export type Plan = {
   next_interviewer_id: InterviewerId;
+  stage: InterviewStage;
+  turn_type: TurnType;
   question_type: string;
+  focus: string;
+  goal: string;
   difficulty: Difficulty;
   reason: string;
+  based_on_resume: string | null;
+  based_on_job_requirement: string | null;
+  follow_up_to_round_id: string | null;
 };
 
 export type Round = {
+  id: string;
   question: string;
   answer: string;
   evaluation: Evaluation;
@@ -39,6 +67,12 @@ export type Round = {
   interviewerId: InterviewerId;
   interviewerName: string;
   coordinatorReason: string;
+  stage: InterviewStage;
+  turnType: TurnType;
+  goal: string;
+  basedOnResume: string | null;
+  basedOnJobRequirement: string | null;
+  followUpToRoundId: string | null;
 };
 
 export type Session = {
@@ -49,9 +83,12 @@ export type Session = {
   resume: string;
   interviewers: Persona[];
   activeInterviewerId: InterviewerId;
-  panelType: "standard";
+  panelType: "structured";
+  candidateContext: CandidateContext;
   rounds: Round[];
   currentRound: number;
+  totalRounds: number;
+  currentStage: InterviewStage;
   lastQuestion: string | null;
   lastPlan: Plan | null;
   lastClarified: boolean;
@@ -85,9 +122,9 @@ export function getSession(id: string): Session | undefined {
 }
 
 export function updateSession(id: string, updates: Partial<Session>): Session {
-  const s = sessions.get(id);
-  if (!s) throw new Error("Session not found: " + id);
-  const next = { ...s, ...updates };
+  const session = sessions.get(id);
+  if (!session) throw new Error(`Session not found: ${id}`);
+  const next = { ...session, ...updates };
   sessions.set(id, next);
   return next;
 }
