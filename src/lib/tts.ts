@@ -221,21 +221,28 @@ export function createTtsController(options: TtsControllerOptions): TtsControlle
         await audio.play();
         setStatus("playing");
       } catch (err) {
-        // Most commonly: autoplay blocked because the original gesture chain
-        // was severed. Surface as error so the UI can show a play button.
         busy = false;
+        releaseUrl();
         setStatus("error");
-        options.onError?.(
+        const msg =
           err instanceof Error && err.name === "NotAllowedError"
-            ? "Browser blocked auto-play. Tap the speaker to play."
-            : "Could not start audio playback",
-        );
+            ? "Browser blocked auto-play. Tap the speaker area to replay."
+            : "Could not start audio playback";
+        options.onError?.(msg);
+        // Reject so callers (e.g. interview auto-speak dedupe) can retry after a user gesture.
+        throw new Error(msg);
       }
     } catch (err) {
       if (controller.signal.aborted) return;
       busy = false;
       setStatus("error");
-      options.onError?.(err instanceof Error ? err.message : "TTS request failed");
+      if (
+        !(err instanceof Error) ||
+        (err.message !== "Browser blocked auto-play. Tap the speaker area to replay." &&
+          err.message !== "Could not start audio playback")
+      ) {
+        options.onError?.(err instanceof Error ? err.message : "TTS request failed");
+      }
     } finally {
       if (abortController === controller) abortController = null;
     }
