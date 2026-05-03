@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+  generateCandidateContext,
   generateInterviewers,
   runClarifier,
   runCoordinator,
@@ -10,6 +11,8 @@ import {
 } from "./agents.server";
 import { getLogs, pushLog, withSessionLog } from "./agent-log.server";
 import { createSession, getInterviewerById, getSession, updateSession } from "./sessions.server";
+
+const TOTAL_TURNS = 6;
 
 const StartSchema = z.object({
   role: z.string().min(1).max(200),
@@ -30,11 +33,29 @@ export const startInterview = createServerFn({ method: "POST" })
         message: `New session for ${data.role} @ ${data.company} (${data.interview_type})`,
       });
 
+      const candidateContext = await generateCandidateContext(
+        data.role,
+        data.company,
+        data.resume,
+        data.jobDescription,
+      );
+      pushLog(sessionId, {
+        agent: "CandidateContext",
+        phase: "info",
+        message: "Derived candidate context from resume and job description",
+        meta: {
+          resumeHighlights: candidateContext.resumeHighlights,
+          targetSkills: candidateContext.targetSkills,
+          experienceGaps: candidateContext.experienceGaps,
+        },
+      });
+
       const interviewers = await generateInterviewers(
         data.role,
         data.company,
         data.interview_type,
         data.jobDescription,
+        data.resume,
       );
       interviewers.forEach((persona) => {
         pushLog(sessionId, {
@@ -53,7 +74,10 @@ export const startInterview = createServerFn({ method: "POST" })
         ...data,
         interviewers,
         activeInterviewerId: interviewers[0].id,
-        panelType: "standard",
+        panelType: "structured",
+        candidateContext,
+        totalRounds: TOTAL_TURNS,
+        currentStage: "intro",
       });
 
       const session = getSession(sessionId)!;
@@ -63,37 +87,34 @@ export const startInterview = createServerFn({ method: "POST" })
       pushLog(sessionId, {
         agent: "Coordinator",
         phase: "info",
-        message: `Opening with ${activeInterviewer.name} on ${plan.question_type}`,
+        message: `Opening with ${activeInterviewer.name} in ${plan.stage}`,
         meta: {
           interviewerId: activeInterviewer.id,
           interviewerName: activeInterviewer.name,
-          difficulty: plan.difficulty,
+          stage: plan.stage,
+          turnType: plan.turn_type,
+          focus: plan.focus,
+          goal: plan.goal,
           reason: plan.reason,
         },
       });
 
-      const question = await runInterviewer(
-        activeInterviewer,
-        plan.question_type,
-        plan.difficulty,
-        data.role,
-        data.company,
-        data.jobDescription,
-      );
-
+      const question = await runInterviewer(activeInterviewer, plan, session);
       pushLog(sessionId, {
         agent: "Interviewer",
         phase: "info",
-        message: `${activeInterviewer.name} is asking the opening question`,
+        message: `${activeInterviewer.name} opened the interview`,
         meta: {
           interviewerId: activeInterviewer.id,
-          questionType: plan.question_type,
-          difficulty: plan.difficulty,
+          stage: plan.stage,
+          turnType: plan.turn_type,
+          focus: plan.focus,
         },
       });
 
       updateSession(sessionId, {
         activeInterviewerId: activeInterviewer.id,
+        currentStage: plan.stage,
         lastQuestion: question,
         lastPlan: plan,
         currentRound: 0,
@@ -105,10 +126,12 @@ export const startInterview = createServerFn({ method: "POST" })
         question,
         interviewers,
         activeInterviewer,
-        panelType: "standard" as const,
+        panelType: "structured" as const,
         round: 1,
-        totalRounds: 5,
-        topic: plan.question_type.replace(/_/g, " "),
+        totalRounds: TOTAL_TURNS,
+        stage: plan.stage,
+        turnType: plan.turn_type,
+        focus: plan.focus,
         difficulty: plan.difficulty,
         coordinatorReason: plan.reason,
       };
@@ -127,54 +150,72 @@ export const submitAnswer = createServerFn({ method: "POST" })
     if (!session) throw new Error("Session not found");
 
     return await withSessionLog(data.sessionId, async () => {
+      const activeInterviewer = getInterviewerById(session!, session!.activeInterviewerId);
+      const activePlan = session!.lastPlan!;
+
       if (!session!.lastClarified) {
-        const clar = await runClarifier(session!.lastQuestion!, data.answer);
-        if (clar.needs_clarification && clar.follow_up) {
+        const clarification = await runClarifier(
+          session!,
+          activePlan,
+          session!.lastQuestion!,
+          data.answer,
+          activeInterviewer,
+        );
+        if (clarification.needs_clarification && clarification.follow_up) {
           pushLog(data.sessionId, {
             agent: "Clarifier",
             phase: "info",
-            message: "Answer too vague, asking a follow-up before scoring",
-            meta: { reason: clar.reason },
+            message: `${activeInterviewer.name} is asking for clarification`,
+            meta: {
+              stage: activePlan.stage,
+              reason: clarification.reason,
+            },
           });
           updateSession(data.sessionId, { lastClarified: true });
           return {
             clarification: true as const,
-            follow_up: clar.follow_up,
+            follow_up: clarification.follow_up,
             done: false as const,
             round: session!.currentRound + 1,
           };
         }
       }
 
-      const activeInterviewer = getInterviewerById(session!, session!.activeInterviewerId);
       const evaluation = await runEvaluator(
         session!.lastQuestion!,
         data.answer,
-        session!.role,
-        session!.company,
-        session!.jobDescription,
+        session!,
+        activePlan,
+        activeInterviewer,
       );
 
       pushLog(data.sessionId, {
         agent: "Evaluator",
         phase: "info",
-        message: `Scored ${evaluation.overall}/10 for ${activeInterviewer.name}'s round`,
+        message: `Scored ${evaluation.overall}/10 for ${activeInterviewer.name}'s turn`,
         meta: {
-          strengths: evaluation.strengths,
-          weaknesses: evaluation.weaknesses,
+          summary: evaluation.answer_summary,
+          followUpTopics: evaluation.follow_up_topics,
+          unresolvedFollowUps: evaluation.unresolved_follow_ups,
         },
       });
 
       const completedRound = {
+        id: crypto.randomUUID(),
         question: session!.lastQuestion!,
         answer: data.answer,
         evaluation,
-        topic: session!.lastPlan?.question_type?.replace(/_/g, " ") ?? "general",
-        difficulty: session!.lastPlan?.difficulty ?? "medium",
+        topic: activePlan.focus,
+        difficulty: activePlan.difficulty,
         interviewerId: activeInterviewer.id,
         interviewerName: activeInterviewer.name,
-        coordinatorReason:
-          session!.lastPlan?.reason ?? `Selected ${activeInterviewer.name} for this round.`,
+        coordinatorReason: activePlan.reason,
+        stage: activePlan.stage,
+        turnType: activePlan.turn_type,
+        goal: activePlan.goal,
+        basedOnResume: activePlan.based_on_resume,
+        basedOnJobRequirement: activePlan.based_on_job_requirement,
+        followUpToRoundId: activePlan.follow_up_to_round_id,
       };
 
       const updatedRounds = [...session!.rounds, completedRound];
@@ -182,11 +223,12 @@ export const submitAnswer = createServerFn({ method: "POST" })
       updateSession(data.sessionId, {
         rounds: updatedRounds,
         currentRound: newRoundNumber,
+        currentStage: activePlan.stage,
         lastClarified: false,
       });
       session = getSession(data.sessionId)!;
 
-      if (newRoundNumber >= 5) {
+      if (newRoundNumber >= session.totalRounds) {
         return {
           evaluation,
           completedRound,
@@ -201,36 +243,34 @@ export const submitAnswer = createServerFn({ method: "POST" })
       pushLog(data.sessionId, {
         agent: "Coordinator",
         phase: "info",
-        message: `Next up: ${nextInterviewer.name} on ${plan.question_type}`,
+        message: `Next move: ${plan.stage} with ${nextInterviewer.name}`,
         meta: {
           interviewerId: nextInterviewer.id,
           interviewerName: nextInterviewer.name,
-          difficulty: plan.difficulty,
+          stage: plan.stage,
+          turnType: plan.turn_type,
+          focus: plan.focus,
+          goal: plan.goal,
           reason: plan.reason,
         },
       });
 
-      const nextQuestion = await runInterviewer(
-        nextInterviewer,
-        plan.question_type,
-        plan.difficulty,
-        session.role,
-        session.company,
-        session.jobDescription,
-      );
+      const nextQuestion = await runInterviewer(nextInterviewer, plan, session);
       pushLog(data.sessionId, {
         agent: "Interviewer",
         phase: "info",
-        message: `${nextInterviewer.name} is asking the next question`,
+        message: `${nextInterviewer.name} delivered the next turn`,
         meta: {
           interviewerId: nextInterviewer.id,
-          questionType: plan.question_type,
-          difficulty: plan.difficulty,
+          stage: plan.stage,
+          turnType: plan.turn_type,
+          focus: plan.focus,
         },
       });
 
       updateSession(data.sessionId, {
         activeInterviewerId: nextInterviewer.id,
+        currentStage: plan.stage,
         lastQuestion: nextQuestion,
         lastPlan: plan,
       });
@@ -240,7 +280,9 @@ export const submitAnswer = createServerFn({ method: "POST" })
         completedRound,
         next_question: nextQuestion,
         nextInterviewer,
-        topic: plan.question_type.replace(/_/g, " "),
+        stage: plan.stage,
+        turnType: plan.turn_type,
+        focus: plan.focus,
         difficulty: plan.difficulty,
         coordinatorReason: plan.reason,
         round: newRoundNumber + 1,
@@ -257,7 +299,7 @@ export const generateReport = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const session = getSession(data.sessionId);
     if (!session) throw new Error("Session not found");
-    if (session.rounds.length < 5) throw new Error("Interview not complete");
+    if (session.rounds.length < session.totalRounds) throw new Error("Interview not complete");
 
     return await withSessionLog(data.sessionId, async () => {
       const report = await runReportGenerator(session);
@@ -274,6 +316,7 @@ export const generateReport = createServerFn({ method: "POST" })
         jobDescription: session.jobDescription,
         interviewers: session.interviewers,
         panelType: session.panelType,
+        totalRounds: session.totalRounds,
       };
     });
   });

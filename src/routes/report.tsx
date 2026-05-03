@@ -6,6 +6,7 @@ import {
   difficultyColor,
   getHireBg,
   getHireColor,
+  humanizeLabel,
   initials,
   scoreToColor,
 } from "@/lib/ghost-utils";
@@ -40,6 +41,7 @@ function ReportPage() {
           decision={report.hire_decision}
           role={report.role}
           company={report.company}
+          totalRounds={report.totalRounds}
         />
 
         <PanelSummary interviewers={report.interviewers} />
@@ -117,11 +119,13 @@ function Hero({
   decision,
   role,
   company,
+  totalRounds,
 }: {
   score: number;
   decision: string;
   role: string;
   company: string;
+  totalRounds: number;
 }) {
   const [shown, setShown] = useState(0);
 
@@ -164,7 +168,7 @@ function Hero({
         </span>
       </div>
       <div className="mt-4 text-sm" style={{ color: "var(--text-2)" }}>
-        Based on 5 panel rounds · {role} @ {company}
+        Based on {totalRounds} interview turns · {role} @ {company}
       </div>
     </div>
   );
@@ -290,7 +294,19 @@ function RoundAccordion({
           </span>
           <span className="font-medium">{round.interviewerName}</span>
           <span style={{ color: "var(--text-3)" }}>·</span>
-          <span className="font-medium">{capitalize(round.topic)}</span>
+          <span className="font-medium">{round.topic}</span>
+          <span
+            className="rounded-full px-2 py-0.5 text-[11px]"
+            style={{ background: "var(--surface3)", color: "var(--text-2)" }}
+          >
+            {humanizeLabel(round.stage)}
+          </span>
+          <span
+            className="rounded-full px-2 py-0.5 text-[11px]"
+            style={{ background: "var(--surface3)", color: "var(--text-2)" }}
+          >
+            {humanizeLabel(round.turnType)}
+          </span>
           <span
             className="rounded-full px-2 py-0.5 text-[11px]"
             style={{
@@ -333,6 +349,17 @@ function RoundAccordion({
               {round.coordinatorReason}
             </div>
           </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <MetaBlock label="Turn Goal" value={round.goal} />
+            <MetaBlock
+              label="Personalization"
+              value={`${round.basedOnResume ? `Resume: ${round.basedOnResume}` : "Resume: none"}${
+                round.basedOnJobRequirement
+                  ? `\nJob: ${round.basedOnJobRequirement}`
+                  : "\nJob: none"
+              }`}
+            />
+          </div>
           <div
             className="mt-3 rounded-[0_8px_8px_8px] p-3 text-[14px] italic"
             style={{
@@ -351,11 +378,26 @@ function RoundAccordion({
               {round.answer.length > 400 ? `${round.answer.slice(0, 400)}...` : round.answer}
             </div>
           </div>
+          <div
+            className="mt-3 rounded-[0_8px_8px_8px] p-3 text-[14px]"
+            style={{ background: "var(--surface2)", borderLeft: "3px solid var(--green)" }}
+          >
+            <div className="mono text-[11px] uppercase" style={{ color: "var(--text-3)" }}>
+              Evaluator Summary
+            </div>
+            <div className="mt-1" style={{ color: "var(--text-2)" }}>
+              {round.evaluation.answer_summary}
+            </div>
+          </div>
           <div className="mt-4 grid grid-cols-2 gap-3">
             <MiniBar label="Clarity" value={evaluation.clarity} />
             <MiniBar label="Tech Depth" value={evaluation.technical_depth} />
             <MiniBar label="Structure" value={evaluation.structure} />
             <MiniBar label="Overall" value={evaluation.overall} />
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+            <MetaBlock label="Resume Alignment" value={evaluation.resume_alignment} />
+            <MetaBlock label="Job Alignment" value={evaluation.job_requirement_alignment} />
           </div>
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
@@ -379,7 +421,37 @@ function RoundAccordion({
               </ul>
             </div>
           </div>
+          {evaluation.unresolved_follow_ups?.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {evaluation.unresolved_follow_ups.map((probe, probeIndex) => (
+                <span
+                  key={probeIndex}
+                  className="rounded-full px-2.5 py-1 text-xs"
+                  style={{
+                    background: "rgba(234,179,8,0.12)",
+                    color: "#fde68a",
+                    border: "1px solid rgba(234,179,8,0.3)",
+                  }}
+                >
+                  {probe}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function MetaBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg p-3" style={{ background: "var(--surface2)" }}>
+      <div className="mono text-[11px] uppercase" style={{ color: "var(--text-3)" }}>
+        {label}
+      </div>
+      <div className="mt-1 whitespace-pre-wrap text-sm" style={{ color: "var(--text-2)" }}>
+        {value}
       </div>
     </div>
   );

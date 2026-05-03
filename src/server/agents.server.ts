@@ -1,12 +1,15 @@
 import { callNemotron, parseJSON } from "./nim.server";
 import type {
+  CandidateContext,
   Difficulty,
   Evaluation,
+  InterviewStage,
   InterviewType,
   InterviewerId,
   Persona,
   Plan,
   Session,
+  TurnType,
 } from "./sessions.server";
 
 const INTERVIEWER_BLUEPRINTS: Record<
@@ -22,55 +25,164 @@ const INTERVIEWER_BLUEPRINTS: Record<
     fallbackName: "Maya",
     fallbackTitle: "Senior Software Engineer",
     focus: "technical depth, tradeoffs, debugging, and system thinking",
-    brief: "Pushes on algorithms, architecture choices, and implementation tradeoffs.",
+    brief: "Pushes on architecture choices, implementation details, and technical tradeoffs.",
   },
   hiring_manager: {
     fallbackName: "Jordan",
     fallbackTitle: "Engineering Manager",
     focus: "behavioral depth, ownership, teamwork, and decision-making",
-    brief: "Tests collaboration, prioritization, and leadership signals.",
+    brief: "Tests collaboration, leadership signals, and how the candidate operates in teams.",
   },
   recruiter: {
     fallbackName: "Avery",
     fallbackTitle: "Technical Recruiter",
     focus: "candidate motivation, role fit, and resume storytelling",
-    brief: "Covers motivation, communication clarity, and resume alignment.",
+    brief: "Covers background, motivation, communication, and why the candidate fits the role.",
   },
 };
 
-const TECHNICAL_TOPICS = new Set(["data_structures", "algorithms", "system_design", "debugging"]);
+const TECHNICAL_TOPICS = new Set([
+  "project_deep_dive",
+  "technical_design",
+  "debugging",
+  "tradeoffs",
+]);
 
-const COORDINATOR_SYSTEM = `You are the coordinator for a mock panel interview.
+const STAGES: InterviewStage[] = [
+  "intro",
+  "resume_walkthrough",
+  "core_technical",
+  "core_behavioral",
+  "candidate_questions",
+  "wrap_up",
+];
 
-You manage the flow between three interviewer personas:
-- senior_engineer: focuses on technical depth, debugging, and tradeoffs
-- hiring_manager: focuses on behavioral depth, teamwork, and ownership
-- recruiter: focuses on motivation, fit, and resume storytelling
+const CANDIDATE_CONTEXT_SYSTEM = `You turn a resume and job description into compact interview context.
 
-You receive the role, company, job description, resume summary, panel roster, interview type, and the history of completed rounds.
-
-Output ONLY valid JSON with no other text:
+Output ONLY valid JSON:
 {
-  "next_interviewer_id": "senior_engineer" | "hiring_manager" | "recruiter",
-  "question_type": "data_structures" | "algorithms" | "system_design" | "debugging" | "behavioral" | "motivation" | "past_experience" | "teamwork",
-  "difficulty": "easy" | "medium" | "hard",
-  "reason": "one concise sentence explaining the choice"
+  "resumeHighlights": ["...", "...", "..."],
+  "targetSkills": ["...", "...", "...", "..."],
+  "experienceGaps": ["...", "...", "..."],
+  "likelyMotivators": ["...", "..."]
 }
 
 Rules:
-- Round 1 is always medium difficulty.
-- If interview_type is "technical": first 4 rounds should be technical, final round should be behavioral or motivation-focused.
-- If interview_type is "behavioral": all rounds should be behavioral, teamwork, motivation, or past_experience.
-- If interview_type is "mixed": alternate between technical and behavioral families when possible.
-- Use senior_engineer for technical topics unless there is a strong reason not to.
-- Use hiring_manager for behavioral, teamwork, and ownership-style questions.
-- Use recruiter for motivation, resume walkthrough, and company-fit questions.
-- If the last round overall score was below 5.0, decrease difficulty by one level and stay close to the weak area.
-- If the last round overall score was above 8.0, you may increase difficulty or broaden the topic.
-- Never repeat the same question_type two rounds in a row.
-- Prefer not to repeat the same interviewer twice in a row unless the last answer clearly needs a deeper follow-up.
-- Keep the reason concrete and useful for a demo trace.
-- Output valid JSON only.`;
+- Keep each item short and concrete.
+- Pull targetSkills from the job description.
+- Pull resumeHighlights from actual candidate experience.
+- experienceGaps should identify likely weak or missing areas relative to the role.
+- likelyMotivators should be inferred conservatively from the resume and role.
+- Output JSON only.`;
+
+const COORDINATOR_SYSTEM = `You are the planner for a realistic panel interview.
+
+Your job is to decide the NEXT conversational move so the interview feels sequential, reactive, and human.
+
+You manage these interview stages:
+- intro
+- resume_walkthrough
+- core_technical
+- core_behavioral
+- candidate_questions
+- wrap_up
+
+You also choose a turn type:
+- new_question
+- follow_up
+- challenge
+- clarification
+- transition
+
+Output ONLY valid JSON:
+{
+  "next_interviewer_id": "senior_engineer" | "hiring_manager" | "recruiter",
+  "stage": "intro" | "resume_walkthrough" | "core_technical" | "core_behavioral" | "candidate_questions" | "wrap_up",
+  "turn_type": "new_question" | "follow_up" | "challenge" | "clarification" | "transition",
+  "question_type": "background" | "resume_deep_dive" | "project_deep_dive" | "technical_design" | "debugging" | "tradeoffs" | "behavioral" | "motivation" | "candidate_questions" | "closing",
+  "focus": "short phrase for what this turn is testing",
+  "goal": "what the interviewer wants to learn from the candidate",
+  "difficulty": "easy" | "medium" | "hard",
+  "reason": "one concise sentence for the trace",
+  "based_on_resume": "specific resume item or empty string",
+  "based_on_job_requirement": "specific requirement or empty string",
+  "follow_up_to_round_id": "round id or empty string"
+}
+
+Rules:
+- Make the interview feel like one coherent conversation, not a quiz.
+- Opening sequence should usually be intro, then resume_walkthrough, before deeper probing.
+- Prefer staying with the same interviewer for 2-3 connected turns when they are probing the same answer.
+- Use follow_up or challenge when the previous answer created a natural next question.
+- Use resume details in intro, resume_walkthrough, and behavioral stages.
+- Use job requirements heavily in technical and fit-related stages.
+- Use recruiter for intro, motivation, candidate_questions, and some resume walkthrough.
+- Use senior_engineer for technical deep dives, debugging, and tradeoffs.
+- Use hiring_manager for behavioral depth, ownership, and cross-functional collaboration.
+- candidate_questions should feel like a realistic late-stage conversation, such as asking what the candidate is optimizing for or how they evaluate team fit.
+- wrap_up should be short and natural.
+- Keep difficulty medium in the first two turns unless the user answer is exceptionally strong.
+- If the previous answer was partial but promising, prefer a follow_up from the same interviewer over switching topics.
+- Output JSON only.`;
+
+const INTERVIEWER_SYSTEM = `You are a real interviewer in a mock interview panel.
+
+You are not generating a quiz prompt. You are saying the next thing this interviewer would naturally say out loud.
+
+Rules:
+- Sound human, direct, and conversational.
+- Keep it to 1-3 sentences.
+- You may briefly acknowledge the candidate's previous answer before asking the next thing.
+- If turn_type is follow_up or challenge, build directly on the candidate's previous answer.
+- If stage is intro or resume_walkthrough, anchor the question in the candidate's background.
+- If stage is core_technical or core_behavioral, anchor the question in the job requirements and prior answers.
+- Do not say "Here is your next question."
+- Do not mention JSON, stages, turns, or hidden planning logic.
+- Do not coach or evaluate.
+- Output only the interviewer utterance.`;
+
+const EVALUATOR_SYSTEM = `You are an expert interview evaluator.
+
+Evaluate the candidate's answer in the context of the role, the interview stage, and what the interviewer was trying to learn.
+
+Output ONLY valid JSON:
+{
+  "clarity": <integer 1-10>,
+  "technical_depth": <integer 1-10>,
+  "structure": <integer 1-10>,
+  "overall": <float 1.0-10.0 with one decimal>,
+  "strengths": ["...", "...", "..."],
+  "weaknesses": ["...", "...", "..."],
+  "correct": <boolean>,
+  "missed_concepts": ["...", "..."],
+  "answer_summary": "1-2 sentence summary of what the candidate actually said",
+  "unresolved_follow_ups": ["...", "..."],
+  "follow_up_topics": ["...", "..."],
+  "resume_alignment": "one short sentence about how well the answer connected to their background",
+  "job_requirement_alignment": "one short sentence about how well the answer matched the job",
+}
+
+Rules:
+- Be strict but fair.
+- unresolved_follow_ups should only include things a realistic interviewer would naturally probe next.
+- follow_up_topics should be short phrases.
+- Use the interview stage and turn goal when scoring.
+- Output JSON only.`;
+
+const REPORT_SYSTEM = `You are generating a final debrief report for a coherent mock interview conversation.
+
+Output ONLY valid JSON:
+{
+  "overall_score": <float 1.0-10.0 one decimal>,
+  "hire_decision": "strong yes" | "yes" | "lean yes" | "maybe" | "lean no" | "no" | "strong no",
+  "strengths": ["...", "...", "..."],
+  "weaknesses": ["...", "...", "..."],
+  "drill_questions": ["...", "...", "..."],
+  "study_plan": "4-5 sentence action plan"
+}
+
+The report should reflect the interview as a realistic conversation, not disconnected questions.
+Output JSON only.`;
 
 function sanitizeInterviewerId(value: unknown): InterviewerId | null {
   if (value === "senior_engineer" || value === "hiring_manager" || value === "recruiter") {
@@ -86,34 +198,29 @@ function sanitizeDifficulty(value: unknown): Difficulty {
   return "medium";
 }
 
-function defaultQuestionTypeFor(interviewType: InterviewType, roundNumber: number): string {
-  if (interviewType === "behavioral") {
-    const topics = ["past_experience", "teamwork", "motivation", "behavioral"];
-    return topics[(roundNumber - 1) % topics.length];
-  }
-  if (interviewType === "mixed") {
-    return roundNumber % 2 === 1 ? "algorithms" : "teamwork";
-  }
-  if (roundNumber >= 5) {
-    return "behavioral";
-  }
-  return "algorithms";
+function sanitizeStage(value: unknown): InterviewStage | null {
+  if (typeof value !== "string") return null;
+  return STAGES.includes(value as InterviewStage) ? (value as InterviewStage) : null;
 }
 
-function defaultInterviewerFor(questionType: string): InterviewerId {
-  if (questionType === "motivation") return "recruiter";
+function sanitizeTurnType(value: unknown): TurnType | null {
   if (
-    questionType === "behavioral" ||
-    questionType === "past_experience" ||
-    questionType === "teamwork"
+    value === "new_question" ||
+    value === "follow_up" ||
+    value === "challenge" ||
+    value === "clarification" ||
+    value === "transition"
   ) {
-    return "hiring_manager";
+    return value;
   }
-  return "senior_engineer";
+  return null;
 }
 
-function humanizeInterviewerId(interviewerId: InterviewerId) {
-  return interviewerId.replace(/_/g, " ");
+function humanize(value: string) {
+  return value
+    .split("_")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
 }
 
 function cleanQuestionText(question: string) {
@@ -179,14 +286,240 @@ function normalizePersona(raw: unknown, interviewerId: InterviewerId, company: s
   };
 }
 
+function fallbackCandidateContext(resume: string, jobDescription: string): CandidateContext {
+  const resumeHighlights = resume
+    .split(/[\n.•-]+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 20)
+    .slice(0, 3);
+  const targetSkills = jobDescription
+    .split(/[\n,.;•-]+/)
+    .map((part) => part.trim())
+    .filter((part) => part.length > 3)
+    .slice(0, 4);
+
+  return {
+    resumeHighlights: resumeHighlights.length
+      ? resumeHighlights
+      : ["Candidate background summary unavailable."],
+    targetSkills: targetSkills.length ? targetSkills : ["Role requirements summary unavailable."],
+    experienceGaps: ["Need stronger evidence of role-specific depth."],
+    likelyMotivators: ["Interest in growth and impact."],
+  };
+}
+
+function defaultStageForRound(session: Session, roundNumber: number): InterviewStage {
+  if (roundNumber <= 1) return "intro";
+  if (roundNumber === 2) return "resume_walkthrough";
+  if (roundNumber === session.totalRounds) return "wrap_up";
+  if (roundNumber === session.totalRounds - 1) {
+    return session.interview_type === "technical" ? "core_behavioral" : "candidate_questions";
+  }
+  if (session.interview_type === "behavioral") return "core_behavioral";
+  if (session.interview_type === "technical") return "core_technical";
+  return roundNumber % 2 === 1 ? "core_technical" : "core_behavioral";
+}
+
+function defaultQuestionTypeForStage(stage: InterviewStage): string {
+  switch (stage) {
+    case "intro":
+      return "background";
+    case "resume_walkthrough":
+      return "resume_deep_dive";
+    case "core_technical":
+      return "project_deep_dive";
+    case "core_behavioral":
+      return "behavioral";
+    case "candidate_questions":
+      return "candidate_questions";
+    case "wrap_up":
+      return "closing";
+  }
+}
+
+function defaultInterviewerForStage(stage: InterviewStage): InterviewerId {
+  switch (stage) {
+    case "intro":
+      return "recruiter";
+    case "resume_walkthrough":
+      return "recruiter";
+    case "core_technical":
+      return "senior_engineer";
+    case "core_behavioral":
+      return "hiring_manager";
+    case "candidate_questions":
+      return "recruiter";
+    case "wrap_up":
+      return "recruiter";
+  }
+}
+
+function defaultTurnTypeForStage(session: Session, stage: InterviewStage): TurnType {
+  const lastRound = session.rounds.at(-1);
+  if (
+    lastRound &&
+    lastRound.stage === stage &&
+    lastRound.evaluation.unresolved_follow_ups.length > 0 &&
+    lastRound.turnType !== "clarification"
+  ) {
+    return lastRound.stage === "core_technical" ? "challenge" : "follow_up";
+  }
+  return stage === "wrap_up" ? "transition" : "new_question";
+}
+
+function defaultFocusForStage(stage: InterviewStage, session: Session): string {
+  switch (stage) {
+    case "intro":
+      return "candidate background and role fit";
+    case "resume_walkthrough":
+      return session.candidateContext.resumeHighlights[0] ?? "resume walkthrough";
+    case "core_technical":
+      return session.candidateContext.targetSkills[0] ?? "technical problem solving";
+    case "core_behavioral":
+      return "ownership, teamwork, and decision-making";
+    case "candidate_questions":
+      return "candidate priorities and mutual fit";
+    case "wrap_up":
+      return "final signal and close";
+  }
+}
+
+function defaultGoalForStage(stage: InterviewStage): string {
+  switch (stage) {
+    case "intro":
+      return "Understand the candidate's background and what attracts them to the role.";
+    case "resume_walkthrough":
+      return "Dig into a real experience from the resume and understand scope and impact.";
+    case "core_technical":
+      return "Test technical depth, tradeoffs, and problem-solving under realistic constraints.";
+    case "core_behavioral":
+      return "Test ownership, collaboration, communication, and judgment.";
+    case "candidate_questions":
+      return "Understand what the candidate values and how they think about team fit.";
+    case "wrap_up":
+      return "Close naturally and surface the strongest final signal from the candidate.";
+  }
+}
+
+function defaultDifficultyForStage(stage: InterviewStage, roundNumber: number): Difficulty {
+  if (roundNumber <= 2) return "medium";
+  if (stage === "wrap_up" || stage === "candidate_questions") return "easy";
+  return "medium";
+}
+
+function defaultResumeAnchor(session: Session, stage: InterviewStage) {
+  if (stage === "intro" || stage === "resume_walkthrough" || stage === "core_behavioral") {
+    return session.candidateContext.resumeHighlights[0] ?? null;
+  }
+  return null;
+}
+
+function defaultJobAnchor(session: Session, stage: InterviewStage) {
+  if (stage === "core_technical" || stage === "core_behavioral") {
+    return session.candidateContext.targetSkills[0] ?? null;
+  }
+  return null;
+}
+
+function defaultPlan(session: Session): Plan {
+  const roundNumber = session.currentRound + 1;
+  const stage = defaultStageForRound(session, roundNumber);
+  const lastRound = session.rounds.at(-1);
+  const turnType = defaultTurnTypeForStage(session, stage);
+  const nextInterviewer =
+    turnType !== "new_question" && lastRound && lastRound.stage === stage
+      ? lastRound.interviewerId
+      : defaultInterviewerForStage(stage);
+
+  return {
+    next_interviewer_id: nextInterviewer,
+    stage,
+    turn_type: turnType,
+    question_type: defaultQuestionTypeForStage(stage),
+    focus: defaultFocusForStage(stage, session),
+    goal: defaultGoalForStage(stage),
+    difficulty: defaultDifficultyForStage(stage, roundNumber),
+    reason:
+      turnType === "new_question"
+        ? `Move into ${humanize(stage)} to keep the interview progressing naturally.`
+        : `Stay with ${humanize(nextInterviewer)} for a natural ${turnType.replace("_", " ")} on the previous answer.`,
+    based_on_resume: defaultResumeAnchor(session, stage),
+    based_on_job_requirement: defaultJobAnchor(session, stage),
+    follow_up_to_round_id: lastRound && turnType !== "new_question" ? lastRound.id : null,
+  };
+}
+
+function trimStringArray(value: unknown, limit: number) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, limit);
+}
+
+export async function generateCandidateContext(
+  role: string,
+  company: string,
+  resume: string,
+  jobDescription: string,
+): Promise<CandidateContext> {
+  const raw = await callNemotron(
+    CANDIDATE_CONTEXT_SYSTEM,
+    `Role: ${role}
+Company: ${company}
+
+Resume:
+${resume.slice(0, 3000)}
+
+Job Description:
+${jobDescription.slice(0, 3000)}
+
+Generate compact interview context. Output JSON only.`,
+    0.3,
+    350,
+    "CandidateContext",
+  );
+
+  const parsed = parseJSON<Partial<CandidateContext>>(raw);
+  const fallback = fallbackCandidateContext(resume, jobDescription);
+
+  return {
+    resumeHighlights: trimStringArray(parsed.resumeHighlights, 4).length
+      ? trimStringArray(parsed.resumeHighlights, 4)
+      : fallback.resumeHighlights,
+    targetSkills: trimStringArray(parsed.targetSkills, 5).length
+      ? trimStringArray(parsed.targetSkills, 5)
+      : fallback.targetSkills,
+    experienceGaps: trimStringArray(parsed.experienceGaps, 4).length
+      ? trimStringArray(parsed.experienceGaps, 4)
+      : fallback.experienceGaps,
+    likelyMotivators: trimStringArray(parsed.likelyMotivators, 3).length
+      ? trimStringArray(parsed.likelyMotivators, 3)
+      : fallback.likelyMotivators,
+  };
+}
+
 export async function runCoordinator(session: Session): Promise<Plan> {
+  const fallback = defaultPlan(session);
   const historyText =
     session.rounds.length === 0
-      ? "No previous rounds. This is the first question."
+      ? "No previous turns. Start naturally."
       : session.rounds
           .map(
-            (round, index) =>
-              `Round ${index + 1}: Interviewer=${round.interviewerName} (${round.interviewerId}), Topic=${round.topic}, Difficulty=${round.difficulty}, Overall=${round.evaluation.overall}, Weaknesses=${round.evaluation.weaknesses.join(", ")}, Reason=${round.coordinatorReason}`,
+            (round, index) => `
+Turn ${index + 1}:
+  stage=${round.stage}
+  turnType=${round.turnType}
+  interviewer=${round.interviewerName} (${round.interviewerId})
+  focus=${round.topic}
+  goal=${round.goal}
+  question=${round.question}
+  answerSummary=${round.evaluation.answer_summary}
+  unresolvedFollowUps=${round.evaluation.unresolved_follow_ups.join(" | ")}
+  resumeAnchor=${round.basedOnResume ?? "none"}
+  jobAnchor=${round.basedOnJobRequirement ?? "none"}
+  score=${round.evaluation.overall}`,
           )
           .join("\n");
 
@@ -201,141 +534,160 @@ export async function runCoordinator(session: Session): Promise<Plan> {
 Job Role: ${session.role}
 Company: ${session.company}
 Interview Type: ${session.interview_type}
-Job Description Summary: ${session.jobDescription.slice(0, 700)}
-Resume Summary: ${session.resume.slice(0, 500)}
-Current Round: ${session.currentRound + 1} of 5
+Total Turns: ${session.totalRounds}
+Upcoming Turn Number: ${session.currentRound + 1}
+Current Stage: ${session.currentStage}
 Current Active Interviewer: ${session.activeInterviewerId}
+
+Candidate Context:
+- Resume Highlights: ${session.candidateContext.resumeHighlights.join(" | ")}
+- Target Skills: ${session.candidateContext.targetSkills.join(" | ")}
+- Experience Gaps: ${session.candidateContext.experienceGaps.join(" | ")}
+- Likely Motivators: ${session.candidateContext.likelyMotivators.join(" | ")}
 
 Panel Roster:
 ${interviewerRoster}
 
-Previous Round History:
+Recent Transcript:
 ${historyText}
 
-Decide the next interviewer and question. Output JSON only.`;
+Decide the next conversational move. Output JSON only.`;
 
-  const raw = await callNemotron(COORDINATOR_SYSTEM, userMessage, 0.3, 260, "Coordinator");
+  const raw = await callNemotron(COORDINATOR_SYSTEM, userMessage, 0.35, 320, "Coordinator");
   const parsed = parseJSON<Partial<Plan>>(raw);
-  const roundNumber = session.currentRound + 1;
-  const questionType =
-    typeof parsed.question_type === "string" && parsed.question_type.trim()
-      ? parsed.question_type.trim()
-      : defaultQuestionTypeFor(session.interview_type, roundNumber);
+
+  const stage = sanitizeStage(parsed.stage) ?? fallback.stage;
+  const turnType = sanitizeTurnType(parsed.turn_type) ?? fallback.turn_type;
   const nextInterviewerId =
-    sanitizeInterviewerId(parsed.next_interviewer_id) ?? defaultInterviewerFor(questionType);
+    sanitizeInterviewerId(parsed.next_interviewer_id) ??
+    (turnType !== "new_question" && fallback.follow_up_to_round_id
+      ? (session.rounds.at(-1)?.interviewerId ?? fallback.next_interviewer_id)
+      : defaultInterviewerForStage(stage));
 
   return {
     next_interviewer_id: nextInterviewerId,
-    question_type: questionType,
-    difficulty: sanitizeDifficulty(parsed.difficulty),
+    stage,
+    turn_type: turnType,
+    question_type:
+      typeof parsed.question_type === "string" && parsed.question_type.trim()
+        ? parsed.question_type.trim()
+        : defaultQuestionTypeForStage(stage),
+    focus:
+      typeof parsed.focus === "string" && parsed.focus.trim()
+        ? parsed.focus.trim()
+        : defaultFocusForStage(stage, session),
+    goal:
+      typeof parsed.goal === "string" && parsed.goal.trim()
+        ? parsed.goal.trim()
+        : defaultGoalForStage(stage),
+    difficulty: sanitizeDifficulty(parsed.difficulty ?? fallback.difficulty),
     reason:
       typeof parsed.reason === "string" && parsed.reason.trim()
-        ? parsed.reason
-            .trim()
-            .replaceAll("senior_engineer", "senior engineer")
-            .replaceAll("hiring_manager", "hiring manager")
-            .replaceAll("recruiter", "recruiter")
-        : `Selected ${humanizeInterviewerId(
-            nextInterviewerId,
-          )} to cover ${questionType.replace(/_/g, " ")}.`,
+        ? parsed.reason.trim()
+        : fallback.reason,
+    based_on_resume:
+      typeof parsed.based_on_resume === "string" && parsed.based_on_resume.trim()
+        ? parsed.based_on_resume.trim()
+        : defaultResumeAnchor(session, stage),
+    based_on_job_requirement:
+      typeof parsed.based_on_job_requirement === "string" && parsed.based_on_job_requirement.trim()
+        ? parsed.based_on_job_requirement.trim()
+        : defaultJobAnchor(session, stage),
+    follow_up_to_round_id:
+      typeof parsed.follow_up_to_round_id === "string" && parsed.follow_up_to_round_id.trim()
+        ? parsed.follow_up_to_round_id.trim()
+        : fallback.follow_up_to_round_id,
   };
 }
 
-const interviewerSystem = (
-  persona: Persona,
-) => `You are ${persona.name}, a ${persona.title} at ${persona.company} with ${persona.years} years of experience. You are one of three interviewers on a mock hiring panel.
-
-Your personality: ${persona.personality}
-Your focus: ${persona.focus}
-
-Your only job right now is to ask ONE interview question chosen by the coordinator.
-
-Rules:
-- Sound human, direct, and realistic.
-- Do not introduce yourself or explain the interview format.
-- Do not say "here is your question" or add filler.
-- Ask only the question text, 1-4 sentences maximum.
-- Do not evaluate, hint, coach, or give sample answers.
-- Make the question feel like it comes from your role on the panel.
-- Output only the question text.`;
-
 export async function runInterviewer(
   persona: Persona,
-  questionType: string,
-  difficulty: Difficulty,
-  role: string,
-  company: string,
-  jobDescription: string,
+  plan: Plan,
+  session: Session,
 ): Promise<string> {
-  const userMessage = `Ask a ${difficulty} difficulty ${questionType} question for a ${role} candidate interviewing at ${company}.
+  const recentTranscript = session.rounds
+    .slice(-2)
+    .map(
+      (round, index) => `
+Recent Turn ${index + 1}:
+  interviewer=${round.interviewerName}
+  stage=${round.stage}
+  turnType=${round.turnType}
+  question=${round.question}
+  answerSummary=${round.evaluation.answer_summary}
+  unresolvedFollowUps=${round.evaluation.unresolved_follow_ups.join(" | ")}`,
+    )
+    .join("\n");
 
-Job Description Summary:
-${jobDescription.slice(0, 800)}
+  const userMessage = `
+You are ${persona.name}, ${persona.title} at ${persona.company}.
+Your style: ${persona.personality}
+Your focus: ${persona.focus}
 
-Lean into this panelist's perspective and ask the question now.`;
-  const raw = await callNemotron(interviewerSystem(persona), userMessage, 0.8, 220, "Interviewer");
+Role: ${session.role}
+Company: ${session.company}
+Interview Type: ${session.interview_type}
+
+Current Stage: ${plan.stage}
+Turn Type: ${plan.turn_type}
+Question Type: ${plan.question_type}
+Focus: ${plan.focus}
+Goal: ${plan.goal}
+Difficulty: ${plan.difficulty}
+Resume Anchor: ${plan.based_on_resume ?? "none"}
+Job Requirement Anchor: ${plan.based_on_job_requirement ?? "none"}
+
+Candidate Context:
+- Resume Highlights: ${session.candidateContext.resumeHighlights.join(" | ")}
+- Target Skills: ${session.candidateContext.targetSkills.join(" | ")}
+- Experience Gaps: ${session.candidateContext.experienceGaps.join(" | ")}
+- Likely Motivators: ${session.candidateContext.likelyMotivators.join(" | ")}
+
+Resume:
+${session.resume.slice(0, 1800)}
+
+Job Description:
+${session.jobDescription.slice(0, 1800)}
+
+Recent Transcript:
+${recentTranscript || "No prior turns yet."}
+
+Say the next natural interviewer utterance now. Output only that utterance.`;
+
+  const raw = await callNemotron(INTERVIEWER_SYSTEM, userMessage, 0.75, 260, "Interviewer");
   return cleanQuestionText(raw);
 }
-
-const EVALUATOR_SYSTEM = `You are an expert interview evaluator.
-
-You receive the job context, interview question, and candidate answer. Evaluate it strictly and honestly.
-
-Output ONLY valid JSON with no other text:
-{
-  "clarity": <integer 1-10>,
-  "technical_depth": <integer 1-10>,
-  "structure": <integer 1-10>,
-  "overall": <float 1.0-10.0 with one decimal>,
-  "strengths": [<string>, <string>],
-  "weaknesses": [<string>, <string>, <string>],
-  "correct": <boolean>,
-  "missed_concepts": [<string>, <string>]
-}
-
-Scoring calibration:
-- 9-10: genuinely exceptional answer
-- 7-8: strong answer with minor gaps
-- 5-6: partial but workable answer
-- 3-4: significant gaps
-- 1-2: fundamentally weak or incorrect
-
-The average candidate should land around 4.5-6.0. Output JSON only.`;
 
 export async function runEvaluator(
   question: string,
   answer: string,
-  role: string,
-  company: string,
-  jobDescription: string,
+  session: Session,
+  plan: Plan,
+  interviewer: Persona,
 ): Promise<Evaluation> {
-  const userMessage = `Role: ${role}
-Company: ${company}
-Job Description Summary: ${jobDescription.slice(0, 500)}
+  const userMessage = `Role: ${session.role}
+Company: ${session.company}
+Interviewer: ${interviewer.name}, ${interviewer.title}
+Stage: ${plan.stage}
+Turn Type: ${plan.turn_type}
+Focus: ${plan.focus}
+Goal: ${plan.goal}
+Resume Anchor: ${plan.based_on_resume ?? "none"}
+Job Requirement Anchor: ${plan.based_on_job_requirement ?? "none"}
+
+Candidate Context:
+- Resume Highlights: ${session.candidateContext.resumeHighlights.join(" | ")}
+- Target Skills: ${session.candidateContext.targetSkills.join(" | ")}
+- Experience Gaps: ${session.candidateContext.experienceGaps.join(" | ")}
 
 Interview Question: ${question}
 
 Candidate Answer: ${answer}
 
 Evaluate this answer. Output JSON only.`;
-  const raw = await callNemotron(EVALUATOR_SYSTEM, userMessage, 0.2, 420, "Evaluator");
+  const raw = await callNemotron(EVALUATOR_SYSTEM, userMessage, 0.2, 520, "Evaluator");
   return parseJSON<Evaluation>(raw);
 }
-
-const REPORT_SYSTEM = `You are generating a final debrief report for a panel mock interview.
-
-Output ONLY valid JSON with no other text:
-{
-  "overall_score": <float 1.0-10.0 one decimal>,
-  "hire_decision": "strong yes" | "yes" | "lean yes" | "maybe" | "lean no" | "no" | "strong no",
-  "strengths": [<string>, <string>, <string>],
-  "weaknesses": [<string>, <string>, <string>],
-  "drill_questions": [<string>, <string>, <string>],
-  "study_plan": <string, 4-5 sentences>
-}
-
-Use the round data, interviewer shifts, and recurring weaknesses to generate a convincing debrief.
-Output valid JSON only.`;
 
 export type Report = {
   overall_score: number;
@@ -350,34 +702,33 @@ export async function runReportGenerator(session: Session): Promise<Report> {
   const roundsSummary = session.rounds
     .map(
       (round, index) => `
-Round ${index + 1}:
-  Interviewer: ${round.interviewerName} (${round.interviewerId})
-  Topic: ${round.topic}
-  Difficulty: ${round.difficulty}
-  Coordinator Reason: ${round.coordinatorReason}
-  Question: ${round.question}
-  Answer: ${round.answer}
-  Scores: clarity=${round.evaluation.clarity}, technical_depth=${round.evaluation.technical_depth}, structure=${round.evaluation.structure}, overall=${round.evaluation.overall}
-  Strengths: ${round.evaluation.strengths.join(", ")}
-  Weaknesses: ${round.evaluation.weaknesses.join(", ")}
-  Missed: ${round.evaluation.missed_concepts.join(", ")}`,
+Turn ${index + 1}:
+  stage=${round.stage}
+  turnType=${round.turnType}
+  interviewer=${round.interviewerName} (${round.interviewerId})
+  focus=${round.topic}
+  goal=${round.goal}
+  resumeAnchor=${round.basedOnResume ?? "none"}
+  jobAnchor=${round.basedOnJobRequirement ?? "none"}
+  question=${round.question}
+  answerSummary=${round.evaluation.answer_summary}
+  scores=clarity:${round.evaluation.clarity}, technical_depth:${round.evaluation.technical_depth}, structure:${round.evaluation.structure}, overall:${round.evaluation.overall}
+  strengths=${round.evaluation.strengths.join(" | ")}
+  weaknesses=${round.evaluation.weaknesses.join(" | ")}
+  unresolvedFollowUps=${round.evaluation.unresolved_follow_ups.join(" | ")}
+  resumeAlignment=${round.evaluation.resume_alignment}
+  jobAlignment=${round.evaluation.job_requirement_alignment}`,
     )
-    .join("\n");
-
-  const panelSummary = session.interviewers
-    .map((persona) => `${persona.name} (${persona.id}) - ${persona.focus}`)
     .join("\n");
 
   const userMessage = `
 Job Role: ${session.role} at ${session.company}
 Interview Type: ${session.interview_type}
-Job Description: ${session.jobDescription.slice(0, 600)}
-Resume: ${session.resume.slice(0, 400)}
+Resume Highlights: ${session.candidateContext.resumeHighlights.join(" | ")}
+Target Skills: ${session.candidateContext.targetSkills.join(" | ")}
+Experience Gaps: ${session.candidateContext.experienceGaps.join(" | ")}
 
-Panel:
-${panelSummary}
-
-All 5 Rounds:
+Interview Transcript Summary:
 ${roundsSummary}
 
 Generate the final debrief report. Output JSON only.`;
@@ -393,6 +744,7 @@ export async function generateInterviewers(
   company: string,
   interviewType: InterviewType,
   jobDescription: string,
+  resume: string,
 ): Promise<Persona[]> {
   const raw = await callNemotron(
     `You generate a realistic 3-person interview panel for mock interviews.
@@ -428,10 +780,14 @@ Output ONLY valid JSON with exactly these keys and no markdown:
 Role being interviewed for: ${role}
 Company: ${company}
 Interview type: ${interviewType}
+
 Job description summary:
 ${jobDescription.slice(0, 900)}
 
-The senior engineer should feel technical, the hiring manager should feel leadership-oriented, and the recruiter should feel candidate-facing.
+Resume summary:
+${resume.slice(0, 900)}
+
+The panel should feel like a real interview team for this candidate and role.
 Output JSON only.`,
     0.8,
     320,
@@ -445,22 +801,23 @@ Output JSON only.`,
   );
 }
 
-const CLARIFY_SYSTEM = `You are a triage agent that decides if a candidate's interview answer is too vague, off-topic, dismissive, or low-effort to be evaluated fairly.
+const CLARIFY_SYSTEM = `You are deciding whether the interviewer should ask for clarification before moving on.
 
-Output ONLY valid JSON with no markdown:
+Output ONLY valid JSON:
 {
   "needs_clarification": <boolean>,
-  "follow_up": "<a short human follow-up question the interviewer would ask>",
+  "follow_up": "<a natural, in-context clarification question the interviewer would actually ask>",
   "reason": "<one short sentence>"
 }
 
 needs_clarification is true when the answer is:
-- under ~15 meaningful words and not a direct correct answer
-- gibberish, "idk", "no idea", "skip", or random characters
-- completely off-topic relative to the question
-- a pure refusal
+- too short to evaluate fairly
+- clearly off-topic
+- a refusal or filler response
+- missing the actual substance needed for this stage
 
-Otherwise false. Output JSON only.`;
+The follow_up must sound like the same interviewer continuing the conversation.
+Output JSON only.`;
 
 export type Clarification = {
   needs_clarification: boolean;
@@ -468,12 +825,29 @@ export type Clarification = {
   reason: string;
 };
 
-export async function runClarifier(question: string, answer: string): Promise<Clarification> {
+export async function runClarifier(
+  session: Session,
+  plan: Plan,
+  question: string,
+  answer: string,
+  interviewer: Persona,
+): Promise<Clarification> {
   const raw = await callNemotron(
     CLARIFY_SYSTEM,
-    `Question: ${question}\n\nAnswer: ${answer}\n\nDecide. Output JSON only.`,
+    `Interviewer: ${interviewer.name}, ${interviewer.title}
+Stage: ${plan.stage}
+Turn Type: ${plan.turn_type}
+Focus: ${plan.focus}
+Goal: ${plan.goal}
+Resume Anchor: ${plan.based_on_resume ?? "none"}
+Job Requirement Anchor: ${plan.based_on_job_requirement ?? "none"}
+
+Question: ${question}
+Answer: ${answer}
+
+Decide. Output JSON only.`,
     0.2,
-    150,
+    180,
     "Clarifier",
   );
   return parseJSON<Clarification>(raw);
