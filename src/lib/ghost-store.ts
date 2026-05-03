@@ -1,29 +1,52 @@
 import { useSyncExternalStore } from "react";
-import type { Persona, Evaluation, Round } from "@/server/sessions.server";
 import type { Report } from "@/server/agents.server";
+import type { Evaluation, Persona, Round } from "@/server/sessions.server";
+
+export type SetupData = {
+  role: string;
+  company: string;
+  jobDescription: string;
+  interview_type: string;
+  resume: string;
+};
+
+export type ReportState = Report & {
+  rounds: Round[];
+  role: string;
+  company: string;
+  jobDescription: string;
+  interviewers: Persona[];
+  panelType: string;
+};
 
 export type AppState = {
   sessionId: string | null;
-  setupData: { role: string; company: string; interview_type: string; resume: string } | null;
-  interviewer: Persona | null;
+  setupData: SetupData | null;
+  interviewers: Persona[];
+  activeInterviewer: Persona | null;
+  panelType: string | null;
   currentQuestion: string;
   currentTopic: string;
   currentDifficulty: string;
+  currentCoordinatorReason: string;
   currentRound: number;
   totalRounds: number;
   rounds: Round[];
   lastEvaluation: Evaluation | null;
   lastClarification: string | null;
-  report: (Report & { rounds: Round[]; role: string; company: string; interviewer: Persona }) | null;
+  report: ReportState | null;
 };
 
 const initial: AppState = {
   sessionId: null,
   setupData: null,
-  interviewer: null,
+  interviewers: [],
+  activeInterviewer: null,
+  panelType: null,
   currentQuestion: "",
   currentTopic: "",
   currentDifficulty: "",
+  currentCoordinatorReason: "",
   currentRound: 1,
   totalRounds: 5,
   rounds: [],
@@ -39,15 +62,15 @@ export const store = {
   get: () => state,
   set: (patch: Partial<AppState>) => {
     state = { ...state, ...patch };
-    listeners.forEach((l) => l());
+    listeners.forEach((listener) => listener());
   },
   reset: () => {
     state = initial;
-    listeners.forEach((l) => l());
+    listeners.forEach((listener) => listener());
   },
-  subscribe: (l: () => void) => {
-    listeners.add(l);
-    return () => listeners.delete(l);
+  subscribe: (listener: () => void) => {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
   },
 };
 

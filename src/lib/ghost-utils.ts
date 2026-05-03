@@ -29,11 +29,18 @@ export function scoreToColor(score: number) {
   return "#ef4444";
 }
 export function difficultyColor(d: string) {
-  return ({ easy: "#22c55e", medium: "#eab308", hard: "#ef4444" } as Record<string, string>)[d] ?? "#888";
+  return (
+    ({ easy: "#22c55e", medium: "#eab308", hard: "#ef4444" } as Record<string, string>)[d] ?? "#888"
+  );
 }
 export function capitalize(str: string) {
   return str ? str.charAt(0).toUpperCase() + str.slice(1) : "";
 }
 export function initials(name: string) {
-  return name.split(" ").map(s => s[0]).join("").slice(0, 2).toUpperCase();
+  return name
+    .split(" ")
+    .map((s) => s[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }

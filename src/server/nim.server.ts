@@ -14,7 +14,13 @@ export async function callNemotron(
   if (!apiKey) throw new Error("NVIDIA_API_KEY is not configured");
   const sid = currentSessionId();
   const t0 = Date.now();
-  if (sid) pushLog(sid, { agent, phase: "start", message: `Calling ${MODEL}`, meta: { temperature, maxTokens, prompt: userMessage.slice(0, 220) } });
+  if (sid)
+    pushLog(sid, {
+      agent,
+      phase: "start",
+      message: `Calling ${MODEL}`,
+      meta: { temperature, maxTokens, prompt: userMessage.slice(0, 220) },
+    });
 
   const res = await fetch(`${NIM_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -36,17 +42,32 @@ export async function callNemotron(
 
   if (!res.ok) {
     const t = await res.text();
-    if (sid) pushLog(sid, { agent, phase: "error", message: `API error ${res.status}`, meta: { body: t.slice(0, 200) } });
+    if (sid)
+      pushLog(sid, {
+        agent,
+        phase: "error",
+        message: `API error ${res.status}`,
+        meta: { body: t.slice(0, 200) },
+      });
     throw new Error(`NIM API error ${res.status}: ${t.slice(0, 300)}`);
   }
-  const data = (await res.json()) as { choices?: { message?: { content?: string | null } }[]; usage?: Record<string, number> };
+  const data = (await res.json()) as {
+    choices?: { message?: { content?: string | null } }[];
+    usage?: Record<string, number>;
+  };
   const content = data?.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
     console.error("NIM empty content:", JSON.stringify(data).slice(0, 500));
     if (sid) pushLog(sid, { agent, phase: "error", message: "Empty response from model" });
     throw new Error("AI model returned empty response");
   }
-  if (sid) pushLog(sid, { agent, phase: "end", message: `Done in ${Date.now() - t0}ms`, meta: { tokens: data.usage?.total_tokens, preview: content.slice(0, 200) } });
+  if (sid)
+    pushLog(sid, {
+      agent,
+      phase: "end",
+      message: `Done in ${Date.now() - t0}ms`,
+      meta: { tokens: data.usage?.total_tokens, preview: content.slice(0, 200) },
+    });
   return content;
 }
 

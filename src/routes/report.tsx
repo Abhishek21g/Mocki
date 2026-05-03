@@ -1,7 +1,14 @@
-import { createFileRoute, useNavigate, Navigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { useAppState, store } from "@/lib/ghost-store";
-import { getHireBg, getHireColor, scoreToColor, difficultyColor, capitalize } from "@/lib/ghost-utils";
+import { store, useAppState } from "@/lib/ghost-store";
+import {
+  capitalize,
+  difficultyColor,
+  getHireBg,
+  getHireColor,
+  initials,
+  scoreToColor,
+} from "@/lib/ghost-utils";
 
 export const Route = createFileRoute("/report")({
   head: () => ({
@@ -14,26 +21,51 @@ function ReportPage() {
   const state = useAppState();
   const nav = useNavigate();
   if (!state.report) return <Navigate to="/" />;
-  const r = state.report;
+  const report = state.report;
 
   return (
     <div className="grid-bg min-h-screen pb-24">
       <header className="mx-auto flex max-w-5xl items-center justify-between px-6 pt-8">
-        <div className="font-bold" style={{ color: "var(--green)" }}>🧭 Mockpilot</div>
-        <div className="mono text-xs" style={{ color: "var(--text-3)" }}>DEBRIEF REPORT</div>
+        <div className="font-bold" style={{ color: "var(--green)" }}>
+          🧭 Mockpilot
+        </div>
+        <div className="mono text-xs" style={{ color: "var(--text-3)" }}>
+          PANEL DEBRIEF
+        </div>
       </header>
 
-      <main className="mx-auto max-w-4xl px-6 pt-12">
-        <Hero score={r.overall_score} decision={r.hire_decision} role={r.role} company={r.company} />
+      <main className="mx-auto max-w-5xl px-6 pt-12">
+        <Hero
+          score={report.overall_score}
+          decision={report.hire_decision}
+          role={report.role}
+          company={report.company}
+        />
+
+        <PanelSummary interviewers={report.interviewers} />
 
         <div className="mt-12 grid grid-cols-1 gap-5 md:grid-cols-3">
-          <ColumnCard title="Strengths" color="#76b900" icon="✓" items={r.strengths} itemColor="#76b900" />
-          <ColumnCard title="Weaknesses" color="#ef4444" icon="✗" items={r.weaknesses} itemColor="#fca5a5" />
+          <ColumnCard
+            title="Strengths"
+            color="#76b900"
+            icon="✓"
+            items={report.strengths}
+            itemColor="#76b900"
+          />
+          <ColumnCard
+            title="Weaknesses"
+            color="#ef4444"
+            icon="✗"
+            items={report.weaknesses}
+            itemColor="#fca5a5"
+          />
           <ColumnCard
             title="Focus Areas"
             color="#eab308"
             icon="🎯"
-            items={Array.from(new Set(r.rounds.flatMap((rd) => rd.evaluation.missed_concepts || []))).slice(0, 5)}
+            items={Array.from(
+              new Set(report.rounds.flatMap((round) => round.evaluation.missed_concepts || [])),
+            ).slice(0, 5)}
             itemColor="#fde68a"
           />
         </div>
@@ -41,22 +73,24 @@ function ReportPage() {
         <section className="mt-12">
           <h2 className="mb-4 text-2xl font-bold">🎯 Practice These Next</h2>
           <div className="flex flex-col gap-3">
-            {r.drill_questions.map((q, i) => (
-              <DrillCard key={i} index={i + 1} text={q} />
+            {report.drill_questions.map((question, index) => (
+              <DrillCard key={index} index={index + 1} text={question} />
             ))}
           </div>
         </section>
 
         <section className="mt-12 gp-card p-7 md:p-8">
           <h2 className="mb-3 text-xl font-bold">📋 Your Personal Study Plan</h2>
-          <p className="text-[15px] leading-[1.8]" style={{ color: "var(--text-2)" }}>{r.study_plan}</p>
+          <p className="text-[15px] leading-[1.8]" style={{ color: "var(--text-2)" }}>
+            {report.study_plan}
+          </p>
         </section>
 
         <section className="mt-12">
           <h2 className="mb-4 text-lg font-semibold">Session Breakdown</h2>
           <div className="flex flex-col gap-2">
-            {r.rounds.map((rd, i) => (
-              <RoundAccordion key={i} index={i} round={rd} />
+            {report.rounds.map((round, index) => (
+              <RoundAccordion key={index} index={index} round={round} />
             ))}
           </div>
         </section>
@@ -78,16 +112,27 @@ function ReportPage() {
   );
 }
 
-function Hero({ score, decision, role, company }: { score: number; decision: string; role: string; company: string }) {
+function Hero({
+  score,
+  decision,
+  role,
+  company,
+}: {
+  score: number;
+  decision: string;
+  role: string;
+  company: string;
+}) {
   const [shown, setShown] = useState(0);
+
   useEffect(() => {
     const start = performance.now();
-    const dur = 1200;
+    const duration = 1200;
     let raf = 0;
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - start) / dur);
-      setShown(score * (0.5 - 0.5 * Math.cos(Math.PI * p)));
-      if (p < 1) raf = requestAnimationFrame(tick);
+    const tick = (time: number) => {
+      const progress = Math.min(1, (time - start) / duration);
+      setShown(score * (0.5 - 0.5 * Math.cos(Math.PI * progress)));
+      if (progress < 1) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -96,10 +141,15 @@ function Hero({ score, decision, role, company }: { score: number; decision: str
   return (
     <div className="text-center fade-up">
       <div className="flex items-end justify-center gap-1">
-        <span className="mono text-7xl font-extrabold leading-none md:text-8xl" style={{ color: "var(--green)" }}>
+        <span
+          className="mono text-7xl font-extrabold leading-none md:text-8xl"
+          style={{ color: "var(--green)" }}
+        >
           {shown.toFixed(1)}
         </span>
-        <span className="mono pb-2 text-3xl" style={{ color: "var(--text-3)" }}>/10</span>
+        <span className="mono pb-2 text-3xl" style={{ color: "var(--text-3)" }}>
+          /10
+        </span>
       </div>
       <div className="mt-6 flex justify-center">
         <span
@@ -114,13 +164,63 @@ function Hero({ score, decision, role, company }: { score: number; decision: str
         </span>
       </div>
       <div className="mt-4 text-sm" style={{ color: "var(--text-2)" }}>
-        Based on 5 rounds · {role} @ {company}
+        Based on 5 panel rounds · {role} @ {company}
       </div>
     </div>
   );
 }
 
-function ColumnCard({ title, color, icon, items, itemColor }: { title: string; color: string; icon: string; items: string[]; itemColor: string }) {
+function PanelSummary({
+  interviewers,
+}: {
+  interviewers: import("@/server/sessions.server").Persona[];
+}) {
+  return (
+    <section className="mt-12">
+      <h2 className="mb-4 text-lg font-semibold">Panel Lineup</h2>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {interviewers.map((interviewer) => (
+          <div key={interviewer.id} className="gp-card p-5">
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-black"
+                style={{ background: "linear-gradient(135deg, var(--green), #4d7a00)" }}
+              >
+                {initials(interviewer.name)}
+              </div>
+              <div>
+                <div className="font-semibold">{interviewer.name}</div>
+                <div className="text-sm" style={{ color: "var(--text-2)" }}>
+                  {interviewer.title}
+                </div>
+              </div>
+            </div>
+            <div
+              className="mt-3 rounded-xl px-3 py-2 text-xs"
+              style={{ background: "var(--surface2)", color: "var(--text-2)" }}
+            >
+              {interviewer.focus}
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ColumnCard({
+  title,
+  color,
+  icon,
+  items,
+  itemColor,
+}: {
+  title: string;
+  color: string;
+  icon: string;
+  items: string[];
+  itemColor: string;
+}) {
   return (
     <div className="gp-card p-6" style={{ borderTop: `2px solid ${color}` }}>
       <div className="mb-3 flex items-center gap-2 font-semibold">
@@ -129,10 +229,10 @@ function ColumnCard({ title, color, icon, items, itemColor }: { title: string; c
       </div>
       <ul className="flex flex-col gap-2 text-sm" style={{ color: "var(--text-2)" }}>
         {items.length === 0 && <li style={{ color: "var(--text-3)" }}>—</li>}
-        {items.map((s, i) => (
-          <li key={i} className="flex gap-2">
+        {items.map((item, index) => (
+          <li key={index} className="flex gap-2">
             <span style={{ color: itemColor }}>{icon}</span>
-            <span>{s}</span>
+            <span>{item}</span>
           </li>
         ))}
       </ul>
@@ -142,6 +242,7 @@ function ColumnCard({ title, color, icon, items, itemColor }: { title: string; c
 
 function DrillCard({ index, text }: { index: number; text: string }) {
   const [copied, setCopied] = useState(false);
+
   return (
     <div
       className="relative rounded-[0_12px_12px_12px] p-5 pr-12"
@@ -167,17 +268,28 @@ function DrillCard({ index, text }: { index: number; text: string }) {
   );
 }
 
-function RoundAccordion({ index, round }: { index: number; round: import("@/server/sessions.server").Round }) {
+function RoundAccordion({
+  index,
+  round,
+}: {
+  index: number;
+  round: import("@/server/sessions.server").Round;
+}) {
   const [open, setOpen] = useState(false);
-  const ev = round.evaluation;
+  const evaluation = round.evaluation;
+
   return (
     <div className="gp-card overflow-hidden">
       <button
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen((value) => !value)}
         className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-[color:var(--surface2)]"
       >
         <div className="flex items-center gap-3 text-sm">
-          <span className="mono w-12" style={{ color: "var(--text-3)" }}>R{index + 1}</span>
+          <span className="mono w-12" style={{ color: "var(--text-3)" }}>
+            R{index + 1}
+          </span>
+          <span className="font-medium">{round.interviewerName}</span>
+          <span style={{ color: "var(--text-3)" }}>·</span>
           <span className="font-medium">{capitalize(round.topic)}</span>
           <span
             className="rounded-full px-2 py-0.5 text-[11px]"
@@ -192,44 +304,78 @@ function RoundAccordion({ index, round }: { index: number; round: import("@/serv
         <div className="flex items-center gap-3">
           <span
             className="mono rounded px-2 py-0.5 text-sm font-bold"
-            style={{ color: scoreToColor(ev.overall), background: `${scoreToColor(ev.overall)}1a` }}
+            style={{
+              color: scoreToColor(evaluation.overall),
+              background: `${scoreToColor(evaluation.overall)}1a`,
+            }}
           >
-            {ev.overall.toFixed(1)}
+            {evaluation.overall.toFixed(1)}
           </span>
           <span style={{ color: "var(--text-3)" }}>{open ? "−" : "+"}</span>
         </div>
       </button>
-      <div style={{ maxHeight: open ? 800 : 0, transition: "max-height 300ms ease", overflow: "hidden" }}>
+      <div
+        style={{
+          maxHeight: open ? 900 : 0,
+          transition: "max-height 300ms ease",
+          overflow: "hidden",
+        }}
+      >
         <div className="border-t px-5 py-4 text-sm" style={{ borderColor: "var(--border)" }}>
           <div
-            className="rounded-[0_8px_8px_8px] p-3 text-[14px] italic"
-            style={{ background: "var(--surface2)", borderLeft: "3px solid var(--green)", color: "var(--text-2)" }}
+            className="rounded-[0_8px_8px_8px] p-3 text-[14px]"
+            style={{ background: "var(--surface2)", borderLeft: "3px solid var(--green)" }}
+          >
+            <div className="mono text-[11px] uppercase" style={{ color: "var(--text-3)" }}>
+              Coordinator rationale
+            </div>
+            <div className="mt-1 italic" style={{ color: "var(--text-2)" }}>
+              {round.coordinatorReason}
+            </div>
+          </div>
+          <div
+            className="mt-3 rounded-[0_8px_8px_8px] p-3 text-[14px] italic"
+            style={{
+              background: "var(--surface2)",
+              borderLeft: "3px solid var(--green)",
+              color: "var(--text-2)",
+            }}
           >
             {round.question}
           </div>
           <div className="mt-3">
-            <div className="mono text-[11px] uppercase" style={{ color: "var(--text-3)" }}>Your Answer:</div>
+            <div className="mono text-[11px] uppercase" style={{ color: "var(--text-3)" }}>
+              Your Answer
+            </div>
             <div className="mt-1" style={{ color: "var(--text-2)" }}>
-              {round.answer.length > 300 ? round.answer.slice(0, 300) + "..." : round.answer}
+              {round.answer.length > 400 ? `${round.answer.slice(0, 400)}...` : round.answer}
             </div>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3">
-            <MiniBar label="Clarity" v={ev.clarity} />
-            <MiniBar label="Tech Depth" v={ev.technical_depth} />
-            <MiniBar label="Structure" v={ev.structure} />
-            <MiniBar label="Overall" v={ev.overall} />
+            <MiniBar label="Clarity" value={evaluation.clarity} />
+            <MiniBar label="Tech Depth" value={evaluation.technical_depth} />
+            <MiniBar label="Structure" value={evaluation.structure} />
+            <MiniBar label="Overall" value={evaluation.overall} />
           </div>
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
             <div>
-              <div className="mb-1 text-xs font-semibold" style={{ color: "#86efac" }}>Strengths</div>
+              <div className="mb-1 text-xs font-semibold" style={{ color: "#86efac" }}>
+                Strengths
+              </div>
               <ul className="flex flex-col gap-1 text-xs" style={{ color: "var(--text-2)" }}>
-                {ev.strengths?.map((s, i) => <li key={i}>✓ {s}</li>)}
+                {evaluation.strengths?.map((strength, itemIndex) => (
+                  <li key={itemIndex}>✓ {strength}</li>
+                ))}
               </ul>
             </div>
             <div>
-              <div className="mb-1 text-xs font-semibold" style={{ color: "#fca5a5" }}>Weaknesses</div>
+              <div className="mb-1 text-xs font-semibold" style={{ color: "#fca5a5" }}>
+                Weaknesses
+              </div>
               <ul className="flex flex-col gap-1 text-xs" style={{ color: "var(--text-2)" }}>
-                {ev.weaknesses?.map((s, i) => <li key={i}>✗ {s}</li>)}
+                {evaluation.weaknesses?.map((weakness, itemIndex) => (
+                  <li key={itemIndex}>✗ {weakness}</li>
+                ))}
               </ul>
             </div>
           </div>
@@ -239,16 +385,19 @@ function RoundAccordion({ index, round }: { index: number; round: import("@/serv
   );
 }
 
-function MiniBar({ label, v }: { label: string; v: number }) {
-  const pct = Math.max(0, Math.min(100, (v / 10) * 100));
+function MiniBar({ label, value }: { label: string; value: number }) {
+  const pct = Math.max(0, Math.min(100, (value / 10) * 100));
   return (
     <div>
       <div className="mb-1 flex justify-between text-[11px]">
         <span style={{ color: "var(--text-3)" }}>{label}</span>
-        <span className="mono">{v}</span>
+        <span className="mono">{value}</span>
       </div>
-      <div className="h-1 w-full overflow-hidden rounded-full" style={{ background: "var(--surface3)" }}>
-        <div className="h-full" style={{ width: `${pct}%`, background: scoreToColor(v) }} />
+      <div
+        className="h-1 w-full overflow-hidden rounded-full"
+        style={{ background: "var(--surface3)" }}
+      >
+        <div className="h-full" style={{ width: `${pct}%`, background: scoreToColor(value) }} />
       </div>
     </div>
   );
@@ -257,27 +406,32 @@ function MiniBar({ label, v }: { label: string; v: number }) {
 function CopyReportButton() {
   const state = useAppState();
   const [copied, setCopied] = useState(false);
+
   function copy() {
     if (!state.report) return;
-    const r = state.report;
-    const txt = `Mockpilot Debrief — ${r.role} @ ${r.company}
-Overall: ${r.overall_score.toFixed(1)}/10  (${r.hire_decision})
+    const report = state.report;
+    const text = `Mockpilot Debrief — ${report.role} @ ${report.company}
+Overall: ${report.overall_score.toFixed(1)}/10 (${report.hire_decision})
+
+PANEL:
+${report.interviewers.map((interviewer) => `• ${interviewer.name} — ${interviewer.title}`).join("\n")}
 
 STRENGTHS:
-${r.strengths.map((s) => `• ${s}`).join("\n")}
+${report.strengths.map((item) => `• ${item}`).join("\n")}
 
 WEAKNESSES:
-${r.weaknesses.map((s) => `• ${s}`).join("\n")}
+${report.weaknesses.map((item) => `• ${item}`).join("\n")}
 
 PRACTICE:
-${r.drill_questions.map((q, i) => `${i + 1}. ${q}`).join("\n")}
+${report.drill_questions.map((question, index) => `${index + 1}. ${question}`).join("\n")}
 
 STUDY PLAN:
-${r.study_plan}`;
-    navigator.clipboard.writeText(txt);
+${report.study_plan}`;
+    navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
   return (
     <button className="gp-btn w-full md:flex-1" onClick={copy}>
       {copied ? "✓ Copied!" : "📋 Copy Report"}

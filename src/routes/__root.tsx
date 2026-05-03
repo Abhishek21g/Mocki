@@ -8,11 +8,23 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "🧭 Mockpilot — AI Mock Interviews" },
-      { name: "description", content: "Multi-agent AI interviews that make you genuinely better. Powered by NVIDIA Nemotron." },
+      {
+        name: "description",
+        content:
+          "Multi-agent AI interviews that make you genuinely better. Powered by NVIDIA Nemotron.",
+      },
       { property: "og:title", content: "🧭 Mockpilot — AI Mock Interviews" },
-      { property: "og:description", content: "Multi-agent AI interviews that make you genuinely better. Powered by NVIDIA Nemotron." },
+      {
+        property: "og:description",
+        content:
+          "Multi-agent AI interviews that make you genuinely better. Powered by NVIDIA Nemotron.",
+      },
       { name: "twitter:title", content: "🧭 Mockpilot — AI Mock Interviews" },
-      { name: "twitter:description", content: "Multi-agent AI interviews that make you genuinely better. Powered by NVIDIA Nemotron." },
+      {
+        name: "twitter:description",
+        content:
+          "Multi-agent AI interviews that make you genuinely better. Powered by NVIDIA Nemotron.",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -28,8 +40,12 @@ export const Route = createRootRoute({
   notFoundComponent: () => (
     <div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
-        <h1 className="text-7xl font-bold" style={{ color: "var(--green)" }}>404</h1>
-        <a href="/" className="mt-4 inline-block text-[color:var(--text-2)] hover:text-white">Back home</a>
+        <h1 className="text-7xl font-bold" style={{ color: "var(--green)" }}>
+          404
+        </h1>
+        <a href="/" className="mt-4 inline-block text-[color:var(--text-2)] hover:text-white">
+          Back home
+        </a>
       </div>
     </div>
   ),

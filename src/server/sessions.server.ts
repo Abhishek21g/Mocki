@@ -1,9 +1,15 @@
+export type InterviewerId = "senior_engineer" | "hiring_manager" | "recruiter";
+export type InterviewType = "technical" | "behavioral" | "mixed";
+export type Difficulty = "easy" | "medium" | "hard";
+
 export type Persona = {
+  id: InterviewerId;
   name: string;
   title: string;
   company: string;
   years: number;
   personality: string;
+  focus: string;
 };
 
 export type Evaluation = {
@@ -18,9 +24,9 @@ export type Evaluation = {
 };
 
 export type Plan = {
-  next_interviewer_type: string;
+  next_interviewer_id: InterviewerId;
   question_type: string;
-  difficulty: string;
+  difficulty: Difficulty;
   reason: string;
 };
 
@@ -29,15 +35,21 @@ export type Round = {
   answer: string;
   evaluation: Evaluation;
   topic: string;
-  difficulty: string;
+  difficulty: Difficulty;
+  interviewerId: InterviewerId;
+  interviewerName: string;
+  coordinatorReason: string;
 };
 
 export type Session = {
   role: string;
   company: string;
-  interview_type: string;
+  jobDescription: string;
+  interview_type: InterviewType;
   resume: string;
-  persona: Persona;
+  interviewers: Persona[];
+  activeInterviewerId: InterviewerId;
+  panelType: "standard";
   rounds: Round[];
   currentRound: number;
   lastQuestion: string | null;
@@ -50,7 +62,13 @@ const g = globalThis as unknown as { __mockpilot_sessions?: Map<string, Session>
 if (!g.__mockpilot_sessions) g.__mockpilot_sessions = new Map();
 const sessions = g.__mockpilot_sessions;
 
-export function createSession(id: string, data: Omit<Session, "rounds" | "currentRound" | "lastQuestion" | "lastPlan" | "lastClarified" | "createdAt">) {
+export function createSession(
+  id: string,
+  data: Omit<
+    Session,
+    "rounds" | "currentRound" | "lastQuestion" | "lastPlan" | "lastClarified" | "createdAt"
+  >,
+) {
   sessions.set(id, {
     ...data,
     rounds: [],
@@ -72,4 +90,12 @@ export function updateSession(id: string, updates: Partial<Session>): Session {
   const next = { ...s, ...updates };
   sessions.set(id, next);
   return next;
+}
+
+export function getInterviewerById(session: Session, interviewerId: InterviewerId): Persona {
+  const interviewer = session.interviewers.find((candidate) => candidate.id === interviewerId);
+  if (!interviewer) {
+    throw new Error(`Interviewer not found: ${interviewerId}`);
+  }
+  return interviewer;
 }
