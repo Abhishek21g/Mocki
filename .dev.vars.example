@@ -24,3 +24,20 @@ NVIDIA_ASR_FUNCTION_ID=bb0837de-8c7b-481f-9ec8-ef5663e9c1fa
 NVIDIA_ASR_LANGUAGE=en-US
 # Adds punctuation/casing where supported.
 NVIDIA_ASR_AUTOMATIC_PUNCTUATION=true
+
+# --- Text-to-Speech (optional) -------------------------------------------------
+# Dedicated key for Magpie TTS. Falls back to NVIDIA_API_KEY if omitted.
+NVIDIA_TTS_API_KEY=
+# NVCF function id for magpie-tts-multilingual (find on build.nvidia.com).
+NVIDIA_TTS_FUNCTION_ID=
+# TTS HTTP endpoint the server posts to.
+# For hosted NVCF via local bridge: http://127.0.0.1:8788/synthesize
+# For self-hosted NIM: http://localhost:9000/v1/audio/speech (or similar).
+NVIDIA_TTS_HTTP_URL=http://127.0.0.1:8788/synthesize
+# Default language code for synthesis. en-US is recommended.
+NVIDIA_TTS_LANGUAGE=en-US
+# Magpie native sample rate. Both 22050 and 44100 are supported.
+NVIDIA_TTS_SAMPLE_RATE_HZ=22050
+# TTS proxy endpoint the browser POSTs to (expects audio/wav back).
+# In local dev, point this directly at the Python bridge to avoid Worker -> localhost issues.
+VITE_TTS_PROXY_URL=http://127.0.0.1:8788/synthesize
