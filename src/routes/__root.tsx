@@ -1,6 +1,8 @@
 import { Outlet, createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ghost/Toaster";
+import { AuthBar } from "@/components/ghost/AuthBar";
+import { SupabaseAuthProvider } from "@/lib/supabase-context";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -32,10 +34,11 @@ export const Route = createRootRoute({
   }),
   shellComponent: RootShell,
   component: () => (
-    <>
+    <SupabaseAuthProvider>
+      <AuthBar />
       <Outlet />
       <Toaster />
-    </>
+    </SupabaseAuthProvider>
   ),
   notFoundComponent: () => (
     <div className="flex min-h-screen items-center justify-center">
