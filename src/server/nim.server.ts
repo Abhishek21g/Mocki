@@ -6,6 +6,23 @@ const NIM_BASE_URL = "https://integrate.api.nvidia.com/v1";
 const MODEL = "nvidia/nvidia-nemotron-nano-9b-v2";
 
 /**
+ * Estimated USD cost per 1 million tokens for {@link MODEL}.
+ *
+ * These are reasonable build.nvidia.com paid-tier estimates for the
+ * Nemotron Nano 9B class. Used purely for the in-app cost meter on the
+ * agent dashboard; not a billing source of truth.
+ */
+const COST_PER_M_INPUT_USD = 0.2;
+const COST_PER_M_OUTPUT_USD = 0.4;
+
+function estimateCostUsd(inputTokens: number, outputTokens: number): number {
+  return (
+    (inputTokens / 1_000_000) * COST_PER_M_INPUT_USD +
+    (outputTokens / 1_000_000) * COST_PER_M_OUTPUT_USD
+  );
+}
+
+/**
  * Vite's vite.config.ts runs in a different process than TanStack Start server
  * functions. Reading `.dev.vars` here ensures Nemotron calls see NVIDIA_API_KEY in dev.
  */
@@ -48,12 +65,15 @@ export async function callNemotron(
   const apiKey = process.env.NVIDIA_API_KEY;
   if (!apiKey) throw new Error("NVIDIA_API_KEY is not configured");
   const sid = currentSessionId();
+  const corrId = crypto.randomUUID();
   const t0 = Date.now();
   if (sid)
     pushLog(sid, {
       agent,
       phase: "start",
       message: `Calling ${MODEL}`,
+      corrId,
+      model: MODEL,
       meta: { temperature, maxTokens, prompt: userMessage.slice(0, 220) },
     });
 
@@ -82,26 +102,52 @@ export async function callNemotron(
         agent,
         phase: "error",
         message: `API error ${res.status}`,
+        corrId,
+        latencyMs: Date.now() - t0,
+        model: MODEL,
         meta: { body: t.slice(0, 200) },
       });
     throw new Error(`NIM API error ${res.status}: ${t.slice(0, 300)}`);
   }
   const data = (await res.json()) as {
     choices?: { message?: { content?: string | null } }[];
-    usage?: Record<string, number>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
   };
   const content = data?.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
     console.error("NIM empty content:", JSON.stringify(data).slice(0, 500));
-    if (sid) pushLog(sid, { agent, phase: "error", message: "Empty response from model" });
+    if (sid)
+      pushLog(sid, {
+        agent,
+        phase: "error",
+        message: "Empty response from model",
+        corrId,
+        latencyMs: Date.now() - t0,
+        model: MODEL,
+      });
     throw new Error("AI model returned empty response");
   }
+  const latencyMs = Date.now() - t0;
+  const inputTokens = data.usage?.prompt_tokens ?? 0;
+  const outputTokens = data.usage?.completion_tokens ?? 0;
+  const costUsd = estimateCostUsd(inputTokens, outputTokens);
   if (sid)
     pushLog(sid, {
       agent,
       phase: "end",
-      message: `Done in ${Date.now() - t0}ms`,
-      meta: { tokens: data.usage?.total_tokens, preview: content.slice(0, 200) },
+      message: `Done in ${latencyMs}ms`,
+      corrId,
+      latencyMs,
+      inputTokens,
+      outputTokens,
+      costUsd,
+      model: MODEL,
+      meta: {
+        // Keep the legacy `tokens` field so any pre-dashboard consumers (e.g.
+        // the existing event-list UI) don't lose info during the migration.
+        tokens: data.usage?.total_tokens,
+        preview: content.slice(0, 200),
+      },
     });
   return content;
 }

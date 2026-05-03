@@ -10,7 +10,7 @@ import {
   runInterviewer,
   runReportGenerator,
 } from "./agents.server";
-import { getLogs, pushLog, withSessionLog } from "./agent-log.server";
+import { getLogs, markTurnBoundary, pushLog, withSessionLog } from "./agent-log.server";
 import { createSession, getInterviewerById, getSession, updateSession } from "./sessions.server";
 import { getUserIdForToken } from "./supabase.server";
 import {
@@ -142,6 +142,9 @@ export const startInterview = createServerFn({ method: "POST" })
       });
 
       const session = getSession(sessionId)!;
+      // Setup events above (RoleProfile, Memory, PanelGen, etc.) sit on
+      // turn 0; the interview itself begins here.
+      markTurnBoundary(sessionId, "Turn 1 started · opening question");
       const plan = await runCoordinator(session);
       const activeInterviewer = getInterviewerById(session, plan.next_interviewer_id);
 
@@ -300,6 +303,9 @@ export const submitAnswer = createServerFn({ method: "POST" })
         };
       }
 
+      // New question = new turn. Clarifications above bail out earlier
+      // (no boundary), so they correctly stay on the previous turn.
+      markTurnBoundary(data.sessionId, `Turn ${newRoundNumber + 1} started`);
       const plan = await runCoordinator(session);
       const nextInterviewer = getInterviewerById(session, plan.next_interviewer_id);
       pushLog(data.sessionId, {
