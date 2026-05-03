@@ -3,6 +3,7 @@ import { useState } from "react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
 import { store } from "@/lib/ghost-store";
+import { useSupabaseAuth } from "@/lib/supabase-context";
 import { startInterview } from "@/server/interview.functions";
 
 export const Route = createFileRoute("/")({
@@ -21,6 +22,7 @@ export const Route = createFileRoute("/")({
 
 function SetupPage() {
   const nav = useNavigate();
+  const { getAccessToken, status, user } = useSupabaseAuth();
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -35,6 +37,7 @@ function SetupPage() {
     if (!valid || loading) return;
     setLoading(true);
     try {
+      const accessToken = getAccessToken();
       const res = await startInterview({
         data: {
           role,
@@ -42,6 +45,7 @@ function SetupPage() {
           jobDescription,
           interview_type: interviewType as "technical" | "behavioral" | "mixed",
           resume,
+          ...(accessToken ? { accessToken } : {}),
         },
       });
       store.set({
@@ -91,6 +95,22 @@ function SetupPage() {
           <p className="mt-3 text-base md:text-lg" style={{ color: "var(--text-2)" }}>
             Multi-agent panel interviews that adapt in real time
           </p>
+          {status === "ready" && user && (
+            <p
+              className="mono mt-3 text-[11px] uppercase tracking-wider"
+              style={{ color: "var(--green)" }}
+            >
+              Memory enabled · this session will train on your prior interviews
+            </p>
+          )}
+          {status === "ready" && !user && (
+            <p
+              className="mono mt-3 text-[11px] uppercase tracking-wider"
+              style={{ color: "var(--text-3)" }}
+            >
+              Sign in (top right) to save history and let the panel learn across sessions
+            </p>
+          )}
         </header>
 
         <form
