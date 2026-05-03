@@ -264,8 +264,11 @@ function createProxyRecorder(options: Required<Pick<SpeechControllerOptions, "on
 
 export function createSpeechRecognitionController(options: SpeechControllerOptions): SpeechController {
   const recognitionCtor = getSpeechRecognitionCtor();
+  // Always use the browser's built-in Web Speech API, regardless of whether
+  // VITE_STT_PROXY_URL is set. The NVIDIA Riva proxy path remains in this
+  // file for reference but is intentionally never selected.
   const sttProxyUrl = options.proxyUrl?.trim();
-  const canUseProxy = Boolean(sttProxyUrl) && isAudioCaptureSupported();
+  const canUseProxy = false;
 
   if (canUseProxy && sttProxyUrl) {
     const proxy = createProxyRecorder({
