@@ -1,3 +1,9 @@
-# Copy this file to .dev.vars and add your real key (never commit .dev.vars).
-# Get a key from NVIDIA NIM / API dashboard.
-NVIDIA_API_KEY=paste_your_key_here
+# Copy this file to .dev.vars and fill in real values (never commit .dev.vars).
+
+# NVIDIA NIM API key — get one from https://build.nvidia.com/.
+NVIDIA_API_KEY=paste_your_nvidia_key_here
+
+# Supabase — get from your Supabase project settings (API).
+# Required for sign-in, history persistence, and learner memory features.
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=paste_your_supabase_anon_key_here
