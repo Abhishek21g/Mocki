@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { nitro } from "nitro/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 import { cloudflare } from "@cloudflare/vite-plugin";
 
@@ -33,6 +34,10 @@ function loadDevVars() {
 
 loadDevVars();
 
+function isVercelBuild() {
+  return Boolean(process.env.VERCEL);
+}
+
 export default defineConfig({
   server: {
     port: 8080,
@@ -43,7 +48,17 @@ export default defineConfig({
     tailwindcss(),
     tanstackStart(),
     viteReact(),
-    ...(process.env.NODE_ENV === "production" ? [cloudflare()] : []),
+    ...(process.env.NODE_ENV === "production"
+      ? [
+          ...(isVercelBuild()
+            ? [nitro()]
+            : [
+                cloudflare({
+                  viteEnvironment: { name: "ssr" },
+                }),
+              ]),
+        ]
+      : []),
   ],
   resolve: {
     dedupe: ["react", "react-dom", "@tanstack/react-router", "@tanstack/react-start"],
