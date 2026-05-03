@@ -1,3 +1,5 @@
+import type { InterviewStage, InterviewType, RoleProfile } from "@/server/sessions.server";
+
 export function getHireColor(decision: string) {
   const map: Record<string, string> = {
     "strong yes": "#22c55e",
@@ -42,6 +44,27 @@ export function humanizeLabel(value: string) {
     .map((part) => capitalize(part))
     .join(" ");
 }
+
+export function stageLabel(stage: InterviewStage) {
+  if (stage === "core_skills") return "Core Skills";
+  return humanizeLabel(stage);
+}
+
+export function interviewTypeLabel(interviewType: InterviewType) {
+  switch (interviewType) {
+    case "technical":
+      return "Role Skills";
+    case "behavioral":
+      return "Behavioral";
+    case "mixed":
+      return "Mixed";
+  }
+}
+
+export function scoreAxisLabel(roleProfile: RoleProfile) {
+  return roleProfile.coreSkillsLabel;
+}
+
 export function initials(name: string) {
   return name
     .split(" ")

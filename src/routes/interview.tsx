@@ -1,5 +1,6 @@
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { store, useAppState } from "@/lib/ghost-store";
@@ -9,10 +10,12 @@ import {
   humanizeLabel,
   initials,
   scoreToColor,
+  scoreAxisLabel,
+  stageLabel,
 } from "@/lib/ghost-utils";
 import { cn } from "@/lib/utils";
 import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview.functions";
-import type { InterviewStage, Persona, TurnType } from "@/server/sessions.server";
+import type { InterviewStage, Persona, RoleProfile, TurnType } from "@/server/sessions.server";
 
 type AgentEvent = {
   id: string;
@@ -76,12 +79,13 @@ function InterviewPage() {
     };
   }, [state.sessionId]);
 
-  if (!state.sessionId || !state.setupData || !state.activeInterviewer) {
+  if (!state.sessionId || !state.setupData || !state.activeInterviewer || !state.roleProfile) {
     return <Navigate to="/" />;
   }
 
   const setup = state.setupData;
   const activeInterviewer = state.activeInterviewer;
+  const roleProfile = state.roleProfile;
   const showInlineAgents = showAgents && canInlineAgents;
   const showDrawerAgents = showAgents && !canInlineAgents;
 
@@ -313,6 +317,7 @@ function InterviewPage() {
                 ev={state.lastEvaluation}
                 round={state.rounds.length}
                 stage={state.rounds[state.rounds.length - 1].stage}
+                roleProfile={roleProfile}
               />
             )}
           </section>
@@ -356,9 +361,7 @@ function TopBar({
         borderBottom: "1px solid #1a1a1a",
       }}
     >
-      <div className="font-bold" style={{ color: "var(--green)" }}>
-        🧭 Mockpilot
-      </div>
+      <HomeLogo className="text-base" />
       <div className="hidden text-sm md:block">
         <span style={{ color: "var(--text-2)" }}>{role}</span>
         <span style={{ color: "var(--text-3)" }}> @ </span>
@@ -413,7 +416,7 @@ function SessionStrip({
   return (
     <section className="gp-card flex flex-col gap-4 p-5 xl:flex-row xl:items-center xl:justify-between">
       <div className="flex flex-wrap gap-3">
-        <FlowBadge label="Flow" value={stage} accent="var(--green)" />
+        <FlowBadge label="Flow" value={stageLabel(stage)} accent="var(--green)" />
         <FlowBadge label="Move" value={turnType} accent="var(--text-2)" />
         <FlowBadge label="Active" value={activeInterviewer.name} accent="var(--text)" />
         <FlowBadge label="Focus" value={focus} accent="var(--text)" />
@@ -447,7 +450,7 @@ function FlowBadge({ label, value, accent }: { label: string; value: string; acc
         {label}
       </div>
       <div className="text-sm font-medium" style={{ color: accent }}>
-        {humanizeLabel(value)}
+        {value.includes("_") ? humanizeLabel(value) : value}
       </div>
     </div>
   );
@@ -528,7 +531,7 @@ function FlowCard({
           className="rounded-full px-3 py-1 text-xs font-medium"
           style={{ background: "var(--green-dim)", color: "var(--green)" }}
         >
-          {humanizeLabel(stage)}
+          {stageLabel(stage)}
         </span>
         <span
           className="rounded-full px-3 py-1 text-xs font-medium"
@@ -631,10 +634,11 @@ function EvaluationCard({
   ev,
   round,
   stage,
+  roleProfile,
 }: {
   ev: {
     clarity: number;
-    technical_depth: number;
+    role_skill_depth: number;
     structure: number;
     overall: number;
     strengths: string[];
@@ -645,6 +649,7 @@ function EvaluationCard({
   };
   round: number;
   stage: InterviewStage;
+  roleProfile: RoleProfile;
 }) {
   const items = [
     ...(ev.strengths ?? []).map((text) => ({ kind: "s" as const, text })),
@@ -670,7 +675,7 @@ function EvaluationCard({
     <div className="gp-card fade-up p-6">
       <div className="mb-4 flex items-end justify-between">
         <div className="text-sm font-semibold" style={{ color: "var(--text-2)" }}>
-          Turn {round} · {humanizeLabel(stage)}
+          Turn {round} · {stageLabel(stage)}
         </div>
         <div className="mono text-3xl font-bold" style={{ color: scoreToColor(ev.overall) }}>
           {overallShown.toFixed(1)}
@@ -684,7 +689,7 @@ function EvaluationCard({
       </p>
       <div className="flex flex-col gap-3">
         <ScoreBar label="Clarity" score={ev.clarity} delay={0} />
-        <ScoreBar label="Technical Depth" score={ev.technical_depth} delay={120} />
+        <ScoreBar label={scoreAxisLabel(roleProfile)} score={ev.role_skill_depth} delay={120} />
         <ScoreBar label="Structure" score={ev.structure} delay={240} />
       </div>
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">

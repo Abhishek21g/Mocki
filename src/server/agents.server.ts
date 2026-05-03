@@ -8,50 +8,67 @@ import type {
   InterviewerId,
   Persona,
   Plan,
+  QuestionType,
+  RoleProfile,
   Session,
   TurnType,
 } from "./sessions.server";
 
-const INTERVIEWER_BLUEPRINTS: Record<
-  InterviewerId,
-  {
-    fallbackName: string;
-    fallbackTitle: string;
-    focus: string;
-    brief: string;
-  }
-> = {
-  senior_engineer: {
-    fallbackName: "Maya",
-    fallbackTitle: "Senior Software Engineer",
-    focus: "technical depth, tradeoffs, debugging, and system thinking",
-    brief: "Pushes on architecture choices, implementation details, and technical tradeoffs.",
-  },
-  hiring_manager: {
-    fallbackName: "Jordan",
-    fallbackTitle: "Engineering Manager",
-    focus: "behavioral depth, ownership, teamwork, and decision-making",
-    brief: "Tests collaboration, leadership signals, and how the candidate operates in teams.",
-  },
-  recruiter: {
-    fallbackName: "Avery",
-    fallbackTitle: "Technical Recruiter",
-    focus: "candidate motivation, role fit, and resume storytelling",
-    brief: "Covers background, motivation, communication, and why the candidate fits the role.",
-  },
-};
-
-const TECHNICAL_TOPICS = new Set([
+const PANEL_ARCHETYPES: InterviewerId[] = ["practitioner", "hiring_manager", "recruiter"];
+const SOFTWARE_QUESTION_TYPES = new Set<QuestionType>([
   "project_deep_dive",
   "technical_design",
   "debugging",
   "tradeoffs",
 ]);
+const NON_SOFTWARE_QUESTION_TYPES = new Set<QuestionType>([
+  "role_execution",
+  "customer_scenario",
+  "process",
+  "judgment",
+]);
+const ALL_QUESTION_TYPES = new Set<QuestionType>([
+  "background",
+  "resume_deep_dive",
+  "project_deep_dive",
+  "technical_design",
+  "debugging",
+  "tradeoffs",
+  "role_execution",
+  "judgment",
+  "customer_scenario",
+  "process",
+  "behavioral",
+  "motivation",
+  "candidate_questions",
+  "closing",
+]);
+
+const INTERVIEWER_BLUEPRINTS: Record<
+  InterviewerId,
+  {
+    fallbackName: string;
+    brief: string;
+  }
+> = {
+  practitioner: {
+    fallbackName: "Maya",
+    brief: "Pushes on day-to-day execution, scenario judgment, and role-specific depth.",
+  },
+  hiring_manager: {
+    fallbackName: "Jordan",
+    brief: "Tests ownership, reliability, collaboration, and how the candidate operates on a team.",
+  },
+  recruiter: {
+    fallbackName: "Avery",
+    brief: "Covers motivation, communication, logistics, and overall fit for the role.",
+  },
+};
 
 const STAGES: InterviewStage[] = [
   "intro",
   "resume_walkthrough",
-  "core_technical",
+  "core_skills",
   "core_behavioral",
   "candidate_questions",
   "wrap_up",
@@ -82,7 +99,7 @@ Your job is to decide the NEXT conversational move so the interview feels sequen
 You manage these interview stages:
 - intro
 - resume_walkthrough
-- core_technical
+- core_skills
 - core_behavioral
 - candidate_questions
 - wrap_up
@@ -96,10 +113,10 @@ You also choose a turn type:
 
 Output ONLY valid JSON:
 {
-  "next_interviewer_id": "senior_engineer" | "hiring_manager" | "recruiter",
-  "stage": "intro" | "resume_walkthrough" | "core_technical" | "core_behavioral" | "candidate_questions" | "wrap_up",
+  "next_interviewer_id": "practitioner" | "hiring_manager" | "recruiter",
+  "stage": "intro" | "resume_walkthrough" | "core_skills" | "core_behavioral" | "candidate_questions" | "wrap_up",
   "turn_type": "new_question" | "follow_up" | "challenge" | "clarification" | "transition",
-  "question_type": "background" | "resume_deep_dive" | "project_deep_dive" | "technical_design" | "debugging" | "tradeoffs" | "behavioral" | "motivation" | "candidate_questions" | "closing",
+  "question_type": "background" | "resume_deep_dive" | "project_deep_dive" | "technical_design" | "debugging" | "tradeoffs" | "role_execution" | "judgment" | "customer_scenario" | "process" | "behavioral" | "motivation" | "candidate_questions" | "closing",
   "focus": "short phrase for what this turn is testing",
   "goal": "what the interviewer wants to learn from the candidate",
   "difficulty": "easy" | "medium" | "hard",
@@ -115,10 +132,12 @@ Rules:
 - Prefer staying with the same interviewer for 2-3 connected turns when they are probing the same answer.
 - Use follow_up or challenge when the previous answer created a natural next question.
 - Use resume details in intro, resume_walkthrough, and behavioral stages.
-- Use job requirements heavily in technical and fit-related stages.
+- Use job requirements heavily in core_skills and fit-related stages.
 - Use recruiter for intro, motivation, candidate_questions, and some resume walkthrough.
-- Use senior_engineer for technical deep dives, debugging, and tradeoffs.
-- Use hiring_manager for behavioral depth, ownership, and cross-functional collaboration.
+- Use practitioner for role-skill deep dives, real scenarios, and tradeoffs.
+- Use hiring_manager for behavioral depth, ownership, reliability, and team judgment.
+- If the role profile says software engineering or the core skills label is Technical Depth, practitioner questions may use project_deep_dive, technical_design, debugging, and tradeoffs.
+- Otherwise, prefer role_execution, customer_scenario, process, and judgment for core_skills.
 - candidate_questions should feel like a realistic late-stage conversation, such as asking what the candidate is optimizing for or how they evaluate team fit.
 - wrap_up should be short and natural.
 - Keep difficulty medium in the first two turns unless the user answer is exceptionally strong.
@@ -135,7 +154,8 @@ Rules:
 - You may briefly acknowledge the candidate's previous answer before asking the next thing.
 - If turn_type is follow_up or challenge, build directly on the candidate's previous answer.
 - If stage is intro or resume_walkthrough, anchor the question in the candidate's background.
-- If stage is core_technical or core_behavioral, anchor the question in the job requirements and prior answers.
+- If stage is core_skills or core_behavioral, anchor the question in the job requirements and prior answers.
+- Keep the language realistic for the role domain; do not force software-engineering terms into non-technical jobs.
 - Do not say "Here is your next question."
 - Do not mention JSON, stages, turns, or hidden planning logic.
 - Do not coach or evaluate.
@@ -148,7 +168,7 @@ Evaluate the candidate's answer in the context of the role, the interview stage,
 Output ONLY valid JSON:
 {
   "clarity": <integer 1-10>,
-  "technical_depth": <integer 1-10>,
+  "role_skill_depth": <integer 1-10>,
   "structure": <integer 1-10>,
   "overall": <float 1.0-10.0 with one decimal>,
   "strengths": ["...", "...", "..."],
@@ -159,11 +179,12 @@ Output ONLY valid JSON:
   "unresolved_follow_ups": ["...", "..."],
   "follow_up_topics": ["...", "..."],
   "resume_alignment": "one short sentence about how well the answer connected to their background",
-  "job_requirement_alignment": "one short sentence about how well the answer matched the job",
+  "job_requirement_alignment": "one short sentence about how well the answer matched the job"
 }
 
 Rules:
 - Be strict but fair.
+- role_skill_depth means the depth of job-relevant skills for this role. For software roles, that includes technical depth.
 - unresolved_follow_ups should only include things a realistic interviewer would naturally probe next.
 - follow_up_topics should be short phrases.
 - Use the interview stage and turn goal when scoring.
@@ -185,7 +206,7 @@ The report should reflect the interview as a realistic conversation, not disconn
 Output JSON only.`;
 
 function sanitizeInterviewerId(value: unknown): InterviewerId | null {
-  if (value === "senior_engineer" || value === "hiring_manager" || value === "recruiter") {
+  if (value === "practitioner" || value === "hiring_manager" || value === "recruiter") {
     return value;
   }
   return null;
@@ -214,6 +235,21 @@ function sanitizeTurnType(value: unknown): TurnType | null {
     return value;
   }
   return null;
+}
+
+function sanitizeQuestionType(value: unknown): QuestionType | null {
+  if (typeof value !== "string") return null;
+  return ALL_QUESTION_TYPES.has(value as QuestionType) ? (value as QuestionType) : null;
+}
+
+function sanitizeScore(value: unknown, fallback: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.max(1, Math.min(10, Math.round(value)));
+}
+
+function sanitizeOverallScore(value: unknown, fallback: number) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.max(1, Math.min(10, Number(value.toFixed(1))));
 }
 
 function humanize(value: string) {
@@ -254,13 +290,161 @@ function cleanQuestionText(question: string) {
     .trim();
 }
 
-function normalizePersona(raw: unknown, interviewerId: InterviewerId, company: string): Persona {
+function isSoftwareRoleText(value: string) {
+  return /\b(software|frontend|backend|full[ -]?stack|engineer|developer|programmer|devops|sre|platform|data engineer|machine learning|ml engineer|qa automation)\b/i.test(
+    value,
+  );
+}
+
+function isSoftwareRoleProfile(roleProfile: RoleProfile) {
+  return roleProfile.coreSkillsLabel === "Technical Depth";
+}
+
+function cleanRoleText(role: string) {
+  return role
+    .replace(/\s+@\s+.+$/i, "")
+    .replace(/\s+-\s+.+$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function toTitleCase(value: string) {
+  return value.replace(/\w\S*/g, (part) => part[0].toUpperCase() + part.slice(1).toLowerCase());
+}
+
+function shortRoleDomain(role: string) {
+  return cleanRoleText(role).toLowerCase().split(/\s+/).slice(0, 4).join(" ");
+}
+
+function looksCustomerFacing(role: string, jobDescription: string) {
+  return /\b(customer|guest|service|sales|retail|front desk|support|cashier|barista|server|host)\b/i.test(
+    `${role} ${jobDescription}`,
+  );
+}
+
+function inferRoleDomainLabel(role: string, jobDescription: string) {
+  const haystack = `${role} ${jobDescription}`.toLowerCase();
+  if (/\b(barista|espresso|coffee|cafe)\b/.test(haystack)) return "barista";
+  if (
+    /\b(customer support|support specialist|support representative|help desk|call center)\b/.test(
+      haystack,
+    )
+  ) {
+    return "customer support";
+  }
+  if (/\b(retail|cashier|store associate|sales associate|merchandising)\b/.test(haystack)) {
+    return "retail";
+  }
+  if (isSoftwareRoleText(haystack)) return "software engineering";
+  if (/\b(warehouse|logistics|fulfillment|operations)\b/.test(haystack)) return "operations";
+  if (/\b(marketing|content|growth)\b/.test(haystack)) return "marketing";
+  if (/\b(design|ux|ui|product design|graphic design)\b/.test(haystack)) return "design";
+  return shortRoleDomain(role) || "general operations";
+}
+
+export function deriveRoleProfile(
+  role: string,
+  jobDescription: string,
+  interviewType: InterviewType,
+): RoleProfile {
+  const roleDomainLabel = inferRoleDomainLabel(role, jobDescription);
+  const panelMode =
+    interviewType === "behavioral" ? "behavioral" : interviewType === "mixed" ? "mixed" : "skills";
+
+  return {
+    panelMode,
+    roleDomainLabel,
+    coreSkillsLabel: isSoftwareRoleText(`${role} ${jobDescription}`)
+      ? "Technical Depth"
+      : "Role Skills",
+    panelArchetypes: [...PANEL_ARCHETYPES],
+  };
+}
+
+function fallbackTitleForInterviewer(
+  interviewerId: InterviewerId,
+  role: string,
+  roleProfile: RoleProfile,
+) {
+  const cleanRole = cleanRoleText(role);
+  const lowerRole = cleanRole.toLowerCase();
+
+  if (interviewerId === "practitioner") {
+    if (isSoftwareRoleProfile(roleProfile)) {
+      return /engineer|developer/i.test(cleanRole) ? cleanRole : "Software Engineer";
+    }
+    if (/\bbarista\b/i.test(lowerRole)) return "Senior Barista";
+    if (/\bcustomer support|support representative|support specialist\b/i.test(lowerRole)) {
+      return "Customer Support Specialist";
+    }
+    if (/\bcashier|sales associate|store associate|retail associate\b/i.test(lowerRole)) {
+      return "Senior Sales Associate";
+    }
+    if (/\bwarehouse|fulfillment|operations\b/i.test(lowerRole)) return "Operations Specialist";
+    return cleanRole ? toTitleCase(cleanRole) : "Senior Team Member";
+  }
+
+  if (interviewerId === "hiring_manager") {
+    if (isSoftwareRoleProfile(roleProfile)) return "Engineering Manager";
+    if (roleProfile.roleDomainLabel === "barista") return "Cafe Manager";
+    if (roleProfile.roleDomainLabel === "retail") return "Store Manager";
+    if (roleProfile.roleDomainLabel === "customer support") return "Support Manager";
+    if (roleProfile.roleDomainLabel === "operations") return "Operations Manager";
+    if (roleProfile.roleDomainLabel === "marketing") return "Marketing Manager";
+    if (roleProfile.roleDomainLabel === "design") return "Design Manager";
+    return "Hiring Manager";
+  }
+
+  return isSoftwareRoleProfile(roleProfile) ? "Technical Recruiter" : "Talent Partner";
+}
+
+function fallbackFocusForInterviewer(interviewerId: InterviewerId, roleProfile: RoleProfile) {
+  if (interviewerId === "practitioner") {
+    return isSoftwareRoleProfile(roleProfile)
+      ? "technical depth, tradeoffs, debugging, and system thinking"
+      : "day-to-day execution, real scenarios, process judgment, and role-specific problem solving";
+  }
+  if (interviewerId === "hiring_manager") {
+    return "ownership, teamwork, reliability, and decision-making";
+  }
+  return "candidate motivation, communication, logistics, and role fit";
+}
+
+function isEngineeringBiasedTitle(title: string) {
+  return /\b(engineer|developer|architect|sre|devops)\b/i.test(title);
+}
+
+function isEngineeringBiasedFocus(focus: string) {
+  return /\b(system design|architecture|debugging|technical depth|distributed systems)\b/i.test(
+    focus,
+  );
+}
+
+function normalizePersona(
+  raw: unknown,
+  interviewerId: InterviewerId,
+  company: string,
+  role: string,
+  roleProfile: RoleProfile,
+): Persona {
   const defaults = INTERVIEWER_BLUEPRINTS[interviewerId];
   const value = (raw ?? {}) as Partial<Persona>;
+  const fallbackTitle = fallbackTitleForInterviewer(interviewerId, role, roleProfile);
+  const parsedTitle =
+    typeof value.title === "string" && value.title.trim() ? value.title.trim() : fallbackTitle;
   const title =
-    typeof value.title === "string" && value.title.trim()
-      ? value.title.trim()
-      : `${defaults.fallbackTitle} @ ${company}`;
+    !isSoftwareRoleProfile(roleProfile) &&
+    interviewerId !== "recruiter" &&
+    isEngineeringBiasedTitle(parsedTitle)
+      ? fallbackTitle
+      : parsedTitle;
+  const fallbackFocus = fallbackFocusForInterviewer(interviewerId, roleProfile);
+  const parsedFocus =
+    typeof value.focus === "string" && value.focus.trim() ? value.focus.trim() : fallbackFocus;
+  const focus =
+    !isSoftwareRoleProfile(roleProfile) && isEngineeringBiasedFocus(parsedFocus)
+      ? fallbackFocus
+      : parsedFocus;
 
   return {
     id: interviewerId,
@@ -281,8 +465,7 @@ function normalizePersona(raw: unknown, interviewerId: InterviewerId, company: s
       typeof value.personality === "string" && value.personality.trim()
         ? value.personality.trim()
         : "direct, thoughtful, high-signal",
-    focus:
-      typeof value.focus === "string" && value.focus.trim() ? value.focus.trim() : defaults.focus,
+    focus,
   };
 }
 
@@ -316,18 +499,21 @@ function defaultStageForRound(session: Session, roundNumber: number): InterviewS
     return session.interview_type === "technical" ? "core_behavioral" : "candidate_questions";
   }
   if (session.interview_type === "behavioral") return "core_behavioral";
-  if (session.interview_type === "technical") return "core_technical";
-  return roundNumber % 2 === 1 ? "core_technical" : "core_behavioral";
+  if (session.interview_type === "technical") return "core_skills";
+  return roundNumber % 2 === 1 ? "core_skills" : "core_behavioral";
 }
 
-function defaultQuestionTypeForStage(stage: InterviewStage): string {
+function defaultQuestionTypeForStage(stage: InterviewStage, session: Session): QuestionType {
   switch (stage) {
     case "intro":
       return "background";
     case "resume_walkthrough":
       return "resume_deep_dive";
-    case "core_technical":
-      return "project_deep_dive";
+    case "core_skills":
+      if (isSoftwareRoleProfile(session.roleProfile)) return "project_deep_dive";
+      return looksCustomerFacing(session.role, session.jobDescription)
+        ? "customer_scenario"
+        : "role_execution";
     case "core_behavioral":
       return "behavioral";
     case "candidate_questions":
@@ -343,8 +529,8 @@ function defaultInterviewerForStage(stage: InterviewStage): InterviewerId {
       return "recruiter";
     case "resume_walkthrough":
       return "recruiter";
-    case "core_technical":
-      return "senior_engineer";
+    case "core_skills":
+      return "practitioner";
     case "core_behavioral":
       return "hiring_manager";
     case "candidate_questions":
@@ -362,7 +548,7 @@ function defaultTurnTypeForStage(session: Session, stage: InterviewStage): TurnT
     lastRound.evaluation.unresolved_follow_ups.length > 0 &&
     lastRound.turnType !== "clarification"
   ) {
-    return lastRound.stage === "core_technical" ? "challenge" : "follow_up";
+    return lastRound.stage === "core_skills" ? "challenge" : "follow_up";
   }
   return stage === "wrap_up" ? "transition" : "new_question";
 }
@@ -373,8 +559,8 @@ function defaultFocusForStage(stage: InterviewStage, session: Session): string {
       return "candidate background and role fit";
     case "resume_walkthrough":
       return session.candidateContext.resumeHighlights[0] ?? "resume walkthrough";
-    case "core_technical":
-      return session.candidateContext.targetSkills[0] ?? "technical problem solving";
+    case "core_skills":
+      return session.candidateContext.targetSkills[0] ?? "role-specific problem solving";
     case "core_behavioral":
       return "ownership, teamwork, and decision-making";
     case "candidate_questions":
@@ -384,14 +570,14 @@ function defaultFocusForStage(stage: InterviewStage, session: Session): string {
   }
 }
 
-function defaultGoalForStage(stage: InterviewStage): string {
+function defaultGoalForStage(stage: InterviewStage, session: Session): string {
   switch (stage) {
     case "intro":
       return "Understand the candidate's background and what attracts them to the role.";
     case "resume_walkthrough":
       return "Dig into a real experience from the resume and understand scope and impact.";
-    case "core_technical":
-      return "Test technical depth, tradeoffs, and problem-solving under realistic constraints.";
+    case "core_skills":
+      return `Test ${session.roleProfile.coreSkillsLabel.toLowerCase()}, judgment, and problem-solving under realistic job constraints.`;
     case "core_behavioral":
       return "Test ownership, collaboration, communication, and judgment.";
     case "candidate_questions":
@@ -415,7 +601,7 @@ function defaultResumeAnchor(session: Session, stage: InterviewStage) {
 }
 
 function defaultJobAnchor(session: Session, stage: InterviewStage) {
-  if (stage === "core_technical" || stage === "core_behavioral") {
+  if (stage === "core_skills" || stage === "core_behavioral") {
     return session.candidateContext.targetSkills[0] ?? null;
   }
   return null;
@@ -435,9 +621,9 @@ function defaultPlan(session: Session): Plan {
     next_interviewer_id: nextInterviewer,
     stage,
     turn_type: turnType,
-    question_type: defaultQuestionTypeForStage(stage),
+    question_type: defaultQuestionTypeForStage(stage, session),
     focus: defaultFocusForStage(stage, session),
-    goal: defaultGoalForStage(stage),
+    goal: defaultGoalForStage(stage, session),
     difficulty: defaultDifficultyForStage(stage, roundNumber),
     reason:
       turnType === "new_question"
@@ -456,6 +642,58 @@ function trimStringArray(value: unknown, limit: number) {
     .map((item) => item.trim())
     .filter(Boolean)
     .slice(0, limit);
+}
+
+function normalizeEvaluation(raw: unknown): Evaluation {
+  const value = (raw ?? {}) as Partial<Evaluation> & { technical_depth?: unknown };
+
+  return {
+    clarity: sanitizeScore(value.clarity, 6),
+    role_skill_depth: sanitizeScore(value.role_skill_depth ?? value.technical_depth, 6),
+    structure: sanitizeScore(value.structure, 6),
+    overall: sanitizeOverallScore(value.overall, 6),
+    strengths: trimStringArray(value.strengths, 4),
+    weaknesses: trimStringArray(value.weaknesses, 4),
+    correct: typeof value.correct === "boolean" ? value.correct : true,
+    missed_concepts: trimStringArray(value.missed_concepts, 4),
+    answer_summary:
+      typeof value.answer_summary === "string" && value.answer_summary.trim()
+        ? value.answer_summary.trim()
+        : "The answer addressed part of the prompt but needs a clearer summary.",
+    unresolved_follow_ups: trimStringArray(value.unresolved_follow_ups, 4),
+    follow_up_topics: trimStringArray(value.follow_up_topics, 4),
+    resume_alignment:
+      typeof value.resume_alignment === "string" && value.resume_alignment.trim()
+        ? value.resume_alignment.trim()
+        : "The answer referenced the candidate's background only loosely.",
+    job_requirement_alignment:
+      typeof value.job_requirement_alignment === "string" && value.job_requirement_alignment.trim()
+        ? value.job_requirement_alignment.trim()
+        : "The answer only partially matched the stated job requirements.",
+  };
+}
+
+function isQuestionTypeAllowedForStage(
+  questionType: QuestionType,
+  stage: InterviewStage,
+  roleProfile: RoleProfile,
+) {
+  switch (stage) {
+    case "intro":
+      return questionType === "background" || questionType === "motivation";
+    case "resume_walkthrough":
+      return questionType === "resume_deep_dive";
+    case "core_skills":
+      return isSoftwareRoleProfile(roleProfile)
+        ? SOFTWARE_QUESTION_TYPES.has(questionType) || questionType === "project_deep_dive"
+        : NON_SOFTWARE_QUESTION_TYPES.has(questionType);
+    case "core_behavioral":
+      return questionType === "behavioral" || questionType === "judgment";
+    case "candidate_questions":
+      return questionType === "candidate_questions" || questionType === "motivation";
+    case "wrap_up":
+      return questionType === "closing";
+  }
 }
 
 export async function generateCandidateContext(
@@ -530,10 +768,20 @@ Turn ${index + 1}:
     )
     .join("\n");
 
+  const allowedSkillTypes = isSoftwareRoleProfile(session.roleProfile)
+    ? "project_deep_dive, technical_design, debugging, tradeoffs"
+    : "role_execution, customer_scenario, process, judgment";
+
   const userMessage = `
 Job Role: ${session.role}
 Company: ${session.company}
 Interview Type: ${session.interview_type}
+Role Profile:
+- Panel Mode: ${session.roleProfile.panelMode}
+- Role Domain: ${session.roleProfile.roleDomainLabel}
+- Core Skills Label: ${session.roleProfile.coreSkillsLabel}
+- Panel Archetypes: ${session.roleProfile.panelArchetypes.join(", ")}
+- Allowed Core Skills Question Types: ${allowedSkillTypes}
 Total Turns: ${session.totalRounds}
 Upcoming Turn Number: ${session.currentRound + 1}
 Current Stage: ${session.currentStage}
@@ -563,15 +811,18 @@ Decide the next conversational move. Output JSON only.`;
     (turnType !== "new_question" && fallback.follow_up_to_round_id
       ? (session.rounds.at(-1)?.interviewerId ?? fallback.next_interviewer_id)
       : defaultInterviewerForStage(stage));
+  const parsedQuestionType = sanitizeQuestionType(parsed.question_type);
+  const questionType =
+    parsedQuestionType &&
+    isQuestionTypeAllowedForStage(parsedQuestionType, stage, session.roleProfile)
+      ? parsedQuestionType
+      : defaultQuestionTypeForStage(stage, session);
 
   return {
     next_interviewer_id: nextInterviewerId,
     stage,
     turn_type: turnType,
-    question_type:
-      typeof parsed.question_type === "string" && parsed.question_type.trim()
-        ? parsed.question_type.trim()
-        : defaultQuestionTypeForStage(stage),
+    question_type: questionType,
     focus:
       typeof parsed.focus === "string" && parsed.focus.trim()
         ? parsed.focus.trim()
@@ -579,7 +830,7 @@ Decide the next conversational move. Output JSON only.`;
     goal:
       typeof parsed.goal === "string" && parsed.goal.trim()
         ? parsed.goal.trim()
-        : defaultGoalForStage(stage),
+        : defaultGoalForStage(stage, session),
     difficulty: sanitizeDifficulty(parsed.difficulty ?? fallback.difficulty),
     reason:
       typeof parsed.reason === "string" && parsed.reason.trim()
@@ -627,6 +878,10 @@ Your focus: ${persona.focus}
 Role: ${session.role}
 Company: ${session.company}
 Interview Type: ${session.interview_type}
+Role Profile:
+- Panel Mode: ${session.roleProfile.panelMode}
+- Role Domain: ${session.roleProfile.roleDomainLabel}
+- Core Skills Label: ${session.roleProfile.coreSkillsLabel}
 
 Current Stage: ${plan.stage}
 Turn Type: ${plan.turn_type}
@@ -668,6 +923,10 @@ export async function runEvaluator(
   const userMessage = `Role: ${session.role}
 Company: ${session.company}
 Interviewer: ${interviewer.name}, ${interviewer.title}
+Role Profile:
+- Panel Mode: ${session.roleProfile.panelMode}
+- Role Domain: ${session.roleProfile.roleDomainLabel}
+- Core Skills Label: ${session.roleProfile.coreSkillsLabel}
 Stage: ${plan.stage}
 Turn Type: ${plan.turn_type}
 Focus: ${plan.focus}
@@ -686,7 +945,7 @@ Candidate Answer: ${answer}
 
 Evaluate this answer. Output JSON only.`;
   const raw = await callNemotron(EVALUATOR_SYSTEM, userMessage, 0.2, 520, "Evaluator");
-  return parseJSON<Evaluation>(raw);
+  return normalizeEvaluation(parseJSON(raw));
 }
 
 export type Report = {
@@ -712,7 +971,7 @@ Turn ${index + 1}:
   jobAnchor=${round.basedOnJobRequirement ?? "none"}
   question=${round.question}
   answerSummary=${round.evaluation.answer_summary}
-  scores=clarity:${round.evaluation.clarity}, technical_depth:${round.evaluation.technical_depth}, structure:${round.evaluation.structure}, overall:${round.evaluation.overall}
+  scores=clarity:${round.evaluation.clarity}, role_skill_depth:${round.evaluation.role_skill_depth}, structure:${round.evaluation.structure}, overall:${round.evaluation.overall}
   strengths=${round.evaluation.strengths.join(" | ")}
   weaknesses=${round.evaluation.weaknesses.join(" | ")}
   unresolvedFollowUps=${round.evaluation.unresolved_follow_ups.join(" | ")}
@@ -724,6 +983,10 @@ Turn ${index + 1}:
   const userMessage = `
 Job Role: ${session.role} at ${session.company}
 Interview Type: ${session.interview_type}
+Role Profile:
+- Panel Mode: ${session.roleProfile.panelMode}
+- Role Domain: ${session.roleProfile.roleDomainLabel}
+- Core Skills Label: ${session.roleProfile.coreSkillsLabel}
 Resume Highlights: ${session.candidateContext.resumeHighlights.join(" | ")}
 Target Skills: ${session.candidateContext.targetSkills.join(" | ")}
 Experience Gaps: ${session.candidateContext.experienceGaps.join(" | ")}
@@ -745,15 +1008,20 @@ export async function generateInterviewers(
   interviewType: InterviewType,
   jobDescription: string,
   resume: string,
+  roleProfile: RoleProfile,
 ): Promise<Persona[]> {
+  const practitionerTitle = fallbackTitleForInterviewer("practitioner", role, roleProfile);
+  const hiringManagerTitle = fallbackTitleForInterviewer("hiring_manager", role, roleProfile);
+  const recruiterTitle = fallbackTitleForInterviewer("recruiter", role, roleProfile);
+
   const raw = await callNemotron(
     `You generate a realistic 3-person interview panel for mock interviews.
 
 Output ONLY valid JSON with exactly these keys and no markdown:
 {
-  "senior_engineer": {
+  "practitioner": {
     "name": "<realistic first name>",
-    "title": "<senior engineering title>",
+    "title": "<realistic role-specific title such as ${practitionerTitle}>",
     "company": "${company}",
     "years": <integer 6-18>,
     "personality": "<2-4 adjective phrase>",
@@ -761,7 +1029,7 @@ Output ONLY valid JSON with exactly these keys and no markdown:
   },
   "hiring_manager": {
     "name": "<realistic first name>",
-    "title": "<engineering manager title>",
+    "title": "<realistic manager title such as ${hiringManagerTitle}>",
     "company": "${company}",
     "years": <integer 6-18>,
     "personality": "<2-4 adjective phrase>",
@@ -769,17 +1037,29 @@ Output ONLY valid JSON with exactly these keys and no markdown:
   },
   "recruiter": {
     "name": "<realistic first name>",
-    "title": "<recruiter title>",
+    "title": "<recruiter title such as ${recruiterTitle}>",
     "company": "${company}",
     "years": <integer 4-15>,
     "personality": "<2-4 adjective phrase>",
     "focus": "<what this interviewer focuses on>"
   }
-}`,
+}
+
+Rules:
+- The panel must feel believable for the target role.
+- For non-technical jobs, do not invent engineering-flavored titles.
+- Only use software-engineering titles when the role is actually software/engineering related.
+- Practitioner is the domain expert for day-to-day work.
+- Hiring manager owns team performance and judgment.
+- Recruiter covers fit, motivation, and logistics.`,
     `Generate a panel for:
 Role being interviewed for: ${role}
 Company: ${company}
 Interview type: ${interviewType}
+Role profile:
+- Panel mode: ${roleProfile.panelMode}
+- Role domain: ${roleProfile.roleDomainLabel}
+- Core skills label: ${roleProfile.coreSkillsLabel}
 
 Job description summary:
 ${jobDescription.slice(0, 900)}
@@ -796,8 +1076,8 @@ Output JSON only.`,
 
   const parsed = parseJSON<PanelResponse>(raw);
 
-  return (Object.keys(INTERVIEWER_BLUEPRINTS) as InterviewerId[]).map((interviewerId) =>
-    normalizePersona(parsed[interviewerId], interviewerId, company),
+  return PANEL_ARCHETYPES.map((interviewerId) =>
+    normalizePersona(parsed[interviewerId], interviewerId, company, role, roleProfile),
   );
 }
 
@@ -835,6 +1115,8 @@ export async function runClarifier(
   const raw = await callNemotron(
     CLARIFY_SYSTEM,
     `Interviewer: ${interviewer.name}, ${interviewer.title}
+Role Domain: ${session.roleProfile.roleDomainLabel}
+Core Skills Label: ${session.roleProfile.coreSkillsLabel}
 Stage: ${plan.stage}
 Turn Type: ${plan.turn_type}
 Focus: ${plan.focus}
@@ -854,5 +1136,5 @@ Decide. Output JSON only.`,
 }
 
 export function isTechnicalTopic(questionType: string) {
-  return TECHNICAL_TOPICS.has(questionType);
+  return SOFTWARE_QUESTION_TYPES.has(questionType as QuestionType);
 }

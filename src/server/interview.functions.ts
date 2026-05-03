@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import {
+  deriveRoleProfile,
   generateCandidateContext,
   generateInterviewers,
   runClarifier,
@@ -33,6 +34,14 @@ export const startInterview = createServerFn({ method: "POST" })
         message: `New session for ${data.role} @ ${data.company} (${data.interview_type})`,
       });
 
+      const roleProfile = deriveRoleProfile(data.role, data.jobDescription, data.interview_type);
+      pushLog(sessionId, {
+        agent: "RoleProfile",
+        phase: "info",
+        message: `Role-aware framing set to ${roleProfile.roleDomainLabel}`,
+        meta: roleProfile,
+      });
+
       const candidateContext = await generateCandidateContext(
         data.role,
         data.company,
@@ -56,6 +65,7 @@ export const startInterview = createServerFn({ method: "POST" })
         data.interview_type,
         data.jobDescription,
         data.resume,
+        roleProfile,
       );
       interviewers.forEach((persona) => {
         pushLog(sessionId, {
@@ -75,6 +85,7 @@ export const startInterview = createServerFn({ method: "POST" })
         interviewers,
         activeInterviewerId: interviewers[0].id,
         panelType: "structured",
+        roleProfile,
         candidateContext,
         totalRounds: TOTAL_TURNS,
         currentStage: "intro",
@@ -127,6 +138,7 @@ export const startInterview = createServerFn({ method: "POST" })
         interviewers,
         activeInterviewer,
         panelType: "structured" as const,
+        roleProfile,
         round: 1,
         totalRounds: TOTAL_TURNS,
         stage: plan.stage,
@@ -317,6 +329,7 @@ export const generateReport = createServerFn({ method: "POST" })
         interviewers: session.interviewers,
         panelType: session.panelType,
         totalRounds: session.totalRounds,
+        roleProfile: session.roleProfile,
       };
     });
   });

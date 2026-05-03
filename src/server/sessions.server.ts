@@ -1,14 +1,37 @@
-export type InterviewerId = "senior_engineer" | "hiring_manager" | "recruiter";
+export type InterviewerId = "practitioner" | "hiring_manager" | "recruiter";
 export type InterviewType = "technical" | "behavioral" | "mixed";
 export type Difficulty = "easy" | "medium" | "hard";
+export type RolePanelMode = "skills" | "behavioral" | "mixed";
 export type InterviewStage =
   | "intro"
   | "resume_walkthrough"
-  | "core_technical"
+  | "core_skills"
   | "core_behavioral"
   | "candidate_questions"
   | "wrap_up";
 export type TurnType = "new_question" | "follow_up" | "challenge" | "clarification" | "transition";
+export type QuestionType =
+  | "background"
+  | "resume_deep_dive"
+  | "project_deep_dive"
+  | "technical_design"
+  | "debugging"
+  | "tradeoffs"
+  | "role_execution"
+  | "judgment"
+  | "customer_scenario"
+  | "process"
+  | "behavioral"
+  | "motivation"
+  | "candidate_questions"
+  | "closing";
+
+export type RoleProfile = {
+  panelMode: RolePanelMode;
+  roleDomainLabel: string;
+  coreSkillsLabel: string;
+  panelArchetypes: InterviewerId[];
+};
 
 export type Persona = {
   id: InterviewerId;
@@ -29,7 +52,7 @@ export type CandidateContext = {
 
 export type Evaluation = {
   clarity: number;
-  technical_depth: number;
+  role_skill_depth: number;
   structure: number;
   overall: number;
   strengths: string[];
@@ -47,7 +70,7 @@ export type Plan = {
   next_interviewer_id: InterviewerId;
   stage: InterviewStage;
   turn_type: TurnType;
-  question_type: string;
+  question_type: QuestionType;
   focus: string;
   goal: string;
   difficulty: Difficulty;
@@ -84,6 +107,7 @@ export type Session = {
   interviewers: Persona[];
   activeInterviewerId: InterviewerId;
   panelType: "structured";
+  roleProfile: RoleProfile;
   candidateContext: CandidateContext;
   rounds: Round[];
   currentRound: number;
