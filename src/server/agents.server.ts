@@ -150,7 +150,6 @@ Output ONLY valid JSON:
   "clarity": <integer 1-10>,
   "technical_depth": <integer 1-10>,
   "structure": <integer 1-10>,
-  "overall": <float 1.0-10.0 with one decimal>,
   "strengths": ["...", "...", "..."],
   "weaknesses": ["...", "...", "..."],
   "correct": <boolean>,
@@ -159,11 +158,18 @@ Output ONLY valid JSON:
   "unresolved_follow_ups": ["...", "..."],
   "follow_up_topics": ["...", "..."],
   "resume_alignment": "one short sentence about how well the answer connected to their background",
-  "job_requirement_alignment": "one short sentence about how well the answer matched the job",
+  "job_requirement_alignment": "one short sentence about how well the answer matched the job"
 }
 
+Scoring calibration — use the full range:
+- 9-10: Exceptional. Would genuinely impress a senior interviewer. Complete, precise, well-structured. 10 = flawless.
+- 7-8: Strong answer. Minor gaps or imprecision only. Above average candidate.
+- 5-6: Acceptable. Basic understanding present but lacks depth, completeness, or precision.
+- 3-4: Partial understanding. Significant conceptual gaps or off-target.
+- 1-2: Fundamentally incorrect, extremely incomplete, or off-topic.
+
 Rules:
-- Be strict but fair.
+- Be strict but fair. Do not compress scores into the 4-7 range — use the full 1-10 scale.
 - unresolved_follow_ups should only include things a realistic interviewer would naturally probe next.
 - follow_up_topics should be short phrases.
 - Use the interview stage and turn goal when scoring.
@@ -686,7 +692,14 @@ Candidate Answer: ${answer}
 
 Evaluate this answer. Output JSON only.`;
   const raw = await callNemotron(EVALUATOR_SYSTEM, userMessage, 0.2, 520, "Evaluator");
-  return parseJSON<Evaluation>(raw);
+  const parsed = parseJSON<Evaluation>(raw);
+
+  const clarity = Math.max(1, Math.min(10, Math.round(parsed.clarity)));
+  const technical_depth = Math.max(1, Math.min(10, Math.round(parsed.technical_depth)));
+  const structure = Math.max(1, Math.min(10, Math.round(parsed.structure)));
+  const overall = Math.round(((clarity + technical_depth + structure) / 3) * 10) / 10;
+
+  return { ...parsed, clarity, technical_depth, structure, overall };
 }
 
 export type Report = {
