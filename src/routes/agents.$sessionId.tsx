@@ -14,7 +14,7 @@ type AgentsSearch = {
 
 export const Route = createFileRoute("/agents/$sessionId")({
   head: () => ({
-    meta: [{ title: "Agent Mission Control · Mockpilot" }],
+    meta: [{ title: "Agent Mission Control · Mocki" }],
   }),
   validateSearch: (raw: Record<string, unknown>): AgentsSearch => {
     const t = raw.totalTurns;
