@@ -170,7 +170,7 @@ function SetupPage() {
                 <option value="mixed">Mixed (Panel Style)</option>
               </select>
             </Field>
-            <Field label="Your Resume">
+            <Field label="Your Resume" htmlElement="div">
               <ResumeDropzone
                 disabled={loading}
                 onParsed={(text) => {
@@ -244,7 +244,14 @@ function ResumeDropzone({
 
   return (
     <div className="flex flex-col gap-2">
-      <label
+      {/*
+       * NOTE: This is intentionally a <div>, not a <label>. A <label> wrapping
+       * the hidden <input type="file"> double-fires the picker because the
+       * browser's native label-for-input forwarding *plus* the manual
+       * fileInputRef.click() in onClick both queue an open. Using a <div>
+       * keeps the explicit click/keydown handlers below as the sole trigger.
+       */}
+      <div
         className="rounded-xl border-2 border-dashed p-5 transition-all duration-200"
         role="button"
         tabIndex={disabled ? -1 : 0}
@@ -360,7 +367,7 @@ function ResumeDropzone({
             </div>
           )}
         </div>
-      </label>
+      </div>
 
       {truncated && (
         <p className="text-xs" style={{ color: "#fde68a" }}>
@@ -376,9 +383,25 @@ function ResumeDropzone({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+  // Most fields wrap their input in a <label> so clicking the label text
+  // focuses the input. The resume dropzone, however, contains a hidden
+  // <input type="file"> — and a <label> ancestor will natively forward
+  // every click to that input, which combines with the dropzone's own
+  // onClick={fileInputRef.click()} to open the file picker twice. Pass
+  // htmlElement="div" for any field whose child manages its own click
+  // semantics.
+  htmlElement = "label",
+}: {
+  label: string;
+  children: React.ReactNode;
+  htmlElement?: "label" | "div";
+}) {
+  const Tag = htmlElement;
   return (
-    <label className="flex flex-col gap-2">
+    <Tag className="flex flex-col gap-2">
       <span
         className="mono text-[11px] uppercase tracking-wider"
         style={{ color: "var(--text-3)" }}
@@ -386,6 +409,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
         {label}
       </span>
       {children}
-    </label>
+    </Tag>
   );
 }
