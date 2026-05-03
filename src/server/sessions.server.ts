@@ -52,7 +52,8 @@ export type CandidateContext = {
 
 export type Evaluation = {
   clarity: number;
-  role_skill_depth: number;
+  technical_depth: number;
+  middle_label: string;
   structure: number;
   overall: number;
   strengths: string[];

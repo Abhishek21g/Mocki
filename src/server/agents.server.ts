@@ -161,16 +161,20 @@ Rules:
 - Do not coach or evaluate.
 - Output only the interviewer utterance.`;
 
-const EVALUATOR_SYSTEM = `You are an expert interview evaluator.
+function buildEvaluatorSystem(isTechnical: boolean): string {
+  const middleField = isTechnical
+    ? '"technical_depth": <integer 1-10>'
+    : '"relevance": <integer 1-10>  // how specifically and concretely the candidate answered what was asked, versus a vague generic response that could apply to any job';
+
+  return `You are an expert interview evaluator.
 
 Evaluate the candidate's answer in the context of the role, the interview stage, and what the interviewer was trying to learn.
 
 Output ONLY valid JSON:
 {
   "clarity": <integer 1-10>,
-  "role_skill_depth": <integer 1-10>,
+  ${middleField},
   "structure": <integer 1-10>,
-  "overall": <float 1.0-10.0 with one decimal>,
   "strengths": ["...", "...", "..."],
   "weaknesses": ["...", "...", "..."],
   "correct": <boolean>,
@@ -182,13 +186,25 @@ Output ONLY valid JSON:
   "job_requirement_alignment": "one short sentence about how well the answer matched the job"
 }
 
+Score rubric — apply strictly and use the full range:
+- 10: The answer is complete, specific, and no reasonable critique applies to this specific question. Nothing important is missing.
+- 9: Excellent. Fully addresses the question with specific examples or reasoning. Only the most minor nitpick possible.
+- 7-8: Strong. Covers the key points but is missing one specific element the question called for.
+- 5-6: Adequate but vague. The answer gestures at the right ideas without real specificity or depth.
+- 3-4: Partial. Missed a central part of what the question was asking.
+- 1-2: Fundamentally incorrect, off-topic, or nearly empty.
+
 Rules:
-- Be strict but fair.
-- role_skill_depth means the depth of job-relevant skills for this role. For software roles, that includes technical depth.
-- unresolved_follow_ups should only include things a realistic interviewer would naturally probe next.
+- Do not compress scores into the 4-7 range. A complete, specific, well-reasoned answer must receive a 9 or 10.
+- Consistency rule: every sub-score below 9 must be explained by a weakness in the weaknesses array. If you score clarity, technical_depth/relevance, or structure at 8 or below, you must list a specific weakness that explains exactly what was missing or unclear. If you cannot identify such a weakness, raise the score to 9. A sub-score below 9 with no corresponding weakness is a contradiction and is not allowed.
+- You may ONLY list a weakness if the candidate failed to address something the question explicitly and directly asked for. Before listing any weakness, ask: did this specific question ask for this? If the question asked about motivation, weaknesses may only concern whether motivation was clearly and specifically expressed — not skills, values, or knowledge the question never requested. If the question asked about experience, weaknesses may only concern whether experience was clearly described. A weakness about topic X is only valid if the question directly asked about topic X. Do not infer what the interviewer "probably wanted" — judge only what the question literally asked. When in doubt, do not list it. If no weakness passes this test, return an empty array.
+- missed_concepts must only include concepts the question explicitly asked about and the candidate failed to address. Do not include concepts that are merely related to the topic.
+- unresolved_follow_ups should only include things a realistic interviewer would naturally probe next given this specific question.
 - follow_up_topics should be short phrases.
+- Ignore candidate context entirely when generating weaknesses and missed_concepts. It is provided so you understand their background, not to penalize them for gaps.
 - Use the interview stage and turn goal when scoring.
 - Output JSON only.`;
+}
 
 const REPORT_SYSTEM = `You are generating a final debrief report for a coherent mock interview conversation.
 
@@ -645,11 +661,12 @@ function trimStringArray(value: unknown, limit: number) {
 }
 
 function normalizeEvaluation(raw: unknown): Evaluation {
-  const value = (raw ?? {}) as Partial<Evaluation> & { technical_depth?: unknown };
+  const value = (raw ?? {}) as Partial<Evaluation> & { role_skill_depth?: unknown };
 
   return {
     clarity: sanitizeScore(value.clarity, 6),
-    role_skill_depth: sanitizeScore(value.role_skill_depth ?? value.technical_depth, 6),
+    technical_depth: sanitizeScore(value.technical_depth ?? value.role_skill_depth, 6),
+    middle_label: typeof value.middle_label === "string" ? value.middle_label : "Technical Depth",
     structure: sanitizeScore(value.structure, 6),
     overall: sanitizeOverallScore(value.overall, 6),
     strengths: trimStringArray(value.strengths, 4),
@@ -934,18 +951,26 @@ Goal: ${plan.goal}
 Resume Anchor: ${plan.based_on_resume ?? "none"}
 Job Requirement Anchor: ${plan.based_on_job_requirement ?? "none"}
 
-Candidate Context:
+Candidate Context (for background understanding only — do NOT use to generate weaknesses):
 - Resume Highlights: ${session.candidateContext.resumeHighlights.join(" | ")}
 - Target Skills: ${session.candidateContext.targetSkills.join(" | ")}
-- Experience Gaps: ${session.candidateContext.experienceGaps.join(" | ")}
 
 Interview Question: ${question}
 
 Candidate Answer: ${answer}
 
 Evaluate this answer. Output JSON only.`;
-  const raw = await callNemotron(EVALUATOR_SYSTEM, userMessage, 0.2, 520, "Evaluator");
-  return normalizeEvaluation(parseJSON(raw));
+  const isTechnical = isTechnicalTopic(plan.question_type);
+  const raw = await callNemotron(buildEvaluatorSystem(isTechnical), userMessage, 0.2, 520, "Evaluator");
+  const parsed = parseJSON<Record<string, unknown>>(raw);
+
+  const clarity = Math.max(1, Math.min(10, Math.round(Number(parsed.clarity) || 5)));
+  const middle = Math.max(1, Math.min(10, Math.round(Number(isTechnical ? parsed.technical_depth : parsed.relevance) || 5)));
+  const structure = Math.max(1, Math.min(10, Math.round(Number(parsed.structure) || 5)));
+  const overall = Math.round(((clarity + middle + structure) / 3) * 10) / 10;
+  const middle_label = isTechnical ? "Technical Depth" : "Relevance";
+
+  return { ...(parsed as unknown as Evaluation), clarity, technical_depth: middle, middle_label, structure, overall };
 }
 
 export type Report = {
@@ -971,7 +996,7 @@ Turn ${index + 1}:
   jobAnchor=${round.basedOnJobRequirement ?? "none"}
   question=${round.question}
   answerSummary=${round.evaluation.answer_summary}
-  scores=clarity:${round.evaluation.clarity}, role_skill_depth:${round.evaluation.role_skill_depth}, structure:${round.evaluation.structure}, overall:${round.evaluation.overall}
+  scores=clarity:${round.evaluation.clarity}, technical_depth:${round.evaluation.technical_depth}, structure:${round.evaluation.structure}, overall:${round.evaluation.overall}
   strengths=${round.evaluation.strengths.join(" | ")}
   weaknesses=${round.evaluation.weaknesses.join(" | ")}
   unresolvedFollowUps=${round.evaluation.unresolved_follow_ups.join(" | ")}
