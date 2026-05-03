@@ -18,6 +18,10 @@ dist-ssr
 .nitro
 *.local
 
+# Python bytecode (e.g. tools/nvidia-asr-bridge)
+__pycache__/
+*.py[cod]
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
