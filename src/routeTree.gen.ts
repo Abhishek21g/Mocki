@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiSttRouteImport } from './routes/api/stt'
+import { Route as AgentsSessionIdRouteImport } from './routes/agents.$sessionId'
 
 const ReportRoute = ReportRouteImport.update({
   id: '/report',
@@ -52,12 +53,18 @@ const ApiSttRoute = ApiSttRouteImport.update({
   path: '/api/stt',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentsSessionIdRoute = AgentsSessionIdRouteImport.update({
+  id: '/agents/$sessionId',
+  path: '/agents/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/history': typeof HistoryRoute
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRoute
+  '/agents/$sessionId': typeof AgentsSessionIdRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/history': typeof HistoryRoute
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRoute
+  '/agents/$sessionId': typeof AgentsSessionIdRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/history': typeof HistoryRoute
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRoute
+  '/agents/$sessionId': typeof AgentsSessionIdRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/interview'
     | '/report'
+    | '/agents/$sessionId'
     | '/api/stt'
     | '/api/tts'
     | '/auth/callback'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/interview'
     | '/report'
+    | '/agents/$sessionId'
     | '/api/stt'
     | '/api/tts'
     | '/auth/callback'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/interview'
     | '/report'
+    | '/agents/$sessionId'
     | '/api/stt'
     | '/api/tts'
     | '/auth/callback'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   HistoryRoute: typeof HistoryRoute
   InterviewRoute: typeof InterviewRoute
   ReportRoute: typeof ReportRoute
+  AgentsSessionIdRoute: typeof AgentsSessionIdRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
@@ -172,6 +185,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSttRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents/$sessionId': {
+      id: '/agents/$sessionId'
+      path: '/agents/$sessionId'
+      fullPath: '/agents/$sessionId'
+      preLoaderRoute: typeof AgentsSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -180,6 +200,7 @@ const rootRouteChildren: RootRouteChildren = {
   HistoryRoute: HistoryRoute,
   InterviewRoute: InterviewRoute,
   ReportRoute: ReportRoute,
+  AgentsSessionIdRoute: AgentsSessionIdRoute,
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,
   AuthCallbackRoute: AuthCallbackRoute,
