@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
 import { store } from "@/lib/ghost-store";
 import { startInterview } from "@/server/interview.functions";
@@ -51,10 +52,12 @@ function SetupPage() {
           jobDescription,
           interview_type: interviewType,
           resume,
+          roleProfile: res.roleProfile,
         },
         interviewers: res.interviewers,
         activeInterviewer: res.activeInterviewer,
         panelType: res.panelType,
+        roleProfile: res.roleProfile,
         currentQuestion: res.question,
         currentFocus: res.focus,
         currentDifficulty: res.difficulty,
@@ -79,11 +82,11 @@ function SetupPage() {
     <div className="grid-bg min-h-screen">
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col items-center px-5 py-16">
         <header className="mb-10 text-center fade-up">
-          <h1
-            className="text-5xl font-extrabold tracking-tight md:text-6xl"
-            style={{ color: "var(--green)" }}
-          >
-            🧭 Mockpilot
+          <h1>
+            <HomeLogo
+              resetOnClick={false}
+              className="text-5xl font-extrabold tracking-tight md:text-6xl"
+            />
           </h1>
           <p className="mt-3 text-base md:text-lg" style={{ color: "var(--text-2)" }}>
             Multi-agent panel interviews that adapt in real time
@@ -135,7 +138,7 @@ function SetupPage() {
                 onChange={(e) => setInterviewType(e.target.value)}
                 disabled={loading}
               >
-                <option value="technical">Technical (DSA + System Design)</option>
+                <option value="technical">Role Skills (Job Scenarios + Problem Solving)</option>
                 <option value="behavioral">Behavioral (Experience + Teamwork)</option>
                 <option value="mixed">Mixed (Panel Style)</option>
               </select>

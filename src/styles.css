@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap");
 @import "tailwindcss" source(none);
 @source "../src";
 @import "tw-animate-css";
@@ -29,7 +29,7 @@
   --color-border: var(--border);
   --color-input: var(--border);
   --color-ring: var(--green);
-  --font-sans: "Syne", sans-serif;
+  --font-sans: "Outfit", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 }
 
@@ -57,11 +57,31 @@
 html, body {
   background: var(--bg);
   color: var(--text);
-  font-family: "Syne", sans-serif;
+  font-family: "Outfit", sans-serif;
+  line-height: 1.35;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .mono { font-family: "JetBrains Mono", monospace; }
+
+button,
+input,
+select,
+textarea {
+  line-height: 1.35;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+.gp-btn,
+.gp-input {
+  line-height: 1.2;
+}
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -92,7 +112,7 @@ html, body {
   border-radius: 10px;
   padding: 14px 16px;
   color: var(--text);
-  font-family: "Syne", sans-serif;
+  font-family: "Outfit", sans-serif;
   font-size: 15px;
   width: 100%;
   outline: none;
@@ -115,7 +135,7 @@ html, body {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-family: "Syne", sans-serif;
+  font-family: "Outfit", sans-serif;
 }
 .gp-btn:hover:not(:disabled) { background: #8fd400; transform: scale(1.01); }
 .gp-btn:active:not(:disabled) { transform: scale(0.99); }
