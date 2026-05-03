@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Mic } from "lucide-react";
+import { Mic, Volume2, VolumeX } from "lucide-react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -20,10 +20,13 @@ import {
   type SpeechEngine,
   type SpeechRecognitionStatus,
 } from "@/lib/speech";
+import { createTtsController, primeAudio, type TtsController, type TtsStatus } from "@/lib/tts";
 import { cn } from "@/lib/utils";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview.functions";
 import type { InterviewStage, Persona, RoleProfile, TurnType } from "@/server/sessions.server";
+
+const TTS_ENABLED_STORAGE_KEY = "mockpilot:ttsEnabled";
 
 type AgentEvent = {
   id: string;
@@ -60,8 +63,18 @@ function InterviewPage() {
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [canInlineAgents, setCanInlineAgents] = useState(false);
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognitionController> | null>(null);
+  const ttsRef = useRef<TtsController | null>(null);
   const sinceRef = useRef(0);
   const sttProxyUrl = (import.meta.env.VITE_STT_PROXY_URL as string | undefined)?.trim();
+  const ttsProxyUrl =
+    (import.meta.env.VITE_TTS_PROXY_URL as string | undefined)?.trim() || "/api/tts";
+  const [ttsEnabled, setTtsEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = window.localStorage.getItem(TTS_ENABLED_STORAGE_KEY);
+    return stored === null ? true : stored === "true";
+  });
+  const [ttsStatus, setTtsStatus] = useState<TtsStatus>("idle");
+  const lastSpokenKeyRef = useRef<string | null>(null);
   const controlsDisabled = loadingAnswer || loadingNext || generating;
 
   useEffect(() => {
@@ -97,6 +110,54 @@ function InterviewPage() {
       recognitionRef.current = null;
     };
   }, [sttProxyUrl]);
+
+  useEffect(() => {
+    const tts = createTtsController({
+      proxyUrl: ttsProxyUrl,
+      onStatus: setTtsStatus,
+      onError: (message) => showToast(message),
+    });
+    ttsRef.current = tts;
+    return () => {
+      tts.destroy();
+      ttsRef.current = null;
+    };
+  }, [ttsProxyUrl]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(TTS_ENABLED_STORAGE_KEY, String(ttsEnabled));
+  }, [ttsEnabled]);
+
+  const currentQuestion = state.currentQuestion;
+  const activeInterviewerId = state.activeInterviewer?.id;
+  const activeVoice = state.activeInterviewer?.voice;
+  const sessionId = state.sessionId;
+  const speakingBlocked = loadingAnswer || loadingNext || generating || isHoldingTalk;
+
+  useEffect(() => {
+    if (!ttsEnabled) {
+      ttsRef.current?.stop();
+      // Keep lastSpokenKeyRef populated so re-enabling doesn't replay the
+      // current question; voice-on means "start hearing future questions".
+      return;
+    }
+    if (!currentQuestion || !activeInterviewerId || !activeVoice) return;
+    if (speakingBlocked) return;
+
+    const key = `${activeInterviewerId}::${currentQuestion}`;
+    if (lastSpokenKeyRef.current === key) return;
+    lastSpokenKeyRef.current = key;
+
+    void ttsRef.current?.speak(currentQuestion, activeVoice, sessionId);
+  }, [
+    ttsEnabled,
+    currentQuestion,
+    activeInterviewerId,
+    activeVoice,
+    sessionId,
+    speakingBlocked,
+  ]);
 
   useEffect(() => {
     if (!state.sessionId) return;
@@ -143,6 +204,7 @@ function InterviewPage() {
 
   async function handleSubmit() {
     if (!answer.trim() || controlsDisabled) return;
+    ttsRef.current?.stop();
     setLoadingAnswer(true);
     try {
       const res = await submitAnswer({
@@ -218,6 +280,7 @@ function InterviewPage() {
       setInputMode("typing");
       return;
     }
+    ttsRef.current?.stop();
     setIsHoldingTalk(true);
     recognitionRef.current?.start();
   }
@@ -286,6 +349,7 @@ function InterviewPage() {
               interviewer={activeInterviewer}
               loadingNext={loadingNext}
               lastClarification={state.lastClarification}
+              ttsStatus={ttsStatus}
             />
 
             <div className="flex flex-col gap-3">
@@ -364,14 +428,51 @@ function InterviewPage() {
                     Hold to talk
                   </button>
                 </div>
-                <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
-                  STT:{" "}
-                  {speechSupported
-                    ? capitalize(sttEngine ?? "browser")
-                    : isAudioCaptureSupported() || isSpeechRecognitionSupported()
-                      ? "Needs setup"
-                      : "Unavailable"}
-                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTtsEnabled((prev) => {
+                        const next = !prev;
+                        if (next) primeAudio();
+                        else ttsRef.current?.stop();
+                        return next;
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+                    style={{
+                      borderColor: ttsEnabled ? "rgba(118,185,0,0.5)" : "var(--border)",
+                      background: ttsEnabled ? "var(--green-dim)" : "var(--surface2)",
+                      color: ttsEnabled ? "var(--green)" : "var(--text-2)",
+                    }}
+                    title={
+                      ttsEnabled
+                        ? "Voice on — interviewer reads questions aloud"
+                        : "Voice off — questions are text-only"
+                    }
+                    aria-pressed={ttsEnabled}
+                  >
+                    {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                    <span>
+                      Voice{" "}
+                      {ttsEnabled
+                        ? ttsStatus === "playing"
+                          ? "speaking"
+                          : ttsStatus === "loading"
+                            ? "loading"
+                            : "on"
+                        : "off"}
+                    </span>
+                  </button>
+                  <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
+                    STT:{" "}
+                    {speechSupported
+                      ? capitalize(sttEngine ?? "browser")
+                      : isAudioCaptureSupported() || isSpeechRecognitionSupported()
+                        ? "Needs setup"
+                        : "Unavailable"}
+                  </span>
+                </div>
               </div>
               <div className="relative">
                 <textarea
@@ -716,16 +817,25 @@ function SpeakerSpotlight({
   interviewer,
   loadingNext,
   lastClarification,
+  ttsStatus,
 }: {
   interviewer: Persona;
   loadingNext: boolean;
   lastClarification: string | null;
+  ttsStatus: TtsStatus;
 }) {
+  const speaking = ttsStatus === "playing";
+  const loadingTts = ttsStatus === "loading";
+  const indicatorActive = loadingNext || speaking || loadingTts;
+
   return (
     <div className="gp-card p-6 fade-up">
       <div className="flex items-center gap-4">
         <div
-          className="flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold text-black pulse-ring"
+          className={cn(
+            "flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold text-black",
+            speaking || loadingTts ? "pulse-ring" : "",
+          )}
           style={{ background: "linear-gradient(135deg, var(--green), #4d7a00)" }}
         >
           {initials(interviewer.name)}
@@ -755,15 +865,19 @@ function SpeakerSpotlight({
         <span
           className="h-2 w-2 rounded-full"
           style={{
-            background: loadingNext ? "var(--green)" : "var(--text-3)",
-            animation: loadingNext ? "bounce-dot 1s infinite" : "none",
+            background: indicatorActive ? "var(--green)" : "var(--text-3)",
+            animation: indicatorActive ? "bounce-dot 1s infinite" : "none",
           }}
         />
         {loadingNext
           ? "Planning the next conversational move"
-          : lastClarification
-            ? "Continuing the same answer with clarification"
-            : "Listening for your answer"}
+          : speaking
+            ? "Speaking the question"
+            : loadingTts
+              ? "Synthesizing voice"
+              : lastClarification
+                ? "Continuing the same answer with clarification"
+                : "Listening for your answer"}
       </div>
     </div>
   );
@@ -984,6 +1098,7 @@ function agentColor(agent: string): string {
     Clarifier: "#eab308",
     Evaluator: "#f97316",
     Reporter: "#ec4899",
+    Speaker: "#22d3ee",
   };
   return map[agent] ?? "#888";
 }

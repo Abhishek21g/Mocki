@@ -4,6 +4,7 @@ import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
 import { store } from "@/lib/ghost-store";
 import { useSupabaseAuth } from "@/lib/supabase-context";
+import { primeAudio } from "@/lib/tts";
 import { startInterview } from "@/server/interview.functions";
 
 export const Route = createFileRoute("/")({
@@ -35,6 +36,11 @@ function SetupPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!valid || loading) return;
+    // Unlock the audio element while we still have a user-activation gesture.
+    // The first question is fetched from NVIDIA, which can take several
+    // seconds — long enough for Chrome's autoplay window to expire. Priming
+    // here makes the question audio play automatically on the next page.
+    primeAudio();
     setLoading(true);
     try {
       const accessToken = getAccessToken();
