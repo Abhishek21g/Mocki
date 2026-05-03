@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Mic, Volume2, VolumeX } from "lucide-react";
+import { Mic, User, Volume2, VolumeX } from "lucide-react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -20,6 +20,7 @@ import {
   type SpeechEngine,
   type SpeechRecognitionStatus,
 } from "@/lib/speech";
+import { createAvatarController, type AvatarController, type AvatarStatus } from "@/lib/avatar";
 import { createTtsController, primeAudio, type TtsController, type TtsStatus } from "@/lib/tts";
 import { cn } from "@/lib/utils";
 import { useSupabaseAuth } from "@/lib/supabase-context";
@@ -28,11 +29,12 @@ import type { InterviewStage, Persona, RoleProfile, TurnType } from "@/server/se
 import { AgentDashboard } from "@/components/agent-dashboard";
 import type { AgentEvent } from "@/components/agent-dashboard/types";
 
-const TTS_ENABLED_STORAGE_KEY = "mocki:ttsEnabled";
+const TTS_ENABLED_STORAGE_KEY = "mockpilot:ttsEnabled";
+const AVATAR_ENABLED_STORAGE_KEY = "mockpilot:avatarEnabled";
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
-    meta: [{ title: "Interview · Mocki" }],
+    meta: [{ title: "Interview · Mockpilot" }],
   }),
   component: InterviewPage,
 });
@@ -57,10 +59,14 @@ function InterviewPage() {
   const [canInlineAgents, setCanInlineAgents] = useState(false);
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognitionController> | null>(null);
   const ttsRef = useRef<TtsController | null>(null);
+  const avatarRef = useRef<AvatarController | null>(null);
+  const avatarVideoElRef = useRef<HTMLVideoElement | null>(null);
   const sinceRef = useRef(0);
   const sttProxyUrl = (import.meta.env.VITE_STT_PROXY_URL as string | undefined)?.trim();
   const ttsProxyUrl =
     (import.meta.env.VITE_TTS_PROXY_URL as string | undefined)?.trim() || "/api/tts";
+  const avatarProxyUrl =
+    (import.meta.env.VITE_AVATAR_PROXY_URL as string | undefined)?.trim() || "/api/tts-avatar";
   const [ttsEnabled, setTtsEnabled] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
     const stored = window.localStorage.getItem(TTS_ENABLED_STORAGE_KEY);
@@ -69,6 +75,15 @@ function InterviewPage() {
   const [ttsStatus, setTtsStatus] = useState<TtsStatus>("idle");
   /** Dedupes automatic playback only **after** a question audibly succeeds; avoids locking out retries on transient TTS/play failures (first prompt often hit this). */
   const lastSuccessfullySpokenKeyRef = useRef<string | null>(null);
+
+  const [avatarEnabled, setAvatarEnabled] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const stored = window.localStorage.getItem(AVATAR_ENABLED_STORAGE_KEY);
+    // Default off — only turns on once user explicitly enables it (requires the bridge).
+    return stored === "true";
+  });
+  const [avatarStatus, setAvatarStatus] = useState<AvatarStatus>("idle");
+  const lastAvatarKeyRef = useRef<string | null>(null);
   const controlsDisabled = loadingAnswer || loadingNext || generating;
 
   useEffect(() => {
@@ -118,10 +133,35 @@ function InterviewPage() {
     };
   }, [ttsProxyUrl]);
 
+  // Avatar controller — wired to the <video> element rendered in SpeakerSpotlight.
+  // Re-created whenever the video element or proxy URL changes.
+  useEffect(() => {
+    const videoEl = avatarVideoElRef.current;
+    if (!videoEl) return;
+    const controller = createAvatarController({
+      proxyUrl: avatarProxyUrl,
+      videoEl,
+      onStatus: setAvatarStatus,
+      onError: (message) => showToast(`Avatar: ${message}`),
+    });
+    avatarRef.current = controller;
+    return () => {
+      controller.destroy();
+      avatarRef.current = null;
+    };
+  // Re-run whenever the video element mounts (avatarEnabled toggles it in/out of DOM)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [avatarProxyUrl, avatarEnabled]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(TTS_ENABLED_STORAGE_KEY, String(ttsEnabled));
   }, [ttsEnabled]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(AVATAR_ENABLED_STORAGE_KEY, String(avatarEnabled));
+  }, [avatarEnabled]);
 
   const currentQuestion = state.currentQuestion;
   const activeInterviewerId = state.activeInterviewer?.id;
@@ -130,7 +170,7 @@ function InterviewPage() {
   const speakingBlocked = loadingAnswer || loadingNext || generating || isHoldingTalk;
 
   useEffect(() => {
-    if (!ttsEnabled) {
+    if (!ttsEnabled || avatarEnabled) {
       ttsRef.current?.stop();
       // Keep lastSuccessfullySpokenKeyRef populated so re-enabling doesn't replay the
       // current question; voice-on means "start hearing future questions".
@@ -178,6 +218,48 @@ function InterviewPage() {
     };
   }, [
     ttsEnabled,
+    avatarEnabled,
+    currentQuestion,
+    activeInterviewerId,
+    activeVoice,
+    sessionId,
+    speakingBlocked,
+  ]);
+
+  // Avatar auto-speak: when avatarEnabled, fetch+play the lip-synced video
+  // and suppress the plain TTS so audio doesn't play twice.
+  useEffect(() => {
+    if (!avatarEnabled) {
+      avatarRef.current?.stop();
+      return;
+    }
+    if (!currentQuestion || !activeInterviewerId || !activeVoice) return;
+    if (speakingBlocked) return;
+
+    const key = `${activeInterviewerId}::${currentQuestion}`;
+    if (lastAvatarKeyRef.current === key) return;
+
+    // Stop TTS so both audio sources don't race.
+    ttsRef.current?.stop();
+
+    let cancelled = false;
+    const run = async () => {
+      const ctrl = avatarRef.current;
+      if (!ctrl) return;
+      try {
+        await ctrl.speak(currentQuestion, activeVoice, activeInterviewerId, sessionId);
+        if (!cancelled) lastAvatarKeyRef.current = key;
+      } catch {
+        // Avatar controller already calls onError; silent here.
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    avatarEnabled,
     currentQuestion,
     activeInterviewerId,
     activeVoice,
@@ -231,6 +313,7 @@ function InterviewPage() {
   async function handleSubmit() {
     if (!answer.trim() || controlsDisabled) return;
     ttsRef.current?.stop();
+    avatarRef.current?.stop();
     setLoadingAnswer(true);
     try {
       const res = await submitAnswer({
@@ -307,6 +390,7 @@ function InterviewPage() {
       return;
     }
     ttsRef.current?.stop();
+    avatarRef.current?.stop();
     setIsHoldingTalk(true);
     recognitionRef.current?.start();
   }
@@ -376,6 +460,9 @@ function InterviewPage() {
               loadingNext={loadingNext}
               lastClarification={state.lastClarification}
               ttsStatus={ttsStatus}
+              avatarStatus={avatarStatus}
+              avatarEnabled={avatarEnabled}
+              avatarVideoRef={avatarVideoElRef}
             />
 
             <div className="flex flex-col gap-3">
@@ -467,25 +554,65 @@ function InterviewPage() {
                     }}
                     className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
                     style={{
-                      borderColor: ttsEnabled ? "rgba(118,185,0,0.5)" : "var(--border)",
-                      background: ttsEnabled ? "var(--green-dim)" : "var(--surface2)",
-                      color: ttsEnabled ? "var(--green)" : "var(--text-2)",
+                      borderColor: ttsEnabled && !avatarEnabled ? "rgba(118,185,0,0.5)" : "var(--border)",
+                      background: ttsEnabled && !avatarEnabled ? "var(--green-dim)" : "var(--surface2)",
+                      color: ttsEnabled && !avatarEnabled ? "var(--green)" : "var(--text-2)",
                     }}
                     title={
-                      ttsEnabled
-                        ? "Voice on — interviewer reads questions aloud"
-                        : "Voice off — questions are text-only"
+                      avatarEnabled
+                        ? "Audio handled by live avatar"
+                        : ttsEnabled
+                          ? "Voice on — interviewer reads questions aloud"
+                          : "Voice off — questions are text-only"
                     }
-                    aria-pressed={ttsEnabled}
+                    aria-pressed={ttsEnabled && !avatarEnabled}
+                    disabled={avatarEnabled}
                   >
-                    {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                    {ttsEnabled && !avatarEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
                     <span>
                       Voice{" "}
-                      {ttsEnabled
-                        ? ttsStatus === "playing"
-                          ? "speaking"
-                          : ttsStatus === "loading"
-                            ? "loading"
+                      {avatarEnabled
+                        ? "avatar"
+                        : ttsEnabled
+                          ? ttsStatus === "playing"
+                            ? "speaking"
+                            : ttsStatus === "loading"
+                              ? "loading"
+                              : "on"
+                          : "off"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAvatarEnabled((prev) => {
+                        const next = !prev;
+                        if (!next) avatarRef.current?.stop();
+                        else lastAvatarKeyRef.current = null; // force re-play on enable
+                        return next;
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+                    style={{
+                      borderColor: avatarEnabled ? "rgba(118,185,0,0.5)" : "var(--border)",
+                      background: avatarEnabled ? "var(--green-dim)" : "var(--surface2)",
+                      color: avatarEnabled ? "var(--green)" : "var(--text-2)",
+                    }}
+                    title={
+                      avatarEnabled
+                        ? "Live avatar on — interviewer shown as animated face"
+                        : "Live avatar off — enable to see animated interviewer"
+                    }
+                    aria-pressed={avatarEnabled}
+                  >
+                    <User size={14} />
+                    <span>
+                      Avatar{" "}
+                      {avatarEnabled
+                        ? avatarStatus === "loading"
+                          ? "generating"
+                          : avatarStatus === "playing"
+                            ? "speaking"
                             : "on"
                         : "off"}
                     </span>
@@ -858,28 +985,138 @@ function SpeakerSpotlight({
   loadingNext,
   lastClarification,
   ttsStatus,
+  avatarStatus,
+  avatarEnabled,
+  avatarVideoRef,
 }: {
   interviewer: Persona;
   loadingNext: boolean;
   lastClarification: string | null;
   ttsStatus: TtsStatus;
+  avatarStatus: AvatarStatus;
+  avatarEnabled: boolean;
+  avatarVideoRef: React.RefObject<HTMLVideoElement | null>;
 }) {
-  const speaking = ttsStatus === "playing";
-  const loadingTts = ttsStatus === "loading";
-  const indicatorActive = loadingNext || speaking || loadingTts;
+  const speaking = avatarEnabled ? avatarStatus === "playing" : ttsStatus === "playing";
+  const loadingAudio = avatarEnabled ? avatarStatus === "loading" : ttsStatus === "loading";
+  const indicatorActive = loadingNext || speaking || loadingAudio;
+
+  const statusLabel = loadingNext
+    ? "Planning the next conversational move"
+    : avatarEnabled && avatarStatus === "loading"
+      ? "Generating face — synthesizing voice & lip-sync…"
+      : speaking
+        ? "Speaking the question"
+        : loadingAudio
+          ? "Synthesizing voice"
+          : lastClarification
+            ? "Continuing the same answer with clarification"
+            : "Listening for your answer";
 
   return (
-    <div className="gp-card p-6 fade-up">
-      <div className="flex items-center gap-4">
+    <div className="gp-card p-5 fade-up">
+      {/* ── Live avatar video panel ──────────────────────────────────────── */}
+      {avatarEnabled && (
         <div
-          className={cn(
-            "flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold text-black",
-            speaking || loadingTts ? "pulse-ring" : "",
-          )}
-          style={{ background: "linear-gradient(135deg, var(--green), #4d7a00)" }}
+          className="relative mb-5 overflow-hidden rounded-2xl"
+          style={{
+            background: "var(--surface3)",
+            border: speaking ? "2px solid var(--green)" : "2px solid var(--border)",
+            transition: "border-color 300ms ease",
+            aspectRatio: "4/5",
+            maxHeight: 340,
+          }}
         >
-          {initials(interviewer.name)}
+          {/* The <video> element is always mounted when avatarEnabled so the
+              controller ref is valid. It's hidden with opacity while loading. */}
+          <video
+            ref={avatarVideoRef as React.RefObject<HTMLVideoElement>}
+            playsInline
+            className="h-full w-full object-cover"
+            style={{
+              opacity: avatarStatus === "playing" ? 1 : 0,
+              transition: "opacity 400ms ease",
+            }}
+          />
+
+          {/* Poster / idle state — shown when video isn't playing */}
+          {avatarStatus !== "playing" && (
+            <div
+              className="absolute inset-0 flex flex-col items-center justify-center gap-3"
+              style={{ background: "var(--surface2)" }}
+            >
+              {avatarStatus === "loading" ? (
+                <>
+                  {/* Animated portrait placeholder while generating */}
+                  <div
+                    className={cn(
+                      "flex h-24 w-24 items-center justify-center rounded-full text-2xl font-bold",
+                      "pulse-ring",
+                    )}
+                    style={{ background: "linear-gradient(135deg, var(--green), #4d7a00)", color: "#000" }}
+                  >
+                    {initials(interviewer.name)}
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="gp-spinner" />
+                    <span
+                      className="mono text-[11px] uppercase tracking-wider"
+                      style={{ color: "var(--text-3)" }}
+                    >
+                      Generating face…
+                    </span>
+                  </div>
+                </>
+              ) : (
+                /* Idle — show a static portrait placeholder */
+                <div
+                  className="flex h-24 w-24 items-center justify-center rounded-full text-2xl font-bold"
+                  style={{ background: "linear-gradient(135deg, var(--green), #4d7a00)", color: "#000" }}
+                >
+                  {initials(interviewer.name)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Speaking indicator overlay */}
+          {speaking && (
+            <div
+              className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full px-3 py-1"
+              style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(8px)" }}
+            >
+              {[0, 1, 2, 3].map((i) => (
+                <span
+                  key={i}
+                  className="w-1 rounded-full"
+                  style={{
+                    background: "var(--green)",
+                    height: `${8 + (i % 2 === 0 ? 8 : 4)}px`,
+                    animation: `bounce-dot 0.8s ease-in-out infinite ${i * 120}ms`,
+                  }}
+                />
+              ))}
+              <span className="mono ml-1 text-[10px] uppercase tracking-wider" style={{ color: "var(--green)" }}>
+                Live
+              </span>
+            </div>
+          )}
         </div>
+      )}
+
+      {/* ── Interviewer info ─────────────────────────────────────────────── */}
+      <div className="flex items-center gap-4">
+        {!avatarEnabled && (
+          <div
+            className={cn(
+              "flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold text-black",
+              speaking || loadingAudio ? "pulse-ring" : "",
+            )}
+            style={{ background: "linear-gradient(135deg, var(--green), #4d7a00)" }}
+          >
+            {initials(interviewer.name)}
+          </div>
+        )}
         <div className="flex-1">
           <div className="text-base font-bold">{interviewer.name}</div>
           <div className="text-sm" style={{ color: "var(--text-2)" }}>
@@ -909,15 +1146,7 @@ function SpeakerSpotlight({
             animation: indicatorActive ? "bounce-dot 1s infinite" : "none",
           }}
         />
-        {loadingNext
-          ? "Planning the next conversational move"
-          : speaking
-            ? "Speaking the question"
-            : loadingTts
-              ? "Synthesizing voice"
-              : lastClarification
-                ? "Continuing the same answer with clarification"
-                : "Listening for your answer"}
+        {statusLabel}
       </div>
     </div>
   );
