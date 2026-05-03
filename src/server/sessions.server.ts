@@ -30,6 +30,7 @@ export type CandidateContext = {
 export type Evaluation = {
   clarity: number;
   technical_depth: number;
+  middle_label: string;
   structure: number;
   overall: number;
   strengths: string[];
