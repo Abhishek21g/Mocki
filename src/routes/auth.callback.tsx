@@ -2,6 +2,15 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase-client";
 
+const ALLOWED_POST_AUTH_PATHS = new Set(["/", "/history", "/interview", "/report"]);
+
+function normalizeNextPath(rawNext: string | null) {
+  if (!rawNext) return "/" as const;
+  if (!rawNext.startsWith("/") || rawNext.startsWith("//")) return "/" as const;
+  if (!ALLOWED_POST_AUTH_PATHS.has(rawNext)) return "/" as const;
+  return rawNext as "/" | "/history" | "/interview" | "/report";
+}
+
 export const Route = createFileRoute("/auth/callback")({
   head: () => ({
     meta: [{ title: "Signing you in… · Mockpilot" }],
@@ -40,7 +49,7 @@ function AuthCallback() {
         }
 
         if (!cancelled) {
-          const next = url.searchParams.get("next") ?? "/";
+          const next = normalizeNextPath(url.searchParams.get("next"));
           navigate({ to: next });
         }
       } catch (err) {
