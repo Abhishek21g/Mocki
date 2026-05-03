@@ -7,3 +7,20 @@ NVIDIA_API_KEY=paste_your_nvidia_key_here
 # Required for sign-in, history persistence, and learner memory features.
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=paste_your_supabase_anon_key_here
+
+# --- Speech-to-Text (optional) -------------------------------------------------
+# Dedicated key for speech-to-text. If omitted, /api/stt falls back to NVIDIA_API_KEY.
+NVIDIA_ASR_API_KEY=
+# STT proxy endpoint the browser POSTs audio to (multipart/form-data; expects JSON with "text").
+# In local dev, point this directly at the Python bridge to avoid Worker -> localhost issues.
+VITE_STT_PROXY_URL=http://localhost:3000/api/stt
+# NVIDIA ASR HTTP endpoint.
+# For self-hosted NIM: http://localhost:9000/v1/audio/transcriptions
+# For hosted NVCF via local bridge: http://127.0.0.1:8788/transcribe
+NVIDIA_ASR_HTTP_URL=http://127.0.0.1:8788/transcribe
+# Optional for hosted NVCF-style gateways that require function-id metadata.
+NVIDIA_ASR_FUNCTION_ID=bb0837de-8c7b-481f-9ec8-ef5663e9c1fa
+# Nemotron ASR Streaming is English-only today.
+NVIDIA_ASR_LANGUAGE=en-US
+# Adds punctuation/casing where supported.
+NVIDIA_ASR_AUTOMATIC_PUNCTUATION=true
