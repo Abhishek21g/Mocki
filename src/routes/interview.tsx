@@ -11,7 +11,6 @@ import {
   humanizeLabel,
   initials,
   scoreToColor,
-  scoreAxisLabel,
   stageLabel,
 } from "@/lib/ghost-utils";
 import {
@@ -22,6 +21,7 @@ import {
   type SpeechRecognitionStatus,
 } from "@/lib/speech";
 import { cn } from "@/lib/utils";
+import { useSupabaseAuth } from "@/lib/supabase-context";
 import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview.functions";
 import type { InterviewStage, Persona, RoleProfile, TurnType } from "@/server/sessions.server";
 
@@ -45,6 +45,7 @@ function InterviewPage() {
   const state = useAppState();
   const nav = useNavigate();
   const isMobile = useIsMobile();
+  const { getAccessToken } = useSupabaseAuth();
   const [answer, setAnswer] = useState("");
   const [inputMode, setInputMode] = useState<"typing" | "hold_to_talk">("typing");
   const [speechStatus, setSpeechStatus] = useState<SpeechRecognitionStatus>("idle");
@@ -171,8 +172,12 @@ function InterviewPage() {
         setLoadingAnswer(false);
         setGenerating(true);
         try {
+          const accessToken = getAccessToken();
           const report = await generateReport({
-            data: { sessionId: state.sessionId! },
+            data: {
+              sessionId: state.sessionId!,
+              ...(accessToken ? { accessToken } : {}),
+            },
           });
           store.set({ report });
           nav({ to: "/report" });
@@ -797,7 +802,8 @@ function EvaluationCard({
 }: {
   ev: {
     clarity: number;
-    role_skill_depth: number;
+    technical_depth: number;
+    middle_label?: string;
     structure: number;
     overall: number;
     strengths: string[];
@@ -848,7 +854,7 @@ function EvaluationCard({
       </p>
       <div className="flex flex-col gap-3">
         <ScoreBar label="Clarity" score={ev.clarity} delay={0} />
-        <ScoreBar label={scoreAxisLabel(roleProfile)} score={ev.role_skill_depth} delay={120} />
+        <ScoreBar label={ev.middle_label ?? "Technical Depth"} score={ev.technical_depth} delay={120} />
         <ScoreBar label="Structure" score={ev.structure} delay={240} />
       </div>
       <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
