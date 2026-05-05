@@ -607,7 +607,7 @@ function InterviewPage() {
                   >
                     <User size={14} />
                     <span>
-                      Avatar{" "}
+                      Avatar<sup style={{ fontSize: "0.6em", opacity: 0.6, marginLeft: "1px" }}>β</sup>{" "}
                       {avatarEnabled
                         ? avatarStatus === "loading"
                           ? "generating"
