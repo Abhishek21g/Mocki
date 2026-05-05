@@ -1,4 +1,4 @@
-# Supabase setup for Mockpilot
+# Supabase setup for Mocki
 
 This directory holds the SQL needed to set up the per-user history and learner-memory features.
 

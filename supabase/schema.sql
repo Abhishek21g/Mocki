@@ -1,4 +1,4 @@
--- Mockpilot — Supabase schema for per-user history and learner memory
+-- Mocki — Supabase schema for per-user history and learner memory
 --
 -- Run this in the Supabase SQL editor for a fresh project. Safe to re-run:
 -- everything is wrapped in IF NOT EXISTS / OR REPLACE.

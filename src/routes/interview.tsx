@@ -34,7 +34,7 @@ const AVATAR_ENABLED_STORAGE_KEY = "mockpilot:avatarEnabled";
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
-    meta: [{ title: "Interview · Mockpilot" }],
+    meta: [{ title: "Interview · Mocki" }],
   }),
   component: InterviewPage,
 });
