@@ -139,9 +139,9 @@ export type Session = {
   learnerMemoryPrompt: string | null;
 };
 
-const g = globalThis as unknown as { __mockpilot_sessions?: Map<string, Session> };
-if (!g.__mockpilot_sessions) g.__mockpilot_sessions = new Map();
-const sessions = g.__mockpilot_sessions;
+const g = globalThis as unknown as { __mocki_sessions?: Map<string, Session> };
+if (!g.__mocki_sessions) g.__mocki_sessions = new Map();
+const sessions = g.__mocki_sessions;
 
 export function createSession(
   id: string,
