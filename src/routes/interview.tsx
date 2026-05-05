@@ -57,6 +57,7 @@ function InterviewPage() {
   const [showAgents, setShowAgents] = useState(false);
   const [events, setEvents] = useState<AgentEvent[]>([]);
   const [canInlineAgents, setCanInlineAgents] = useState(false);
+  const [devMode, setDevMode] = useState(false);
   const recognitionRef = useRef<ReturnType<typeof createSpeechRecognitionController> | null>(null);
   const ttsRef = useRef<TtsController | null>(null);
   const avatarRef = useRef<AvatarController | null>(null);
@@ -292,13 +293,6 @@ function InterviewPage() {
     };
   }, [state.sessionId]);
 
-  useEffect(() => {
-    if (inputMode === "typing") {
-      setInterimTranscript("");
-      setIsHoldingTalk(false);
-      recognitionRef.current?.stop();
-    }
-  }, [inputMode]);
 
   if (!state.sessionId || !state.setupData || !state.activeInterviewer || !state.roleProfile) {
     return <Navigate to="/" />;
@@ -383,12 +377,7 @@ function InterviewPage() {
   }
 
   function startHoldToTalk() {
-    if (controlsDisabled) return;
-    if (!speechSupported) {
-      showToast("Voice input is not supported in this browser.");
-      setInputMode("typing");
-      return;
-    }
+    if (controlsDisabled || !speechSupported) return;
     ttsRef.current?.stop();
     avatarRef.current?.stop();
     setIsHoldingTalk(true);
@@ -410,17 +399,19 @@ function InterviewPage() {
       />
 
       <main className="mx-auto max-w-[1600px] px-5 pb-16 pt-24 md:px-8">
-        <SessionStrip
-          activeInterviewer={activeInterviewer}
-          stage={state.currentStage}
-          turnType={state.currentTurnType}
-          focus={state.currentFocus}
-          round={state.currentRound}
-          totalRounds={state.totalRounds}
-          showAgents={showAgents}
-          canInlineAgents={canInlineAgents}
-          onToggleAgents={() => setShowAgents((value) => !value)}
-        />
+        {devMode && (
+          <SessionStrip
+            activeInterviewer={activeInterviewer}
+            stage={state.currentStage}
+            turnType={state.currentTurnType}
+            focus={state.currentFocus}
+            round={state.currentRound}
+            totalRounds={state.totalRounds}
+            showAgents={showAgents}
+            canInlineAgents={canInlineAgents}
+            onToggleAgents={() => setShowAgents((value) => !value)}
+          />
+        )}
 
         <div
           className={cn(
@@ -446,12 +437,14 @@ function InterviewPage() {
               </div>
             </div>
 
-            <FlowCard
-              stage={state.currentStage}
-              turnType={state.currentTurnType}
-              focus={state.currentFocus}
-              reason={state.currentCoordinatorReason}
-            />
+            {devMode && (
+              <FlowCard
+                stage={state.currentStage}
+                turnType={state.currentTurnType}
+                focus={state.currentFocus}
+                reason={state.currentCoordinatorReason}
+              />
+            )}
           </section>
 
           <section className="flex flex-col gap-5">
@@ -488,16 +481,18 @@ function InterviewPage() {
                   {state.currentQuestion}
                 </div>
               )}
-              <div className="flex flex-wrap gap-3">
-                <FlowBadge label="Stage" value={state.currentStage} accent="var(--green)" />
-                <FlowBadge label="Turn" value={state.currentTurnType} accent="var(--text-2)" />
-                <FlowBadge label="Focus" value={state.currentFocus} accent="var(--text)" />
-                <FlowBadge
-                  label="Difficulty"
-                  value={state.currentDifficulty}
-                  accent={difficultyColor(state.currentDifficulty)}
-                />
-              </div>
+              {devMode && (
+                <div className="flex flex-wrap gap-3">
+                  <FlowBadge label="Stage" value={state.currentStage} accent="var(--green)" />
+                  <FlowBadge label="Turn" value={state.currentTurnType} accent="var(--text-2)" />
+                  <FlowBadge label="Focus" value={state.currentFocus} accent="var(--text)" />
+                  <FlowBadge
+                    label="Difficulty"
+                    value={state.currentDifficulty}
+                    accent={difficultyColor(state.currentDifficulty)}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -508,39 +503,6 @@ function InterviewPage() {
                 Your Answer
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div
-                  className="inline-flex rounded-full border p-1"
-                  style={{ borderColor: "var(--border)" }}
-                >
-                  <button
-                    className="rounded-full px-3 py-1.5 text-xs font-semibold"
-                    style={{
-                      background: inputMode === "typing" ? "var(--green-dim)" : "transparent",
-                      color: inputMode === "typing" ? "var(--green)" : "var(--text-2)",
-                    }}
-                    onClick={() => setInputMode("typing")}
-                    disabled={controlsDisabled}
-                  >
-                    Typing
-                  </button>
-                  <button
-                    className="rounded-full px-3 py-1.5 text-xs font-semibold"
-                    style={{
-                      background: inputMode === "hold_to_talk" ? "var(--green-dim)" : "transparent",
-                      color: inputMode === "hold_to_talk" ? "var(--green)" : "var(--text-2)",
-                    }}
-                    onClick={() => {
-                      if (!speechSupported) {
-                        showToast("Voice input is not supported in this browser.");
-                        return;
-                      }
-                      setInputMode("hold_to_talk");
-                    }}
-                    disabled={controlsDisabled || !speechSupported}
-                  >
-                    Hold to talk
-                  </button>
-                </div>
                 <div className="flex items-center gap-3">
                   <button
                     type="button"
@@ -607,84 +569,86 @@ function InterviewPage() {
                       COMING SOON
                     </span>
                   </span>
-                  <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
-                    STT:{" "}
-                    {speechSupported
-                      ? capitalize(sttEngine ?? "browser")
-                      : isAudioCaptureSupported() || isSpeechRecognitionSupported()
-                        ? "Needs setup"
-                        : "Unavailable"}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDevMode((d) => !d)}
+                    title={devMode ? "Switch to interview view" : "Switch to developer view"}
+                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+                    style={{
+                      borderColor: devMode ? "rgba(118,185,0,0.4)" : "var(--border)",
+                      background: devMode ? "var(--green-dim)" : "transparent",
+                      color: devMode ? "var(--green)" : "var(--text-3)",
+                    }}
+                  >
+                    {devMode ? "⚙ Dev" : "⚙ Dev"}
+                  </button>
                 </div>
               </div>
               <div className="relative">
                 <textarea
                   className="gp-input"
                   style={{
-                    minHeight: 240,
+                    minHeight: 200,
                     resize: "vertical",
                     lineHeight: 1.7,
-                    paddingBottom: 30,
+                    paddingBottom: 36,
+                    paddingRight: speechSupported ? 52 : 12,
                   }}
-                  placeholder="Answer as if you were in the room: give context, explain your reasoning, and make your tradeoffs concrete."
-                  value={
-                    inputMode === "typing"
-                      ? answer
-                      : [answer, interimTranscript].filter(Boolean).join(" ")
-                  }
+                  placeholder="Type your answer — or hold the mic button to speak."
+                  value={answer}
                   onChange={(e) => {
-                    if (inputMode !== "typing") return;
-                    setAnswer(e.target.value);
+                    if (!controlsDisabled) setAnswer(e.target.value);
                   }}
-                  readOnly={inputMode === "hold_to_talk"}
                   disabled={controlsDisabled}
                 />
+                {/* Interim voice transcript — faded preview while holding mic */}
+                {interimTranscript ? (
+                  <div
+                    className="pointer-events-none absolute left-3 text-sm"
+                    style={{
+                      top: answer ? "auto" : 14,
+                      bottom: answer ? 36 : "auto",
+                      right: 52,
+                      color: "var(--text-3)",
+                      fontStyle: "italic",
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {interimTranscript}
+                  </div>
+                ) : null}
+                {/* Char count */}
                 <div
-                  className="mono pointer-events-none absolute bottom-2 right-3 text-xs"
+                  className="mono pointer-events-none absolute bottom-2 left-3 text-xs"
                   style={{ color: "var(--text-3)" }}
                 >
-                  {answer.length + (inputMode === "hold_to_talk" ? interimTranscript.length : 0)} chars
+                  {answer.length} chars
+                  {isHoldingTalk && (
+                    <span style={{ color: "var(--green)", marginLeft: 6 }}>● recording</span>
+                  )}
                 </div>
-              </div>
-              {inputMode === "hold_to_talk" && (
-                <div className="flex flex-wrap items-center gap-2">
+                {/* Mic button — always visible if supported */}
+                {speechSupported && (
                   <button
-                    className="flex h-11 w-11 items-center justify-center rounded-full border"
+                    className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border transition-all"
                     style={{
                       borderColor: isHoldingTalk ? "var(--green)" : "var(--border)",
                       background: isHoldingTalk ? "var(--green-dim)" : "var(--surface2)",
-                      color: isHoldingTalk ? "var(--green)" : "var(--text)",
+                      color: isHoldingTalk ? "var(--green)" : "var(--text-2)",
+                      boxShadow: isHoldingTalk ? "0 0 0 3px rgba(118,185,0,0.25)" : "none",
                     }}
                     onPointerDown={startHoldToTalk}
                     onPointerUp={stopHoldToTalk}
                     onPointerLeave={stopHoldToTalk}
                     onPointerCancel={stopHoldToTalk}
-                    disabled={controlsDisabled || !speechSupported}
-                    aria-label={isHoldingTalk ? "Release to stop recording" : "Hold to talk"}
-                    title={isHoldingTalk ? "Release to stop recording" : "Hold to talk"}
-                  >
-                    <Mic size={18} />
-                  </button>
-                  <button
-                    className="rounded-full border px-3 py-2 text-xs font-semibold"
-                    style={{
-                      borderColor: "var(--border)",
-                      background: "var(--surface2)",
-                      color: "var(--text-2)",
-                    }}
-                    onClick={() => {
-                      setAnswer("");
-                      setInterimTranscript("");
-                    }}
                     disabled={controlsDisabled}
+                    aria-label={isHoldingTalk ? "Release to stop recording" : "Hold mic to speak"}
+                    title={isHoldingTalk ? "Release to stop" : "Hold to speak"}
                   >
-                    Clear transcript
+                    <Mic size={14} />
                   </button>
-                  <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
-                    Mic: {humanizeLabel(speechStatus)}
-                  </span>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {!generating && (
