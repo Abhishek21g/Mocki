@@ -17,7 +17,6 @@ import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiTtsAvatarRouteImport } from './routes/api/tts-avatar'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiSttRouteImport } from './routes/api/stt'
-import { Route as ApiTtsAvatarRouteImport } from './routes/api/tts-avatar'
 import { Route as AgentsSessionIdRouteImport } from './routes/agents.$sessionId'
 
 const ReportRoute = ReportRouteImport.update({
@@ -58,11 +57,6 @@ const ApiTtsRoute = ApiTtsRouteImport.update({
 const ApiSttRoute = ApiSttRouteImport.update({
   id: '/api/stt',
   path: '/api/stt',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiTtsAvatarRoute = ApiTtsAvatarRouteImport.update({
-  id: '/api/tts-avatar',
-  path: '/api/tts-avatar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentsSessionIdRoute = AgentsSessionIdRouteImport.update({
@@ -209,13 +203,6 @@ declare module '@tanstack/react-router' {
       path: '/api/stt'
       fullPath: '/api/stt'
       preLoaderRoute: typeof ApiSttRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/tts-avatar': {
-      id: '/api/tts-avatar'
-      path: '/api/tts-avatar'
-      fullPath: '/api/tts-avatar'
-      preLoaderRoute: typeof ApiTtsAvatarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents/$sessionId': {
