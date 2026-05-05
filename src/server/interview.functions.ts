@@ -128,7 +128,7 @@ export const startInterview = createServerFn({ method: "POST" })
 
       const { accessToken: _accessToken, ...persistableInput } = data;
       void _accessToken;
-      createSession(sessionId, {
+      await createSession(sessionId, {
         ...persistableInput,
         interviewers,
         activeInterviewerId: interviewers[0].id,
@@ -141,7 +141,7 @@ export const startInterview = createServerFn({ method: "POST" })
         learnerMemoryPrompt,
       });
 
-      const session = getSession(sessionId)!;
+      const session = (await getSession(sessionId))!;
       // Setup events above (RoleProfile, Memory, PanelGen, etc.) sit on
       // turn 0; the interview itself begins here.
       markTurnBoundary(sessionId, "Turn 1 started · opening question");
@@ -176,7 +176,7 @@ export const startInterview = createServerFn({ method: "POST" })
         },
       });
 
-      updateSession(sessionId, {
+      await updateSession(sessionId, {
         activeInterviewerId: activeInterviewer.id,
         currentStage: plan.stage,
         lastQuestion: question,
@@ -211,7 +211,7 @@ const AnswerSchema = z.object({
 export const submitAnswer = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => AnswerSchema.parse(d))
   .handler(async ({ data }) => {
-    let session = getSession(data.sessionId);
+    let session = await getSession(data.sessionId);
     if (!session) throw new Error("Session not found");
 
     return await withSessionLog(data.sessionId, async () => {
@@ -236,7 +236,7 @@ export const submitAnswer = createServerFn({ method: "POST" })
               reason: clarification.reason,
             },
           });
-          updateSession(data.sessionId, { lastClarified: true });
+          await updateSession(data.sessionId, { lastClarified: true });
           return {
             clarification: true as const,
             follow_up: clarification.follow_up,
@@ -285,13 +285,12 @@ export const submitAnswer = createServerFn({ method: "POST" })
 
       const updatedRounds = [...session!.rounds, completedRound];
       const newRoundNumber = session!.currentRound + 1;
-      updateSession(data.sessionId, {
+      session = await updateSession(data.sessionId, {
         rounds: updatedRounds,
         currentRound: newRoundNumber,
         currentStage: activePlan.stage,
         lastClarified: false,
       });
-      session = getSession(data.sessionId)!;
 
       if (newRoundNumber >= session.totalRounds) {
         return {
@@ -336,7 +335,7 @@ export const submitAnswer = createServerFn({ method: "POST" })
         },
       });
 
-      updateSession(data.sessionId, {
+      await updateSession(data.sessionId, {
         activeInterviewerId: nextInterviewer.id,
         currentStage: plan.stage,
         lastQuestion: nextQuestion,
@@ -368,7 +367,7 @@ const ReportSchema = z.object({
 export const generateReport = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => ReportSchema.parse(d))
   .handler(async ({ data }) => {
-    const session = getSession(data.sessionId);
+    const session = await getSession(data.sessionId);
     if (!session) throw new Error("Session not found");
     if (session.rounds.length < session.totalRounds) throw new Error("Interview not complete");
 
