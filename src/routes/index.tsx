@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
@@ -185,8 +185,12 @@ function SetupPage() {
           </div>
         </form>
 
-        <footer className="mt-8 text-center text-xs" style={{ color: "var(--text-3)" }}>
-          Powered by NVIDIA Nemotron
+        <footer className="mt-8 text-center text-xs flex items-center justify-center gap-4" style={{ color: "var(--text-3)" }}>
+          <span>Powered by NVIDIA Nemotron</span>
+          <span>·</span>
+          <Link to="/about" className="hover:text-white transition-colors">About</Link>
+          <span>·</span>
+          <a href="https://forms.gle/YOUR_FORM_ID" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Feedback</a>
         </footer>
       </div>
     </div>
@@ -438,9 +442,13 @@ function LoginPage({ signInWithGoogle }: { signInWithGoogle: (redirectTo?: strin
           </div>
         </div>
 
-        <p className="mt-6 text-xs" style={{ color: "var(--text-3)" }}>
-          Powered by NVIDIA Nemotron · Built at BeaverHacks 2026
-        </p>
+        <div className="mt-6 flex items-center justify-center gap-4 text-xs" style={{ color: "var(--text-3)" }}>
+          <span>Built at BeaverHacks 2026</span>
+          <span>·</span>
+          <Link to="/about" className="hover:text-white transition-colors">About</Link>
+          <span>·</span>
+          <a href="https://forms.gle/YOUR_FORM_ID" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Feedback</a>
+        </div>
       </div>
     </div>
   );
