@@ -655,27 +655,17 @@ function InterviewPage() {
                 {/* Mic button — always visible if supported */}
                 {speechSupported && (
                   <button
-                    type="button"
                     className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full border transition-all"
                     style={{
                       borderColor: isHoldingTalk ? "var(--green)" : "var(--border)",
                       background: isHoldingTalk ? "var(--green-dim)" : "var(--surface2)",
                       color: isHoldingTalk ? "var(--green)" : "var(--text-2)",
                       boxShadow: isHoldingTalk ? "0 0 0 3px rgba(118,185,0,0.25)" : "none",
-                      // Prevent iOS callout / text selection on long press
-                      WebkitUserSelect: "none",
-                      userSelect: "none",
-                      WebkitTouchCallout: "none",
                     }}
-                    // Touch events for iOS — prevents system mic selector popping up
-                    onTouchStart={(e) => { e.preventDefault(); startHoldToTalk(); }}
-                    onTouchEnd={(e) => { e.preventDefault(); stopHoldToTalk(); }}
-                    onTouchCancel={(e) => { e.preventDefault(); stopHoldToTalk(); }}
-                    // Pointer events for desktop/Android
-                    onPointerDown={(e) => { if (e.pointerType !== "touch") startHoldToTalk(); }}
-                    onPointerUp={(e) => { if (e.pointerType !== "touch") stopHoldToTalk(); }}
-                    onPointerLeave={(e) => { if (e.pointerType !== "touch") stopHoldToTalk(); }}
-                    onPointerCancel={(e) => { if (e.pointerType !== "touch") stopHoldToTalk(); }}
+                    onPointerDown={startHoldToTalk}
+                    onPointerUp={stopHoldToTalk}
+                    onPointerLeave={stopHoldToTalk}
+                    onPointerCancel={stopHoldToTalk}
                     disabled={controlsDisabled}
                     aria-label={isHoldingTalk ? "Release to stop recording" : "Hold mic to speak"}
                     title={isHoldingTalk ? "Release to stop" : "Hold to speak"}

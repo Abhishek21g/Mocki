@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
@@ -442,13 +442,9 @@ function LoginPage({ signInWithGoogle }: { signInWithGoogle: (redirectTo?: strin
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-center gap-4 text-xs" style={{ color: "var(--text-3)" }}>
-          <span>Built at BeaverHacks 2026</span>
-          <span>·</span>
-          <Link to="/about" className="hover:text-white transition-colors">About</Link>
-          <span>·</span>
-          <Link to="/about" className="hover:text-white transition-colors">Feedback</Link>
-        </div>
+        <p className="mt-6 text-xs" style={{ color: "var(--text-3)" }}>
+          Powered by NVIDIA Nemotron · Built at BeaverHacks 2026
+        </p>
       </div>
     </div>
   );
