@@ -175,11 +175,13 @@ export async function createSession(id: string, data: SessionInput): Promise<voi
   };
   const supabase = createSupabaseAdminClient();
   if (supabase) {
+    console.log(`[sessions] createSession ${id} → Supabase`);
     const { error } = await supabase
       .from("session_store")
       .insert({ id, data: session, user_id: data.userId ?? null });
     if (error) throw new Error(`Failed to create session: ${error.message}`);
   } else {
+    console.warn(`[sessions] SUPABASE_SERVICE_ROLE_KEY not set — falling back to in-memory (sessions will be lost on cold start)`);
     memSessions.set(id, session);
   }
 }
@@ -192,9 +194,17 @@ export async function getSession(id: string): Promise<Session | undefined> {
       .select("data")
       .eq("id", id)
       .single();
-    if (error || !data) return undefined;
+    if (error) {
+      console.error(`[sessions] getSession ${id} Supabase error:`, error.message);
+      return undefined;
+    }
+    if (!data) {
+      console.warn(`[sessions] getSession ${id} — not found in Supabase`);
+      return undefined;
+    }
     return data.data as Session;
   }
+  console.warn(`[sessions] getSession ${id} — no Supabase, using in-memory`);
   return memSessions.get(id);
 }
 
