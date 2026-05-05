@@ -582,41 +582,31 @@ function InterviewPage() {
                           : "off"}
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAvatarEnabled((prev) => {
-                        const next = !prev;
-                        if (!next) avatarRef.current?.stop();
-                        else lastAvatarKeyRef.current = null; // force re-play on enable
-                        return next;
-                      });
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
+                  <span
+                    title="Live interviewer avatar powered by NVIDIA Riva — coming soon"
+                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold select-none cursor-default"
                     style={{
-                      borderColor: avatarEnabled ? "rgba(118,185,0,0.5)" : "var(--border)",
-                      background: avatarEnabled ? "var(--green-dim)" : "var(--surface2)",
-                      color: avatarEnabled ? "var(--green)" : "var(--text-2)",
+                      borderColor: "var(--border)",
+                      borderStyle: "dashed",
+                      background: "transparent",
+                      color: "var(--text-3)",
                     }}
-                    title={
-                      avatarEnabled
-                        ? "Live avatar on — interviewer shown as animated face"
-                        : "Live avatar off — enable to see animated interviewer"
-                    }
-                    aria-pressed={avatarEnabled}
                   >
                     <User size={14} />
-                    <span>
-                      Avatar<sup style={{ fontSize: "0.6em", opacity: 0.6, marginLeft: "1px" }}>β</sup>{" "}
-                      {avatarEnabled
-                        ? avatarStatus === "loading"
-                          ? "generating"
-                          : avatarStatus === "playing"
-                            ? "speaking"
-                            : "on"
-                        : "off"}
+                    <span>Live Avatar</span>
+                    <span
+                      style={{
+                        fontSize: "0.7em",
+                        letterSpacing: "0.04em",
+                        background: "linear-gradient(90deg, var(--green), #4d7a00)",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        fontWeight: 700,
+                      }}
+                    >
+                      COMING SOON
                     </span>
-                  </button>
+                  </span>
                   <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
                     STT:{" "}
                     {speechSupported
