@@ -14,7 +14,7 @@ export const Route = createFileRoute("/about")({
 
 const TEAM = [
   {
-    name: "Abhishek Enagutha",
+    name: "Abhishek Enaguthi",
     role: "Full Stack & AI Systems",
     linkedin: "https://www.linkedin.com/in/abhishekenaguthi/",
     initial: "A",
