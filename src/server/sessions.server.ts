@@ -139,26 +139,30 @@ export type Session = {
   learnerMemoryPrompt: string | null;
 };
 
+import { createSupabaseAdminClient } from "./supabase.server";
+
+// In-memory fallback used when SUPABASE_SERVICE_ROLE_KEY is not configured
+// (local dev without Supabase). Shared across the process via globalThis so
+// HMR reloads don't wipe state.
 const g = globalThis as unknown as { __mocki_sessions?: Map<string, Session> };
 if (!g.__mocki_sessions) g.__mocki_sessions = new Map();
-const sessions = g.__mocki_sessions;
+const memSessions = g.__mocki_sessions;
 
-export function createSession(
-  id: string,
-  data: Omit<
-    Session,
-    | "rounds"
-    | "currentRound"
-    | "lastQuestion"
-    | "lastPlan"
-    | "lastClarified"
-    | "createdAt"
-    | "userId"
-    | "learnerMemoryPrompt"
-  > &
-    Partial<Pick<Session, "userId" | "learnerMemoryPrompt">>,
-) {
-  sessions.set(id, {
+type SessionInput = Omit<
+  Session,
+  | "rounds"
+  | "currentRound"
+  | "lastQuestion"
+  | "lastPlan"
+  | "lastClarified"
+  | "createdAt"
+  | "userId"
+  | "learnerMemoryPrompt"
+> &
+  Partial<Pick<Session, "userId" | "learnerMemoryPrompt">>;
+
+export async function createSession(id: string, data: SessionInput): Promise<void> {
+  const session: Session = {
     ...data,
     rounds: [],
     currentRound: 0,
@@ -168,18 +172,53 @@ export function createSession(
     createdAt: Date.now(),
     userId: data.userId ?? null,
     learnerMemoryPrompt: data.learnerMemoryPrompt ?? null,
-  });
+  };
+  const supabase = createSupabaseAdminClient();
+  if (supabase) {
+    const { error } = await supabase
+      .from("session_store")
+      .insert({ id, data: session, user_id: data.userId ?? null });
+    if (error) throw new Error(`Failed to create session: ${error.message}`);
+  } else {
+    memSessions.set(id, session);
+  }
 }
 
-export function getSession(id: string): Session | undefined {
-  return sessions.get(id);
+export async function getSession(id: string): Promise<Session | undefined> {
+  const supabase = createSupabaseAdminClient();
+  if (supabase) {
+    const { data, error } = await supabase
+      .from("session_store")
+      .select("data")
+      .eq("id", id)
+      .single();
+    if (error || !data) return undefined;
+    return data.data as Session;
+  }
+  return memSessions.get(id);
 }
 
-export function updateSession(id: string, updates: Partial<Session>): Session {
-  const session = sessions.get(id);
+export async function updateSession(id: string, updates: Partial<Session>): Promise<Session> {
+  const supabase = createSupabaseAdminClient();
+  if (supabase) {
+    const { data: row, error: fetchErr } = await supabase
+      .from("session_store")
+      .select("data")
+      .eq("id", id)
+      .single();
+    if (fetchErr || !row) throw new Error(`Session not found: ${id}`);
+    const next: Session = { ...(row.data as Session), ...updates };
+    const { error: updateErr } = await supabase
+      .from("session_store")
+      .update({ data: next })
+      .eq("id", id);
+    if (updateErr) throw new Error(`Failed to update session: ${updateErr.message}`);
+    return next;
+  }
+  const session = memSessions.get(id);
   if (!session) throw new Error(`Session not found: ${id}`);
   const next = { ...session, ...updates };
-  sessions.set(id, next);
+  memSessions.set(id, next);
   return next;
 }
 
