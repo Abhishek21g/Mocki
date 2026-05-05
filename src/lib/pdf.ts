@@ -1,3 +1,61 @@
+/**
+ * iOS Safari polyfills required for pdfjs-dist v5 (even the legacy build).
+ *
+ * 1) ReadableStream[Symbol.asyncIterator] — Safari < 26.4 (and most iOS Safari
+ *    versions in the wild) ship ReadableStream without an async-iterator,
+ *    which makes `for await (const chunk of stream)` inside pdfjs throw
+ *    "undefined is not a function (near '...i of e...')" the moment you call
+ *    page.getTextContent(). Recommended fix per mozilla/pdf.js #20973.
+ *
+ * 2) Promise.withResolvers — iOS Safari < 17.4 lacks it. pdfjs uses it
+ *    internally during getDocument().
+ *
+ * Polyfills are applied at module load (before the dynamic pdfjs import) and
+ * are no-ops on browsers that already have these features.
+ */
+if (typeof window !== "undefined") {
+  type AsyncIterableReadableStream = ReadableStream & {
+    [Symbol.asyncIterator]?: () => AsyncIterableIterator<unknown>;
+  };
+  const proto = (
+    typeof ReadableStream !== "undefined" ? ReadableStream.prototype : null
+  ) as AsyncIterableReadableStream | null;
+  if (proto && !proto[Symbol.asyncIterator]) {
+    proto[Symbol.asyncIterator] = async function* (this: ReadableStream) {
+      const reader = this.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) return;
+          yield value;
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    };
+  }
+
+  type WithResolversCapable = PromiseConstructor & {
+    withResolvers?: <T>() => {
+      promise: Promise<T>;
+      resolve: (value: T | PromiseLike<T>) => void;
+      reject: (reason?: unknown) => void;
+    };
+  };
+  const PromiseCtor = Promise as WithResolversCapable;
+  if (typeof PromiseCtor.withResolvers !== "function") {
+    PromiseCtor.withResolvers = function <T>() {
+      let resolve!: (value: T | PromiseLike<T>) => void;
+      let reject!: (reason?: unknown) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    };
+  }
+}
+
 const MAX_PDF_BYTES = 10 * 1024 * 1024;
 const MAX_RESUME_CHARS = 20_000;
 
