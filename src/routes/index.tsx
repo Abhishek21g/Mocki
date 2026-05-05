@@ -188,9 +188,7 @@ function SetupPage() {
         <footer className="mt-8 text-center text-xs flex items-center justify-center gap-4" style={{ color: "var(--text-3)" }}>
           <span>Powered by NVIDIA Nemotron</span>
           <span>·</span>
-          <Link to="/about" className="hover:text-white transition-colors">About</Link>
-          <span>·</span>
-          <Link to="/about" className="hover:text-white transition-colors">Feedback</Link>
+          <Link to="/about" className="hover:text-white transition-colors">About & Feedback</Link>
         </footer>
       </div>
     </div>
@@ -445,9 +443,7 @@ function LoginPage({ signInWithGoogle }: { signInWithGoogle: (redirectTo?: strin
         <div className="mt-6 flex items-center justify-center gap-3 text-xs" style={{ color: "var(--text-3)" }}>
           <span>Powered by NVIDIA Nemotron</span>
           <span>·</span>
-          <Link to="/about" className="hover:text-white transition-colors">About</Link>
-          <span>·</span>
-          <Link to="/about" className="hover:text-white transition-colors">Feedback</Link>
+          <Link to="/about" className="hover:text-white transition-colors">About & Feedback</Link>
         </div>
       </div>
     </div>
