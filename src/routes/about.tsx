@@ -15,28 +15,24 @@ export const Route = createFileRoute("/about")({
 const TEAM = [
   {
     name: "Abhishek Enaguthi",
-    role: "Full Stack & AI Systems",
     linkedin: "https://www.linkedin.com/in/abhishekenaguthi/",
     initial: "A",
     color: "#76b900",
   },
   {
     name: "Muralikrishna Inti",
-    role: "Backend & Infrastructure",
     linkedin: "https://www.linkedin.com/in/muralikinti/",
     initial: "M",
     color: "#4d7a00",
   },
   {
     name: "Mithun Karthikeyan",
-    role: "Frontend & UX",
     linkedin: "https://www.linkedin.com/in/mithunkarth",
     initial: "M",
     color: "#76b900",
   },
   {
     name: "Ross Henderson",
-    role: "AI & Voice Integration",
     linkedin: "https://www.linkedin.com/in/ross-henderson-9b0ba2257/",
     initial: "R",
     color: "#4d7a00",
@@ -97,9 +93,6 @@ function AboutPage() {
                   </div>
                   <div>
                     <div className="font-semibold text-sm">{member.name}</div>
-                    <div className="text-xs" style={{ color: "var(--green)" }}>
-                      {member.role}
-                    </div>
                   </div>
                 </div>
                 <a
