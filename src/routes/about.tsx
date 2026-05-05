@@ -17,7 +17,7 @@ const TEAM = [
     name: "Abhishek Enagutha",
     role: "Full Stack & AI Systems",
     bio: "Built the multi-agent interview pipeline and NVIDIA integration.",
-    linkedin: "https://www.linkedin.com/in/abhishek-enagutha",
+    linkedin: "https://www.linkedin.com/in/abhishekenaguthi/",
     initial: "A",
     color: "#76b900",
   },
