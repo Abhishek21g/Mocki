@@ -190,7 +190,7 @@ function SetupPage() {
           <span>·</span>
           <Link to="/about" className="hover:text-white transition-colors">About</Link>
           <span>·</span>
-          <a href="https://forms.gle/YOUR_FORM_ID" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Feedback</a>
+          <Link to="/about" className="hover:text-white transition-colors">Feedback</Link>
         </footer>
       </div>
     </div>
@@ -447,7 +447,7 @@ function LoginPage({ signInWithGoogle }: { signInWithGoogle: (redirectTo?: strin
           <span>·</span>
           <Link to="/about" className="hover:text-white transition-colors">About</Link>
           <span>·</span>
-          <a href="https://forms.gle/YOUR_FORM_ID" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Feedback</a>
+          <Link to="/about" className="hover:text-white transition-colors">Feedback</Link>
         </div>
       </div>
     </div>
