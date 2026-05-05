@@ -44,6 +44,19 @@ export function createServerClientForUser(accessToken: string | null): SupabaseC
 }
 
 /**
+ * Admin client using the service-role key. Bypasses RLS — only call from
+ * server-side code. Returns null when SUPABASE_SERVICE_ROLE_KEY is not set.
+ */
+export function createSupabaseAdminClient(): SupabaseClient | null {
+  const config = getSupabaseConfig();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!config || !serviceKey) return null;
+  return createClient(config.url, serviceKey, {
+    auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+  });
+}
+
+/**
  * Resolve the user id for a given access token. Returns null if there is no
  * token or the token is not valid; callers decide whether that is fatal.
  */
