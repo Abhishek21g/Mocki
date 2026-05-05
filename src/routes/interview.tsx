@@ -29,8 +29,8 @@ import type { InterviewStage, Persona, RoleProfile, TurnType } from "@/server/se
 import { AgentDashboard } from "@/components/agent-dashboard";
 import type { AgentEvent } from "@/components/agent-dashboard/types";
 
-const TTS_ENABLED_STORAGE_KEY = "mockpilot:ttsEnabled";
-const AVATAR_ENABLED_STORAGE_KEY = "mockpilot:avatarEnabled";
+const TTS_ENABLED_STORAGE_KEY = "mocki:ttsEnabled";
+const AVATAR_ENABLED_STORAGE_KEY = "mocki:avatarEnabled";
 
 export const Route = createFileRoute("/interview")({
   head: () => ({
