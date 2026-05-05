@@ -300,56 +300,80 @@ export function createSpeechRecognitionController(options: SpeechControllerOptio
     };
   }
 
-  const recognition = new recognitionCtor();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = options.language ?? "en-US";
+  // iOS Safari cannot reuse a SpeechRecognition instance after it ends.
+  // We create a fresh instance on every start() call instead.
+  let current: SpeechRecognition | null = null;
 
-  recognition.onstart = () => {
-    options.onStatus("listening");
-  };
+  function createInstance(): SpeechRecognition {
+    const r = new recognitionCtor!();
+    r.continuous = true;
+    r.interimResults = true;
+    r.lang = options.language ?? "en-US";
 
-  recognition.onend = () => {
-    options.onStatus("idle");
-  };
+    r.onstart = () => {
+      options.onStatus("listening");
+    };
 
-  recognition.onresult = (event) => {
-    let interim = "";
-    let final = "";
-    for (let i = event.resultIndex; i < event.results.length; i += 1) {
-      const transcript = event.results[i][0]?.transcript?.trim();
-      if (!transcript) continue;
-      if (event.results[i].isFinal) final += `${transcript} `;
-      else interim += `${transcript} `;
-    }
-    options.onPartial(interim.trim());
-    if (final.trim()) options.onFinal(final.trim());
-  };
+    r.onend = () => {
+      options.onStatus("idle");
+      // Clear the reference so next start() creates a fresh instance.
+      current = null;
+    };
 
-  recognition.onerror = (event) => {
-    options.onStatus("error");
-    if (event.error === "not-allowed") {
-      options.onError("Microphone permission blocked. Allow mic access and retry.");
-    } else {
-      options.onError("Speech recognition failed. Try again.");
-    }
-  };
+    r.onresult = (event) => {
+      let interim = "";
+      let final = "";
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const transcript = event.results[i][0]?.transcript?.trim();
+        if (!transcript) continue;
+        if (event.results[i].isFinal) final += `${transcript} `;
+        else interim += `${transcript} `;
+      }
+      options.onPartial(interim.trim());
+      if (final.trim()) options.onFinal(final.trim());
+    };
+
+    r.onerror = (event) => {
+      options.onStatus("error");
+      current = null;
+      if (event.error === "not-allowed") {
+        options.onError("Microphone permission blocked. Allow mic access and retry.");
+      } else if (event.error === "aborted") {
+        // Silent — user released the button before recognition fired.
+        options.onStatus("idle");
+      } else {
+        options.onError("Speech recognition failed. Try again.");
+      }
+    };
+
+    return r;
+  }
 
   return {
     supported: true,
     engine: "browser",
     start: () => {
       try {
-        recognition.start();
+        // Always create a fresh instance — required on iOS Safari.
+        if (current) {
+          try { current.abort(); } catch { /* ignore */ }
+        }
+        current = createInstance();
+        current.start();
       } catch {
         // Ignore double-start in noisy pointer events.
       }
     },
     stop: () => {
-      recognition.stop();
+      try {
+        current?.stop();
+      } catch { /* ignore */ }
     },
     destroy: () => {
-      recognition.abort();
+      try {
+        current?.abort();
+      } catch { /* ignore */ }
+      current = null;
       options.onPartial("");
     },
   };
