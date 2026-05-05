@@ -16,7 +16,6 @@ const TEAM = [
   {
     name: "Abhishek Enagutha",
     role: "Full Stack & AI Systems",
-    bio: "Built the multi-agent interview pipeline and NVIDIA integration.",
     linkedin: "https://www.linkedin.com/in/abhishekenaguthi/",
     initial: "A",
     color: "#76b900",
@@ -24,7 +23,6 @@ const TEAM = [
   {
     name: "Muralikrishna Inti",
     role: "Backend & Infrastructure",
-    bio: "Architected session persistence, deployment pipeline, and backend reliability.",
     linkedin: "https://www.linkedin.com/in/muralikinti/",
     initial: "M",
     color: "#4d7a00",
@@ -32,7 +30,6 @@ const TEAM = [
   {
     name: "Mithun Karthikeyan",
     role: "Frontend & UX",
-    bio: "Designed the interview experience and built the real-time evaluation UI.",
     linkedin: "https://www.linkedin.com/in/mithunkarth",
     initial: "M",
     color: "#76b900",
@@ -40,7 +37,6 @@ const TEAM = [
   {
     name: "Ross Henderson",
     role: "AI & Voice Integration",
-    bio: "Integrated NVIDIA Magpie TTS, ASR pipeline, and avatar research.",
     linkedin: "https://www.linkedin.com/in/ross-henderson-9b0ba2257/",
     initial: "R",
     color: "#4d7a00",
@@ -106,9 +102,6 @@ function AboutPage() {
                     </div>
                   </div>
                 </div>
-                <p className="text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
-                  {member.bio}
-                </p>
                 <a
                   href={member.linkedin}
                   target="_blank"
