@@ -38,13 +38,13 @@ export type AgentLogEvent = {
 };
 
 const g = globalThis as unknown as {
-  __mockpilot_logs?: Map<string, AgentLogEvent[]>;
-  __mockpilot_turns?: Map<string, number>;
+  __mocki_logs?: Map<string, AgentLogEvent[]>;
+  __mocki_turns?: Map<string, number>;
 };
-if (!g.__mockpilot_logs) g.__mockpilot_logs = new Map();
-if (!g.__mockpilot_turns) g.__mockpilot_turns = new Map();
-const logs = g.__mockpilot_logs;
-const turns = g.__mockpilot_turns;
+if (!g.__mocki_logs) g.__mocki_logs = new Map();
+if (!g.__mocki_turns) g.__mocki_turns = new Map();
+const logs = g.__mocki_logs;
+const turns = g.__mocki_turns;
 
 /**
  * Bumps the per-session turn counter and emits a marker event that the
