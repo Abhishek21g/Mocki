@@ -1,8 +1,8 @@
-# Mockpilot
+# Mocki
 
 Multi-agent AI mock interview platform powered by NVIDIA Nemotron.
 
-Mockpilot runs a coordinated pipeline of specialized agents — a Coordinator that
+Mocki runs a coordinated pipeline of specialized agents — a Coordinator that
 plans the interview flow, a Persona generator, an Interviewer, a Clarifier that
 detects vague answers and asks follow-ups, an Evaluator that scores each
 response, and a Reporter that produces the final assessment. A live agent
