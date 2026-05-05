@@ -78,11 +78,13 @@ function InterviewPage() {
   /** Dedupes automatic playback only **after** a question audibly succeeds; avoids locking out retries on transient TTS/play failures (first prompt often hit this). */
   const lastSuccessfullySpokenKeyRef = useRef<string | null>(null);
 
-  const [avatarEnabled, setAvatarEnabled] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    const stored = window.localStorage.getItem(AVATAR_ENABLED_STORAGE_KEY);
-    // Default off — only turns on once user explicitly enables it (requires the bridge).
-    return stored === "true";
+  // Avatar is disabled — feature is Coming Soon. Clear any stale localStorage value
+  // so returning users who had it on don't get stuck in a broken state.
+  const [avatarEnabled] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(AVATAR_ENABLED_STORAGE_KEY);
+    }
+    return false;
   });
   const [avatarStatus, setAvatarStatus] = useState<AvatarStatus>("idle");
   const lastAvatarKeyRef = useRef<string | null>(null);
@@ -563,32 +565,24 @@ function InterviewPage() {
                     }}
                     className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold"
                     style={{
-                      borderColor: ttsEnabled && !avatarEnabled ? "rgba(118,185,0,0.5)" : "var(--border)",
-                      background: ttsEnabled && !avatarEnabled ? "var(--green-dim)" : "var(--surface2)",
-                      color: ttsEnabled && !avatarEnabled ? "var(--green)" : "var(--text-2)",
+                      borderColor: ttsEnabled ? "rgba(118,185,0,0.5)" : "var(--border)",
+                      background: ttsEnabled ? "var(--green-dim)" : "var(--surface2)",
+                      color: ttsEnabled ? "var(--green)" : "var(--text-2)",
                     }}
-                    title={
-                      avatarEnabled
-                        ? "Audio handled by live avatar"
-                        : ttsEnabled
-                          ? "Voice on — interviewer reads questions aloud"
-                          : "Voice off — questions are text-only"
-                    }
-                    aria-pressed={ttsEnabled && !avatarEnabled}
-                    disabled={avatarEnabled}
+                    title={ttsEnabled ? "Voice on — click to mute" : "Voice off — click to enable"}
+                    aria-pressed={ttsEnabled}
+                    disabled={false}
                   >
-                    {ttsEnabled && !avatarEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
+                    {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
                     <span>
                       Voice{" "}
-                      {avatarEnabled
-                        ? "avatar"
-                        : ttsEnabled
-                          ? ttsStatus === "playing"
-                            ? "speaking"
-                            : ttsStatus === "loading"
-                              ? "loading"
-                              : "on"
-                          : "off"}
+                      {ttsEnabled
+                        ? ttsStatus === "playing"
+                          ? "speaking"
+                          : ttsStatus === "loading"
+                            ? "loading"
+                            : "on"
+                        : "off"}
                     </span>
                   </button>
                   <span
@@ -641,30 +635,14 @@ function InterviewPage() {
                     paddingBottom: 36,
                     paddingRight: speechSupported ? 52 : 12,
                   }}
-                  placeholder="Type your answer — or hold the mic button to speak."
+                  placeholder="Type your answer, or hold the mic to speak."
                   value={answer}
                   onChange={(e) => {
                     if (!controlsDisabled) setAnswer(e.target.value);
                   }}
                   disabled={controlsDisabled}
                 />
-                {/* Interim voice transcript — faded preview while holding mic */}
-                {interimTranscript ? (
-                  <div
-                    className="pointer-events-none absolute left-3 text-sm"
-                    style={{
-                      top: answer ? "auto" : 14,
-                      bottom: answer ? 36 : "auto",
-                      right: 52,
-                      color: "var(--text-3)",
-                      fontStyle: "italic",
-                      lineHeight: 1.7,
-                    }}
-                  >
-                    {interimTranscript}
-                  </div>
-                ) : null}
-                {/* Char count */}
+                {/* Char count + recording status */}
                 <div
                   className="mono pointer-events-none absolute bottom-2 left-3 text-xs"
                   style={{ color: "var(--text-3)" }}
@@ -696,6 +674,21 @@ function InterviewPage() {
                   </button>
                 )}
               </div>
+              {/* Interim transcript — shown as a pill below the textarea while recording */}
+              {interimTranscript && (
+                <div
+                  className="flex items-start gap-2 rounded-xl px-3 py-2 text-sm"
+                  style={{
+                    background: "var(--surface2)",
+                    border: "1px solid rgba(118,185,0,0.3)",
+                    color: "var(--text-2)",
+                    fontStyle: "italic",
+                  }}
+                >
+                  <span style={{ color: "var(--green)", flexShrink: 0 }}>●</span>
+                  <span>{interimTranscript}</span>
+                </div>
+              )}
             </div>
 
             {!generating && (
