@@ -442,9 +442,13 @@ function LoginPage({ signInWithGoogle }: { signInWithGoogle: (redirectTo?: strin
           </div>
         </div>
 
-        <p className="mt-6 text-xs" style={{ color: "var(--text-3)" }}>
-          Powered by NVIDIA Nemotron · Built at BeaverHacks 2026
-        </p>
+        <div className="mt-6 flex items-center justify-center gap-3 text-xs" style={{ color: "var(--text-3)" }}>
+          <span>Powered by NVIDIA Nemotron</span>
+          <span>·</span>
+          <Link to="/about" className="hover:text-white transition-colors">About</Link>
+          <span>·</span>
+          <Link to="/about" className="hover:text-white transition-colors">Feedback</Link>
+        </div>
       </div>
     </div>
   );
