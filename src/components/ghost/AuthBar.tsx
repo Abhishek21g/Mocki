@@ -75,7 +75,7 @@ export function AuthBar() {
           disabled={busy}
           className="rounded-md border border-white/10 bg-black/60 px-3 py-1.5 text-white backdrop-blur transition hover:border-white/30 disabled:opacity-60"
         >
-          {busy ? "Opening…" : "Sign in with Google"}
+          {busy ? "Opening…" : "Login"}
         </button>
       )}
     </div>
