@@ -51,8 +51,9 @@ export function AuthBar() {
           >
             History
           </Link>
+          {/* Email — hidden on mobile to save space */}
           <span
-            className="hidden max-w-[180px] truncate rounded-md border border-white/10 bg-black/40 px-3 py-1.5 backdrop-blur sm:inline"
+            className="hidden max-w-[160px] truncate rounded-md border border-white/10 bg-black/40 px-3 py-1.5 backdrop-blur md:inline"
             style={{ color: "var(--text-2)" }}
             title={user.email ?? user.id}
           >
@@ -64,7 +65,8 @@ export function AuthBar() {
             disabled={busy}
             className="rounded-md border border-white/10 bg-black/40 px-3 py-1.5 text-[color:var(--text-2)] backdrop-blur transition hover:text-white disabled:opacity-50"
           >
-            Sign out
+            <span className="hidden sm:inline">Sign out</span>
+            <span className="sm:hidden">Out</span>
           </button>
         </>
       )}
