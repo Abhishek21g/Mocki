@@ -13,7 +13,10 @@ from pydantic import BaseModel
 
 
 def _load_env_file() -> None:
-    env_path = Path(__file__).resolve().parents[2] / ".dev.vars"
+    try:
+        env_path = Path(__file__).resolve().parents[2] / ".dev.vars"
+    except IndexError:
+        return  # Running from repo root (e.g. Railway) — env vars come from platform
     if not env_path.exists():
         return
     for raw_line in env_path.read_text(encoding="utf-8").splitlines():
