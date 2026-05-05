@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
