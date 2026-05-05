@@ -55,6 +55,36 @@ function loadProjectDevVars() {
 
 loadProjectDevVars();
 
+/** Sleep for `ms` milliseconds. */
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Retry wrapper around a fetch call.
+ * On 429 (rate-limit) or 5xx (server error) we wait and retry with
+ * exponential backoff: 1s → 2s → 4s (3 attempts total).
+ */
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  maxAttempts = 3,
+): Promise<Response> {
+  let lastRes: Response | null = null;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const res = await fetch(url, init);
+    if (res.ok) return res;
+    // Don't retry client errors (4xx) except rate-limit (429)
+    if (res.status !== 429 && res.status < 500) return res;
+    lastRes = res;
+    if (attempt < maxAttempts - 1) {
+      const waitMs = 1000 * Math.pow(2, attempt); // 1s, 2s, 4s
+      await sleep(waitMs);
+    }
+  }
+  return lastRes!;
+}
+
 export async function callNemotron(
   systemPrompt: string,
   userMessage: string,
@@ -77,7 +107,7 @@ export async function callNemotron(
       meta: { temperature, maxTokens, prompt: userMessage.slice(0, 220) },
     });
 
-  const res = await fetch(`${NIM_BASE_URL}/chat/completions`, {
+  const res = await fetchWithRetry(`${NIM_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -101,13 +131,16 @@ export async function callNemotron(
       pushLog(sid, {
         agent,
         phase: "error",
-        message: `API error ${res.status}`,
+        message: `API error ${res.status}${res.status === 429 ? " (rate limited — retries exhausted)" : ""}`,
         corrId,
         latencyMs: Date.now() - t0,
         model: MODEL,
         meta: { body: t.slice(0, 200) },
       });
-    throw new Error(`NIM API error ${res.status}: ${t.slice(0, 300)}`);
+    const msg = res.status === 429
+      ? "NVIDIA API rate limit hit — too many simultaneous interviews. Please wait a moment and try again."
+      : `NIM API error ${res.status}: ${t.slice(0, 300)}`;
+    throw new Error(msg);
   }
   const data = (await res.json()) as {
     choices?: { message?: { content?: string | null } }[];
