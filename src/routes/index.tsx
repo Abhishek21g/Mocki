@@ -185,8 +185,12 @@ function SetupPage() {
           </div>
         </form>
 
-        <footer className="mt-8 text-center text-xs" style={{ color: "var(--text-3)" }}>
-          Powered by NVIDIA Nemotron
+        <footer className="mt-8 text-center text-xs flex items-center justify-center gap-4" style={{ color: "var(--text-3)" }}>
+          <span>Powered by NVIDIA Nemotron</span>
+          <span>·</span>
+          <Link to="/about" className="hover:text-white transition-colors">About</Link>
+          <span>·</span>
+          <Link to="/about" className="hover:text-white transition-colors">Feedback</Link>
         </footer>
       </div>
     </div>
