@@ -70,6 +70,8 @@ const SILENT_WAV_DATA_URL =
  */
 let sharedAudio: HTMLAudioElement | null = null;
 let primed = false;
+let sharedAudioCtx: AudioContext | null = null;
+let sharedAnalyser: AnalyserNode | null = null;
 
 function getSharedAudio(): HTMLAudioElement | null {
   if (typeof window === "undefined" || typeof Audio === "undefined") return null;
@@ -87,6 +89,25 @@ function getSharedAudio(): HTMLAudioElement | null {
  * call does real work. Must be called from a real user-input handler (click,
  * tap, keypress) to satisfy gesture-activation rules.
  */
+export function getAudioAnalyser(): AnalyserNode | null {
+  if (typeof window === "undefined" || typeof AudioContext === "undefined") return null;
+  const audio = getSharedAudio();
+  if (!audio) return null;
+  if (!sharedAudioCtx) {
+    sharedAudioCtx = new AudioContext();
+    const source = sharedAudioCtx.createMediaElementSource(audio);
+    sharedAnalyser = sharedAudioCtx.createAnalyser();
+    sharedAnalyser.fftSize = 256;
+    sharedAnalyser.smoothingTimeConstant = 0.8;
+    source.connect(sharedAnalyser);
+    sharedAnalyser.connect(sharedAudioCtx.destination);
+  }
+  if (sharedAudioCtx.state === "suspended") {
+    sharedAudioCtx.resume().catch(() => undefined);
+  }
+  return sharedAnalyser;
+}
+
 export function primeAudio(): void {
   if (primed) return;
   const audio = getSharedAudio();

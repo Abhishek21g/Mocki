@@ -3,6 +3,7 @@ import { initials } from "@/lib/ghost-utils";
 import type { AvatarStatus } from "@/lib/avatar";
 import type { TtsStatus } from "@/lib/tts";
 import type { Persona } from "@/server/sessions.server";
+import { AvatarOrb } from "./AvatarOrb";
 
 export function SpeakerSpotlight({
   interviewer,
@@ -133,18 +134,12 @@ export function SpeakerSpotlight({
       {/* ── Interviewer info ─────────────────────────────────────────────── */}
       <div className="flex items-center gap-4">
         {!avatarEnabled && (
-          <div
-            className={cn(
-              "flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold text-black",
-              speaking || loadingAudio ? "pulse-ring" : "",
-              onReplayRequest && !speaking && !loadingAudio && !loadingNext ? "cursor-pointer hover:opacity-80 transition-opacity" : "",
-            )}
-            style={{ background: "linear-gradient(135deg, var(--green), #4d7a00)" }}
+          <AvatarOrb
+            label={initials(interviewer.name)}
+            ttsStatus={ttsStatus}
+            size={64}
             onClick={!speaking && !loadingAudio && !loadingNext ? onReplayRequest : undefined}
-            title={!speaking && !loadingAudio && !loadingNext ? "Tap to replay question" : undefined}
-          >
-            {initials(interviewer.name)}
-          </div>
+          />
         )}
         <div className="flex-1">
           <div className="text-base font-bold">{interviewer.name}</div>
