@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { pushLog } from "@/server/agent-log.server";
 
 const DEFAULT_NVIDIA_TTS_HTTP_URL = "http://127.0.0.1:8788/synthesize";
 
@@ -29,6 +28,7 @@ export const Route = createFileRoute("/api/tts")({
         }),
 
       POST: async ({ request }) => {
+        const { pushLog } = await import("@/server/agent-log.server");
         let body: TtsRequestBody;
         try {
           body = (await request.json()) as TtsRequestBody;

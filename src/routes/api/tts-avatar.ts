@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { pushLog } from "@/server/agent-log.server";
 
 const DEFAULT_AVATAR_HTTP_URL = "http://127.0.0.1:8788/tts-avatar";
 
@@ -32,6 +31,7 @@ export const Route = createFileRoute("/api/tts-avatar")({
         }),
 
       POST: async ({ request }) => {
+        const { pushLog } = await import("@/server/agent-log.server");
         let body: AvatarRequestBody;
         try {
           body = (await request.json()) as AvatarRequestBody;
