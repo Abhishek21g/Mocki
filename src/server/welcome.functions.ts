@@ -41,11 +41,11 @@ export const maybeSendWelcomeEmail = createServerFn({ method: "POST" })
       const ageMs = Date.now() - createdAt;
       console.log("[welcome] account age ms:", ageMs);
 
-      // TODO: restore age check after testing
-      // if (ageMs > 5 * 60 * 1000) {
-      //   console.log("[welcome] account too old, skipping");
-      //   return { sent: false };
-      // }
+      // Only send if the account is less than 5 minutes old (new signup)
+      if (ageMs > 5 * 60 * 1000) {
+        console.log("[welcome] account too old, skipping");
+        return { sent: false };
+      }
 
       const email = user.email;
       if (!email) {
