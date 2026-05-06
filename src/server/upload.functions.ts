@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { uploadToSpaces } from "./spaces.server";
+import { uploadToSpaces, getPresignedPutUrl } from "./spaces.server";
 import { getUserIdForToken } from "./supabase.server";
 
 const UploadResumeSchema = z.object({
@@ -27,6 +27,24 @@ export const uploadResumePdf = createServerFn({ method: "POST" })
     const key = `resumes/${userId}/${data.sessionId}/${data.fileName}`;
     const stored = await uploadToSpaces(key, buffer, "application/pdf");
     return { ok: !!stored, key: stored ?? undefined };
+  });
+
+const GetUploadUrlSchema = z.object({
+  accessToken: z.string().min(10).max(8000),
+  sessionId: z.string().min(8).max(80),
+  type: z.enum(["cam"]),
+  mimeType: z.string().max(100),
+});
+
+export const getUploadUrl = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => GetUploadUrlSchema.parse(d))
+  .handler(async ({ data }) => {
+    const userId = await getUserIdForToken(data.accessToken);
+    if (!userId) return { ok: false as const, url: null };
+    const ext = data.mimeType.includes("mp4") ? "mp4" : "webm";
+    const key = `sessions/${userId}/${data.sessionId}/cam.${ext}`;
+    const url = await getPresignedPutUrl(key, data.mimeType);
+    return { ok: !!url, url };
   });
 
 export const uploadSessionData = createServerFn({ method: "POST" })

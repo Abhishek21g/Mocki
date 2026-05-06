@@ -8,6 +8,9 @@ import { createAvatarController, type AvatarController, type AvatarStatus } from
 import { primeAudio } from "@/lib/tts";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview.functions";
+import { getUploadUrl, uploadSessionData } from "@/server/upload.functions";
+import { useKeystrokeTracker } from "@/hooks/useKeystrokeTracker";
+import { useCamRecorder } from "@/hooks/useCamRecorder";
 import { cn } from "@/lib/utils";
 
 import { TopBar } from "@/components/interview/TopBar";
@@ -53,6 +56,9 @@ function InterviewPage() {
   const avatarRef = useRef<AvatarController | null>(null);
   const avatarVideoElRef = useRef<HTMLVideoElement | null>(null);
   const sinceRef = useRef(0);
+  const [camStream, setCamStream] = useState<MediaStream | null>(null);
+  const { getPayload: getKeystrokes } = useKeystrokeTracker(!!state.sessionId);
+  const { getBlob: getCamBlob } = useCamRecorder(camStream);
 
   const sttProxyUrl = (import.meta.env.VITE_STT_PROXY_URL as string | undefined)?.trim();
   const ttsProxyUrl =
@@ -308,6 +314,23 @@ function InterviewPage() {
             },
           });
           store.set({ report });
+
+          if (accessToken && state.sessionId) {
+            const sid = state.sessionId;
+            // Fire-and-forget: upload keystrokes
+            uploadSessionData({
+              data: { accessToken, sessionId: sid, type: "keystrokes", payload: getKeystrokes() },
+            }).catch(() => undefined);
+            // Fire-and-forget: upload cam recording via presigned URL
+            getCamBlob().then(async (result) => {
+              if (!result) return;
+              const { url } = await getUploadUrl({
+                data: { accessToken, sessionId: sid, type: "cam", mimeType: result.mimeType },
+              });
+              if (url) fetch(url, { method: "PUT", body: result.blob, headers: { "Content-Type": result.mimeType } }).catch(() => undefined);
+            }).catch(() => undefined);
+          }
+
           nav({ to: "/report" });
         } catch (e) {
           showToast(e instanceof Error ? e.message : "Failed to generate report");
@@ -441,7 +464,7 @@ function InterviewPage() {
                 />
               </div>
               <div className="w-44 flex-shrink-0">
-                <WebcamFeed />
+                <WebcamFeed onStream={setCamStream} />
               </div>
             </div>
 

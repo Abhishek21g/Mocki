@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 type CamState = "off" | "requesting" | "on" | "denied";
 
-export function WebcamFeed() {
+export function WebcamFeed({ onStream }: { onStream?: (stream: MediaStream | null) => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [camState, setCamState] = useState<CamState>("off");
@@ -11,8 +11,9 @@ export function WebcamFeed() {
   async function startCamera() {
     setCamState("requesting");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
+      onStream?.(stream);
       setCamState("on");
     } catch {
       setCamState("denied");
@@ -23,6 +24,7 @@ export function WebcamFeed() {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    onStream?.(null);
     setCamState("off");
   }
 

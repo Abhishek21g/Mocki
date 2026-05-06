@@ -1,4 +1,5 @@
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 function getClient(): S3Client | null {
   const key = process.env.DO_SPACES_KEY?.trim();
@@ -39,6 +40,27 @@ export async function uploadToSpaces(
     return key;
   } catch (err) {
     console.error("[spaces] upload failed:", err);
+    return null;
+  }
+}
+
+export async function getPresignedPutUrl(
+  key: string,
+  contentType: string,
+  expiresIn = 900,
+): Promise<string | null> {
+  const client = getClient();
+  if (!client) return null;
+  try {
+    const cmd = new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      ContentType: contentType,
+      ACL: "private",
+    });
+    return await getSignedUrl(client, cmd, { expiresIn });
+  } catch (err) {
+    console.error("[spaces] presign failed:", err);
     return null;
   }
 }
