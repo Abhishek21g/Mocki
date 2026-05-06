@@ -77,7 +77,7 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<voi
                 </tr>
               </table>
 
-              <a href="https://mocki-launch.vercel.app"
+              <a href="https://mocki.dev"
                 style="display:inline-block;background:#76b900;color:#000;font-weight:700;font-size:15px;padding:14px 32px;border-radius:10px;text-decoration:none;">
                 Start your first interview →
               </a>
@@ -88,9 +88,9 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<voi
           <tr>
             <td style="padding-top:24px;font-size:12px;color:#525252;line-height:1.6;">
               Built by Abhishek, Murali, Mithun & Ross at BeaverHacks 2026.<br/>
-              <a href="https://mocki-launch.vercel.app/about" style="color:#525252;">About</a>
+              <a href="https://mocki.dev/about" style="color:#525252;">About</a>
               &nbsp;·&nbsp;
-              <a href="https://mocki-launch.vercel.app/about" style="color:#525252;">Feedback</a>
+              <a href="https://mocki.dev/about" style="color:#525252;">Feedback</a>
             </td>
           </tr>
 
