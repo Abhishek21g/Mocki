@@ -15,35 +15,54 @@ export const maybeSendWelcomeEmail = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => Schema.parse(d))
   .handler(async ({ data }) => {
     try {
+      console.log("[welcome] maybeSendWelcomeEmail called");
+
       const userId = await getUserIdForToken(data.accessToken);
-      if (!userId) return { sent: false };
+      if (!userId) {
+        console.log("[welcome] no userId from token");
+        return { sent: false };
+      }
+      console.log("[welcome] userId:", userId);
 
       const admin = createSupabaseAdminClient();
-      if (!admin) return { sent: false };
+      if (!admin) {
+        console.log("[welcome] no admin client");
+        return { sent: false };
+      }
 
-      // Fetch the user record to get email, name, and created_at
       const { data: userData, error } = await admin.auth.admin.getUserById(userId);
-      if (error || !userData?.user) return { sent: false };
+      if (error || !userData?.user) {
+        console.log("[welcome] getUserById failed:", error?.message);
+        return { sent: false };
+      }
 
       const user = userData.user;
       const createdAt = new Date(user.created_at).getTime();
       const ageMs = Date.now() - createdAt;
+      console.log("[welcome] account age ms:", ageMs);
 
-      // Only send if the account is less than 2 minutes old (new signup)
-      if (ageMs > 2 * 60 * 1000) return { sent: false };
+      // Only send if the account is less than 5 minutes old (new signup)
+      if (ageMs > 5 * 60 * 1000) {
+        console.log("[welcome] account too old, skipping");
+        return { sent: false };
+      }
 
       const email = user.email;
-      if (!email) return { sent: false };
+      if (!email) {
+        console.log("[welcome] no email on user");
+        return { sent: false };
+      }
 
       const name =
         user.user_metadata?.full_name ??
         user.user_metadata?.name ??
         email.split("@")[0];
 
+      console.log("[welcome] sending to:", email);
       await sendWelcomeEmail(email, name);
+      console.log("[welcome] sent successfully");
       return { sent: true };
     } catch (err) {
-      // Never block the user — email sending is best-effort
       console.error("[welcome] Error:", err);
       return { sent: false };
     }
