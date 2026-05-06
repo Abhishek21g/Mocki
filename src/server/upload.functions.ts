@@ -51,9 +51,12 @@ export const uploadSessionData = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => UploadDataSchema.parse(d))
   .handler(async ({ data }) => {
     const userId = await getUserIdForToken(data.accessToken);
-    if (!userId) return { ok: false as const };
-
+    if (!userId) {
+      console.warn("[upload] uploadSessionData: no userId from token");
+      return { ok: false as const };
+    }
     const key = `sessions/${userId}/${data.sessionId}/${data.type}.json`;
     const stored = await uploadToSpaces(key, data.payload, "application/json");
+    console.log("[upload] uploadSessionData:", stored ? "ok" : "failed", key);
     return { ok: !!stored };
   });

@@ -12,6 +12,8 @@ function getClient(): S3Client | null {
     region,
     credentials: { accessKeyId: key, secretAccessKey: secret },
     forcePathStyle: false,
+    requestChecksumCalculation: "when_required", // prevents CRC32 checksum headers in presigned URLs
+    responseChecksumValidation: "when_required",
   });
 }
 
