@@ -449,24 +449,18 @@ function InterviewPage() {
           </section>
 
           <section className="flex flex-col gap-5">
-            {/* Speaker + webcam side by side */}
-            <div className="flex gap-4">
-              <div className="flex-1 min-w-0">
-                <SpeakerSpotlight
-                  interviewer={activeInterviewer}
-                  loadingNext={loadingNext}
-                  lastClarification={state.lastClarification}
-                  ttsStatus={ttsStatus}
-                  avatarStatus={avatarStatus}
-                  avatarEnabled={avatarEnabled}
-                  avatarVideoRef={avatarVideoElRef}
-                  onReplayRequest={ttsEnabled ? handleReplayRequest : undefined}
-                />
-              </div>
-              <div className="w-44 flex-shrink-0">
-                <WebcamFeed onStream={setCamStream} />
-              </div>
-            </div>
+            {/* Floating webcam PIP — renders as fixed overlay when on */}
+            <WebcamFeed onStream={setCamStream} />
+            <SpeakerSpotlight
+              interviewer={activeInterviewer}
+              loadingNext={loadingNext}
+              lastClarification={state.lastClarification}
+              ttsStatus={ttsStatus}
+              avatarStatus={avatarStatus}
+              avatarEnabled={avatarEnabled}
+              avatarVideoRef={avatarVideoElRef}
+              onReplayRequest={ttsEnabled ? handleReplayRequest : undefined}
+            />
 
             <div className="flex flex-col gap-3">
               <div
