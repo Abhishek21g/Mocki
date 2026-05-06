@@ -146,10 +146,13 @@ function AboutPage() {
         <FeedbackForm />
 
         {/* Footer */}
-        <footer className="mt-12 text-center text-xs" style={{ color: "var(--text-3)" }}>
+        <footer className="mt-12 text-center text-xs flex flex-col gap-2" style={{ color: "var(--text-3)" }}>
           <Link to="/" className="hover:text-white transition-colors">
             ← Back to Mocki
           </Link>
+          <p style={{ color: "var(--text-3)" }}>
+            By using Mocki, you agree that anonymized interview data may be used to improve the product.
+          </p>
         </footer>
       </div>
     </div>

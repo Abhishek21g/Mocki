@@ -386,6 +386,7 @@ export const generateReport = createServerFn({ method: "POST" })
         role: session.role,
         company: session.company,
         jobDescription: session.jobDescription,
+        resume: session.resume,
         interviewers: session.interviewers,
         panelType: session.panelType,
         totalRounds: session.totalRounds,

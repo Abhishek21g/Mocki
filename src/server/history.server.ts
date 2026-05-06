@@ -12,6 +12,7 @@ export type InterviewSessionPayload = Report & {
   role: string;
   company: string;
   jobDescription: string;
+  resume: string;
   interviewers: Persona[];
   panelType: string;
   totalRounds: number;
