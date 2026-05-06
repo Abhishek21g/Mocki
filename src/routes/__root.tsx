@@ -30,9 +30,6 @@ export const Route = createRootRoute({
       },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: "https://mocki-launch.vercel.app" },
-      { property: "og:image", content: "https://mocki-launch.vercel.app/og.png" },
-      { name: "twitter:image", content: "https://mocki-launch.vercel.app/og.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

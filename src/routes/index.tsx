@@ -395,30 +395,6 @@ function LoginPage({ signInWithGoogle, signInWithGitHub }: {
           Multi-agent AI mock interviews that adapt in real time
         </p>
 
-        {/* How it works */}
-        <div className="w-full grid grid-cols-3 gap-3 mb-6">
-          {[
-            { step: "1", label: "Upload resume", sub: "PDF or paste text" },
-            { step: "2", label: "Meet your panel", sub: "3 AI interviewers" },
-            { step: "3", label: "Get your debrief", sub: "Score + study plan" },
-          ].map(({ step, label, sub }) => (
-            <div
-              key={step}
-              className="rounded-xl p-3 text-center"
-              style={{ background: "var(--surface2)", border: "1px solid var(--border)" }}
-            >
-              <div
-                className="mx-auto mb-2 flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold"
-                style={{ background: "rgba(118,185,0,0.15)", color: "var(--green)" }}
-              >
-                {step}
-              </div>
-              <p className="text-xs font-semibold" style={{ color: "var(--text-1)" }}>{label}</p>
-              <p className="text-[11px] mt-0.5" style={{ color: "var(--text-3)" }}>{sub}</p>
-            </div>
-          ))}
-        </div>
-
         <div
           className="gp-card p-8"
           style={{ boxShadow: "0 0 40px rgba(118,185,0,0.08)" }}
@@ -427,7 +403,7 @@ function LoginPage({ signInWithGoogle, signInWithGitHub }: {
             <div className="flex flex-col gap-1 mb-2">
               <h2 className="text-lg font-bold">Sign in to get started</h2>
               <p className="text-sm" style={{ color: "var(--text-2)" }}>
-                Free. Your history and panel memory are saved to your account.
+                Your interview history and panel memory are saved to your account.
               </p>
             </div>
 
@@ -463,11 +439,11 @@ function LoginPage({ signInWithGoogle, signInWithGitHub }: {
 
             <ul className="text-left text-sm flex flex-col gap-2" style={{ color: "var(--text-2)" }}>
               {[
-                "3-person AI panel — Coordinator, Interviewer, Evaluator",
-                "Questions tailored to your actual resume + job description",
-                "Real-time voice responses powered by NVIDIA Nemotron",
-                "Full score breakdown + strengths & weaknesses after every session",
-                "Panel memory — gets harder as it learns your gaps",
+                "Adaptive 3-person AI interview panel",
+                "Tailored to your resume + job description",
+                "Real-time voice with NVIDIA Magpie TTS",
+                "Full evaluation + debrief after each interview",
+                "Panel learns from your past sessions",
               ].map((f) => (
                 <li key={f} className="flex items-start gap-2">
                   <span style={{ color: "var(--green)", flexShrink: 0 }}>✓</span>
