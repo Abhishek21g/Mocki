@@ -13,6 +13,7 @@ import {
 import { getLogs, markTurnBoundary, pushLog, withSessionLog } from "./agent-log.server";
 import { createSession, getInterviewerById, getSession, updateSession } from "./sessions.server";
 import { getUserIdForToken } from "./supabase.server";
+import { getOrCreateProfile, incrementInterviewsUsed } from "./billing.server";
 import {
   buildUpdatedMemoryFromReport,
   emptyLearnerMemory,
@@ -37,8 +38,20 @@ const StartSchema = z.object({
 export const startInterview = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => StartSchema.parse(d))
   .handler(async ({ data }) => {
+    // Quota gate — 5 free interviews, then pro required
+    const userId = data.accessToken ? await getUserIdForToken(data.accessToken) : null;
+    if (userId) {
+      const profile = await getOrCreateProfile(userId);
+      if (!profile.is_pro && profile.interviews_used >= 5) {
+        return { blocked: true as const, interviewsUsed: profile.interviews_used };
+      }
+    }
+
     const sessionId = crypto.randomUUID();
     return await withSessionLog(sessionId, async () => {
+      // Increment counter now that we're committed to starting
+      if (userId) incrementInterviewsUsed(userId).catch(() => undefined);
+
       pushLog(sessionId, {
         agent: "System",
         phase: "info",
@@ -53,14 +66,11 @@ export const startInterview = createServerFn({ method: "POST" })
         meta: roleProfile,
       });
 
-      let userId: string | null = null;
       let learnerMemory: LearnerMemory = emptyLearnerMemory();
       let learnerMemoryPrompt: string | null = null;
 
-      if (data.accessToken) {
-        userId = await getUserIdForToken(data.accessToken);
-        if (userId) {
-          try {
+      if (userId && data.accessToken) {
+        try {
             learnerMemory = await getLearnerMemoryForUser(data.accessToken);
           } catch (err) {
             pushLog(sessionId, {
@@ -83,7 +93,6 @@ export const startInterview = createServerFn({ method: "POST" })
               strongTopics: learnerMemory.strongTopics.slice(0, 6),
             },
           });
-        }
       }
 
       const candidateContext = await generateCandidateContext(

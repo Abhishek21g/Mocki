@@ -7,6 +7,7 @@ import { extractPdfText, PdfExtractionError } from "@/lib/pdf";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import { primeAudio } from "@/lib/tts";
 import { startInterview } from "@/server/interview.functions";
+import { UpgradeModal } from "@/components/UpgradeModal";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -32,6 +33,7 @@ function SetupPage() {
   const [totalRounds, setTotalRounds] = useState<3 | 4 | 6>(4);
   const [resume, setResume] = useState("");
   const [loading, setLoading] = useState(false);
+  const [upgradeModal, setUpgradeModal] = useState<{ interviewsUsed: number } | null>(null);
 
   const isSignedIn = status === "ready" && !!user;
 
@@ -60,28 +62,36 @@ function SetupPage() {
           ...(accessToken ? { accessToken } : {}),
         },
       });
+
+      if ("blocked" in res && res.blocked) {
+        setUpgradeModal({ interviewsUsed: res.interviewsUsed });
+        setLoading(false);
+        return;
+      }
+
+      const session = res as Exclude<typeof res, { blocked: true }>;
       store.set({
-        sessionId: res.sessionId,
+        sessionId: session.sessionId,
         setupData: {
           role,
           company,
           jobDescription,
           interview_type: interviewType,
           resume,
-          roleProfile: res.roleProfile,
+          roleProfile: session.roleProfile,
         },
-        interviewers: res.interviewers,
-        activeInterviewer: res.activeInterviewer,
-        panelType: res.panelType,
-        roleProfile: res.roleProfile,
-        currentQuestion: res.question,
-        currentFocus: res.focus,
-        currentDifficulty: res.difficulty,
-        currentCoordinatorReason: res.coordinatorReason,
-        currentStage: res.stage,
-        currentTurnType: res.turnType,
-        currentRound: res.round,
-        totalRounds: res.totalRounds,
+        interviewers: session.interviewers,
+        activeInterviewer: session.activeInterviewer,
+        panelType: session.panelType,
+        roleProfile: session.roleProfile,
+        currentQuestion: session.question,
+        currentFocus: session.focus,
+        currentDifficulty: session.difficulty,
+        currentCoordinatorReason: session.coordinatorReason,
+        currentStage: session.stage,
+        currentTurnType: session.turnType,
+        currentRound: session.round,
+        totalRounds: session.totalRounds,
         rounds: [],
         lastEvaluation: null,
         lastClarification: null,
@@ -94,8 +104,17 @@ function SetupPage() {
     }
   }
 
+  const accessTokenForModal = getAccessToken();
+
   return (
     <div className="grid-bg min-h-screen">
+      {upgradeModal && accessTokenForModal && (
+        <UpgradeModal
+          interviewsUsed={upgradeModal.interviewsUsed}
+          accessToken={accessTokenForModal}
+          onClose={() => setUpgradeModal(null)}
+        />
+      )}
       <div className="mx-auto flex min-h-screen max-w-3xl flex-col items-center px-5 py-16">
         <header className="mb-10 text-center fade-up">
           <h1>
