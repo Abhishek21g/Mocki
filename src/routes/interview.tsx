@@ -564,9 +564,9 @@ function InterviewPage() {
         />
       )}
 
-      {/* Floating webcam — bottom-right corner, PiP style */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
-        <WebcamFeed className="h-[135px] w-[180px]" />
+      {/* Floating webcam — bottom-right, sits above the agents toggle */}
+      <div className="fixed bottom-24 right-5 z-50">
+        <WebcamFeed />
       </div>
     </div>
   );
