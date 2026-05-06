@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import { getHireBg, getHireColor, scoreToColor } from "@/lib/ghost-utils";
-import { fetchAdminStats, type AdminStats } from "@/server/admin.functions";
+import { fetchAdminStats, type AdminStats, type AdminUser } from "@/server/admin.functions";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -192,6 +192,19 @@ function AdminPage() {
                 <RecentSessionsList sessions={stats.recentSessions} />
               </div>
             </section>
+
+            {/* Users */}
+            <section className="fade-up mt-8">
+              <div
+                className="mono mb-4 text-[11px] uppercase tracking-wider"
+                style={{ color: "var(--text-3)" }}
+              >
+                All Users ({stats.users.length})
+              </div>
+              <div className="gp-card p-6">
+                <UsersList users={stats.users} />
+              </div>
+            </section>
           </>
         )}
       </main>
@@ -275,6 +288,61 @@ function TopList({ entries }: { entries: { name: string; count: number }[] }) {
           </span>
         </li>
       ))}
+    </ul>
+  );
+}
+
+function UsersList({ users }: { users: AdminUser[] }) {
+  if (users.length === 0) {
+    return <p className="text-sm" style={{ color: "var(--text-3)" }}>No users yet.</p>;
+  }
+  return (
+    <ul className="flex flex-col divide-y" style={{ borderColor: "var(--border)" }}>
+      {users.map((u) => {
+        const joined = (() => {
+          try { return new Date(u.createdAt).toLocaleDateString(); } catch { return "—"; }
+        })();
+        const lastInterview = (() => {
+          if (!u.lastInterview) return null;
+          try { return new Date(u.lastInterview).toLocaleDateString(); } catch { return null; }
+        })();
+        return (
+          <li key={u.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <div
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold"
+                  style={{ background: "var(--green-dim)", color: "var(--green)" }}
+                >
+                  {u.name[0]?.toUpperCase() ?? "?"}
+                </div>
+                <div>
+                  <div className="text-sm font-medium">{u.name}</div>
+                  <div className="text-xs" style={{ color: "var(--text-3)" }}>{u.email}</div>
+                </div>
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <span
+                className="mono rounded-full border px-2 py-0.5 text-[11px] capitalize"
+                style={{ borderColor: "var(--border)", color: "var(--text-3)" }}
+              >
+                {u.provider}
+              </span>
+              <span
+                className="mono rounded-full px-2 py-0.5 text-[11px] tabular-nums"
+                style={{ background: "var(--surface2)", color: u.interviewCount > 0 ? "var(--green)" : "var(--text-3)" }}
+              >
+                {u.interviewCount} interview{u.interviewCount !== 1 ? "s" : ""}
+              </span>
+              <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
+                joined {joined}
+                {lastInterview ? ` · last active ${lastInterview}` : ""}
+              </span>
+            </div>
+          </li>
+        );
+      })}
     </ul>
   );
 }

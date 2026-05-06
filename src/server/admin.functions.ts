@@ -18,6 +18,16 @@ export type RecentSession = {
   interview_type: string | null;
 };
 
+export type AdminUser = {
+  id: string;
+  email: string;
+  name: string;
+  provider: string;
+  createdAt: string;
+  interviewCount: number;
+  lastInterview: string | null;
+};
+
 export type AdminStats = {
   totalUsers: number;
   totalInterviews: number;
@@ -28,6 +38,7 @@ export type AdminStats = {
   topRoles: TopEntry[];
   topCompanies: TopEntry[];
   recentSessions: RecentSession[];
+  users: AdminUser[];
 };
 
 export const fetchAdminStats = createServerFn({ method: "POST" })
@@ -53,13 +64,12 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "unauthorized" as const };
     }
 
-    // Total users
+    // All users (up to 1000)
     const { data: usersData, error: usersError } = await admin.auth.admin.listUsers({
-      perPage: 1,
+      perPage: 1000,
     });
-    const totalUsers = usersError
-      ? 0
-      : (usersData as { total_count?: number } | null)?.total_count ?? 0;
+    const allUsers = usersError ? [] : (usersData?.users ?? []);
+    const totalUsers = allUsers.length;
 
     // Fetch all interview sessions (we count in JS)
     const { data: allSessions, error: sessionsError } = await admin
@@ -135,6 +145,29 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
         interview_type: s.interview_type,
       }));
 
+    // Build per-user interview counts
+    const interviewsByUser: Record<string, { count: number; last: string | null }> = {};
+    for (const s of allSessions) {
+      const uid = (s as Record<string, unknown>).user_id as string | undefined;
+      if (!uid) continue;
+      const entry = interviewsByUser[uid] ?? { count: 0, last: null };
+      entry.count += 1;
+      if (!entry.last || s.created_at > entry.last) entry.last = s.created_at;
+      interviewsByUser[uid] = entry;
+    }
+
+    const users: AdminUser[] = allUsers.map((u) => ({
+      id: u.id,
+      email: u.email ?? "—",
+      name: (u.user_metadata?.full_name as string | undefined) ??
+            (u.user_metadata?.name as string | undefined) ??
+            (u.email?.split("@")[0] ?? "—"),
+      provider: (u.app_metadata?.provider as string | undefined) ?? "unknown",
+      createdAt: u.created_at,
+      interviewCount: interviewsByUser[u.id]?.count ?? 0,
+      lastInterview: interviewsByUser[u.id]?.last ?? null,
+    })).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+
     const stats: AdminStats = {
       totalUsers,
       totalInterviews,
@@ -145,6 +178,7 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
       topRoles,
       topCompanies,
       recentSessions,
+      users,
     };
 
     return { ok: true as const, stats };
