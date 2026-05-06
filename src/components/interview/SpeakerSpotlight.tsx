@@ -12,6 +12,7 @@ export function SpeakerSpotlight({
   avatarStatus,
   avatarEnabled,
   avatarVideoRef,
+  onReplayRequest,
 }: {
   interviewer: Persona;
   loadingNext: boolean;
@@ -20,6 +21,7 @@ export function SpeakerSpotlight({
   avatarStatus: AvatarStatus;
   avatarEnabled: boolean;
   avatarVideoRef: React.RefObject<HTMLVideoElement | null>;
+  onReplayRequest?: () => void;
 }) {
   const speaking = avatarEnabled ? avatarStatus === "playing" : ttsStatus === "playing";
   const loadingAudio = avatarEnabled ? avatarStatus === "loading" : ttsStatus === "loading";
@@ -135,8 +137,11 @@ export function SpeakerSpotlight({
             className={cn(
               "flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold text-black",
               speaking || loadingAudio ? "pulse-ring" : "",
+              onReplayRequest && !speaking && !loadingAudio && !loadingNext ? "cursor-pointer hover:opacity-80 transition-opacity" : "",
             )}
             style={{ background: "linear-gradient(135deg, var(--green), #4d7a00)" }}
+            onClick={!speaking && !loadingAudio && !loadingNext ? onReplayRequest : undefined}
+            title={!speaking && !loadingAudio && !loadingNext ? "Tap to replay question" : undefined}
           >
             {initials(interviewer.name)}
           </div>
@@ -172,6 +177,18 @@ export function SpeakerSpotlight({
         />
         {statusLabel}
       </div>
+
+      {/* Safari / autoplay blocked — tap to hear hint */}
+      {ttsStatus === "error" && onReplayRequest && (
+        <button
+          type="button"
+          onClick={onReplayRequest}
+          className="mt-3 w-full rounded-lg px-3 py-2 text-xs font-semibold transition-opacity hover:opacity-80"
+          style={{ background: "rgba(118,185,0,0.12)", color: "var(--green)", border: "1px solid rgba(118,185,0,0.3)" }}
+        >
+          🔊 Tap to hear question
+        </button>
+      )}
     </div>
   );
 }

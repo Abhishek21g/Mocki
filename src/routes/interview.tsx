@@ -121,6 +121,15 @@ function InterviewPage() {
   const sessionId = state.sessionId;
   const speakingBlocked = loadingAnswer || loadingNext || generating || isHoldingTalk;
 
+  // Safari autoplay fix: called from a real user gesture so the browser
+  // grants a fresh autoplay permission, then replays the current question.
+  function handleReplayRequest() {
+    if (!currentQuestion || !activeVoice || !ttsRef.current) return;
+    primeAudio();
+    lastSuccessfullySpokenKeyRef.current = null; // reset so the speak effect re-fires
+    ttsRef.current.speak(currentQuestion, activeVoice, sessionId).catch(() => undefined);
+  }
+
   useEffect(() => {
     if (!ttsEnabled || avatarEnabled) {
       ttsRef.current?.stop();
@@ -424,6 +433,7 @@ function InterviewPage() {
               avatarStatus={avatarStatus}
               avatarEnabled={avatarEnabled}
               avatarVideoRef={avatarVideoElRef}
+              onReplayRequest={ttsEnabled ? handleReplayRequest : undefined}
             />
 
             <div className="flex flex-col gap-3">
