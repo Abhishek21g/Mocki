@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ghost/Toaster";
 import { AuthBar } from "@/components/ghost/AuthBar";
 import { SupabaseAuthProvider } from "@/lib/supabase-context";
 import { SpeedInsights } from "@vercel/speed-insights/react";
+import { Analytics } from "@vercel/analytics/react";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -68,6 +69,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
         {children}
         <Scripts />
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
