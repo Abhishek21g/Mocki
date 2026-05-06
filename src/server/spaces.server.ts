@@ -36,8 +36,7 @@ export async function uploadToSpaces(
         Key: key,
         Body: body,
         ContentType: contentType,
-        ACL: "private",
-      }),
+              }),
     );
     return key;
   } catch (err) {
@@ -58,8 +57,7 @@ export async function getPresignedPutUrl(
       Bucket: BUCKET,
       Key: key,
       ContentType: contentType,
-      ACL: "private",
-    });
+          });
     return await getSignedUrl(client, cmd, { expiresIn });
   } catch (err) {
     console.error("[spaces] presign failed:", err);
