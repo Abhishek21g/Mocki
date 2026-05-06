@@ -320,15 +320,28 @@ function InterviewPage() {
             // Fire-and-forget: upload keystrokes
             uploadSessionData({
               data: { accessToken, sessionId: sid, type: "keystrokes", payload: getKeystrokes() },
-            }).catch(() => undefined);
+            }).then((r) => {
+              console.log("[upload] keystrokes", r);
+            }).catch((err) => {
+              console.error("[upload] keystrokes failed", err);
+            });
             // Fire-and-forget: upload cam recording via presigned URL
             getCamBlob().then(async (result) => {
+              console.log("[upload] cam blob", result ? `${result.mimeType} ${result.blob.size}b` : "null");
               if (!result) return;
-              const { url } = await getUploadUrl({
+              const r = await getUploadUrl({
                 data: { accessToken, sessionId: sid, type: "cam", mimeType: result.mimeType },
               });
-              if (url) fetch(url, { method: "PUT", body: result.blob, headers: { "Content-Type": result.mimeType } }).catch(() => undefined);
-            }).catch(() => undefined);
+              console.log("[upload] presign", r);
+              if (r.url) {
+                const res = await fetch(r.url, { method: "PUT", body: result.blob, headers: { "Content-Type": result.mimeType } });
+                console.log("[upload] cam PUT", res.status, res.ok);
+              }
+            }).catch((err) => {
+              console.error("[upload] cam failed", err);
+            });
+          } else {
+            console.warn("[upload] skipped — no accessToken or sessionId", { hasToken: !!accessToken, sessionId: state.sessionId });
           }
 
           nav({ to: "/report" });
