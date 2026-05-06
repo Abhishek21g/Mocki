@@ -60,7 +60,7 @@ function InterviewPage() {
   const { getPayload: getKeystrokes } = useKeystrokeTracker(!!state.sessionId);
   const { getBlob: getCamBlob } = useCamRecorder(camStream);
 
-  const sttProxyUrl = (import.meta.env.VITE_STT_PROXY_URL as string | undefined)?.trim();
+  const sttProxyUrl = (import.meta.env.VITE_STT_PROXY_URL as string | undefined)?.trim() || "/api/stt";
   const ttsProxyUrl =
     (import.meta.env.VITE_TTS_PROXY_URL as string | undefined)?.trim() || "/api/tts";
   const avatarProxyUrl =

@@ -90,17 +90,27 @@ function getSharedAudio(): HTMLAudioElement | null {
  * tap, keypress) to satisfy gesture-activation rules.
  */
 export function getAudioAnalyser(): AnalyserNode | null {
-  if (typeof window === "undefined" || typeof AudioContext === "undefined") return null;
+  if (typeof window === "undefined") return null;
+  const AudioContextCtor =
+    window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextCtor) return null;
   const audio = getSharedAudio();
   if (!audio) return null;
   if (!sharedAudioCtx) {
-    sharedAudioCtx = new AudioContext();
-    const source = sharedAudioCtx.createMediaElementSource(audio);
-    sharedAnalyser = sharedAudioCtx.createAnalyser();
-    sharedAnalyser.fftSize = 256;
-    sharedAnalyser.smoothingTimeConstant = 0.8;
-    source.connect(sharedAnalyser);
-    sharedAnalyser.connect(sharedAudioCtx.destination);
+    try {
+      sharedAudioCtx = new AudioContextCtor();
+      const source = sharedAudioCtx.createMediaElementSource(audio);
+      sharedAnalyser = sharedAudioCtx.createAnalyser();
+      sharedAnalyser.fftSize = 256;
+      sharedAnalyser.smoothingTimeConstant = 0.8;
+      source.connect(sharedAnalyser);
+      sharedAnalyser.connect(sharedAudioCtx.destination);
+    } catch {
+      // Safari or other quirk — play without analyser
+      sharedAudioCtx = null;
+      sharedAnalyser = null;
+      return null;
+    }
   }
   if (sharedAudioCtx.state === "suspended") {
     sharedAudioCtx.resume().catch(() => undefined);
@@ -239,6 +249,10 @@ export function createTtsController(options: TtsControllerOptions): TtsControlle
       audio.src = url;
 
       try {
+        // Safari keeps AudioContext suspended until resumed inside a user-gesture chain
+        if (sharedAudioCtx && sharedAudioCtx.state === "suspended") {
+          await sharedAudioCtx.resume().catch(() => undefined);
+        }
         await audio.play();
         setStatus("playing");
       } catch (err) {

@@ -55,6 +55,39 @@ export const Route = createFileRoute("/api/stt")({
             return json({ error: "Missing audio file in form-data (expected 'audio' or 'file')." }, { status: 400 });
           }
 
+          // OpenAI Whisper fallback — used when NVIDIA ASR is not configured
+          const openaiKey = (process.env.OPENAI_API_KEY as string | undefined)?.trim();
+          const nvidiaConfigured = Boolean(
+            (process.env.NVIDIA_ASR_HTTP_URL as string | undefined)?.trim() ||
+            (process.env.NVIDIA_ASR_API_KEY as string | undefined)?.trim() ||
+            (process.env.NVIDIA_API_KEY as string | undefined)?.trim(),
+          );
+
+          if (!nvidiaConfigured && openaiKey) {
+            const whisperForm = new FormData();
+            whisperForm.append("file", audio, audio.name || "audio.wav");
+            whisperForm.append("model", "whisper-1");
+            whisperForm.append("language", "en");
+
+            const whisperRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+              method: "POST",
+              headers: { authorization: `Bearer ${openaiKey}` },
+              body: whisperForm,
+            });
+
+            const whisperData = (await whisperRes.json().catch(() => ({}))) as { text?: string; error?: { message?: string } };
+            if (!whisperRes.ok) {
+              return json({ error: whisperData.error?.message ?? "Whisper transcription failed" }, { status: 502 });
+            }
+            const text = typeof whisperData.text === "string" ? whisperData.text.trim() : "";
+            if (!text) return json({ error: "Whisper returned empty transcript" }, { status: 502 });
+            return json({ text, provider: "openai" });
+          }
+
+          if (!nvidiaConfigured && !openaiKey) {
+            return json({ error: "No STT backend configured. Set OPENAI_API_KEY or NVIDIA_ASR_API_KEY." }, { status: 503 });
+          }
+
           const nvidiaAsrHttpUrl =
             (process.env.NVIDIA_ASR_HTTP_URL as string | undefined)?.trim() ||
             DEFAULT_NVIDIA_ASR_HTTP_URL;

@@ -21,7 +21,13 @@ export function WebcamFeed({ onStream }: { onStream?: (stream: MediaStream | nul
   async function startCamera() {
     setCamState("requesting");
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      // Try with audio first (needed for recording); fall back to video-only if mic is denied
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      } catch {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
       streamRef.current = stream;
       onStream?.(stream);
       setCamState("on");
