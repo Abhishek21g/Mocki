@@ -12,7 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReportRouteImport } from './routes/report'
 import { Route as InterviewRouteImport } from './routes/interview'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReportSessionIdRouteImport } from './routes/report.$sessionId'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ApiTtsAvatarRouteImport } from './routes/api/tts-avatar'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
@@ -34,10 +37,25 @@ const HistoryRoute = HistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const ReportSessionIdRoute = ReportSessionIdRouteImport.update({
+  id: '/$sessionId',
+  path: '/$sessionId',
+  getParentRoute: () => ReportRoute,
 } as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
@@ -67,42 +85,53 @@ const AgentsSessionIdRoute = AgentsSessionIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/history': typeof HistoryRoute
   '/interview': typeof InterviewRoute
-  '/report': typeof ReportRoute
+  '/report': typeof ReportRouteWithChildren
   '/agents/$sessionId': typeof AgentsSessionIdRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/tts-avatar': typeof ApiTtsAvatarRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/report/$sessionId': typeof ReportSessionIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/history': typeof HistoryRoute
   '/interview': typeof InterviewRoute
-  '/report': typeof ReportRoute
+  '/report': typeof ReportRouteWithChildren
   '/agents/$sessionId': typeof AgentsSessionIdRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/tts-avatar': typeof ApiTtsAvatarRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/report/$sessionId': typeof ReportSessionIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/admin': typeof AdminRoute
   '/history': typeof HistoryRoute
   '/interview': typeof InterviewRoute
-  '/report': typeof ReportRoute
+  '/report': typeof ReportRouteWithChildren
   '/agents/$sessionId': typeof AgentsSessionIdRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/tts-avatar': typeof ApiTtsAvatarRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/report/$sessionId': typeof ReportSessionIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
+    | '/admin'
     | '/history'
     | '/interview'
     | '/report'
@@ -111,9 +140,12 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/api/tts-avatar'
     | '/auth/callback'
+    | '/report/$sessionId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
+    | '/admin'
     | '/history'
     | '/interview'
     | '/report'
@@ -122,9 +154,12 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/api/tts-avatar'
     | '/auth/callback'
+    | '/report/$sessionId'
   id:
     | '__root__'
     | '/'
+    | '/about'
+    | '/admin'
     | '/history'
     | '/interview'
     | '/report'
@@ -133,13 +168,16 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/api/tts-avatar'
     | '/auth/callback'
+    | '/report/$sessionId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
+  AdminRoute: typeof AdminRoute
   HistoryRoute: typeof HistoryRoute
   InterviewRoute: typeof InterviewRoute
-  ReportRoute: typeof ReportRoute
+  ReportRoute: typeof ReportRouteWithChildren
   AgentsSessionIdRoute: typeof AgentsSessionIdRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
@@ -170,12 +208,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/report/$sessionId': {
+      id: '/report/$sessionId'
+      path: '/$sessionId'
+      fullPath: '/report/$sessionId'
+      preLoaderRoute: typeof ReportSessionIdRouteImport
+      parentRoute: typeof ReportRoute
     }
     '/auth/callback': {
       id: '/auth/callback'
@@ -215,11 +274,24 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ReportRouteChildren {
+  ReportSessionIdRoute: typeof ReportSessionIdRoute
+}
+
+const ReportRouteChildren: ReportRouteChildren = {
+  ReportSessionIdRoute: ReportSessionIdRoute,
+}
+
+const ReportRouteWithChildren =
+  ReportRoute._addFileChildren(ReportRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
+  AdminRoute: AdminRoute,
   HistoryRoute: HistoryRoute,
   InterviewRoute: InterviewRoute,
-  ReportRoute: ReportRoute,
+  ReportRoute: ReportRouteWithChildren,
   AgentsSessionIdRoute: AgentsSessionIdRoute,
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,

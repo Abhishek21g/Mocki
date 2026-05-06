@@ -411,10 +411,36 @@ function ResumeDropzone({
   );
 }
 
+function isInAppBrowser(): boolean {
+  if (typeof window === "undefined") return false;
+  const ua = window.navigator.userAgent;
+  return /LinkedIn|FBAN|FBAV|Instagram|Twitter|line\/|MicroMessenger|GSA\//.test(ua);
+}
+
+function InAppBrowserBanner() {
+  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  return (
+    <div
+      className="mb-4 rounded-xl p-4 text-sm text-left"
+      style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.3)", color: "#f59e0b" }}
+    >
+      <p className="font-semibold mb-1">⚠️ Open in a real browser to sign in</p>
+      <p className="text-xs" style={{ color: "#fbbf24" }}>
+        Google blocks sign-in from in-app browsers.{" "}
+        {isIOS
+          ? 'Tap the ··· menu → "Open in Safari"'
+          : 'Tap the ··· menu → "Open in Chrome"'}{" "}
+        then sign in from there.
+      </p>
+    </div>
+  );
+}
+
 function LoginPage({ signInWithGoogle, signInWithGitHub }: {
   signInWithGoogle: (redirectTo?: string) => Promise<void>;
   signInWithGitHub: (redirectTo?: string) => Promise<void>;
 }) {
+  const inApp = typeof window !== "undefined" && isInAppBrowser();
   return (
     <div className="grid-bg min-h-screen flex items-center justify-center px-5">
       <div className="w-full max-w-md fade-up text-center">
@@ -431,6 +457,7 @@ function LoginPage({ signInWithGoogle, signInWithGitHub }: {
           style={{ boxShadow: "0 0 40px rgba(118,185,0,0.08)" }}
         >
           <div className="flex flex-col gap-4">
+            {inApp && <InAppBrowserBanner />}
             <div className="flex flex-col gap-1 mb-2">
               <h2 className="text-lg font-bold">Sign in to get started</h2>
               <p className="text-sm" style={{ color: "var(--text-2)" }}>
@@ -440,7 +467,9 @@ function LoginPage({ signInWithGoogle, signInWithGitHub }: {
 
             <button
               className="gp-btn w-full"
-              onClick={() => signInWithGoogle(window.location.href)}
+              disabled={inApp}
+              style={inApp ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
+              onClick={() => !inApp && signInWithGoogle(window.location.href)}
             >
               <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
                 <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
@@ -453,8 +482,9 @@ function LoginPage({ signInWithGoogle, signInWithGitHub }: {
 
             <button
               className="gp-btn-outline w-full flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold transition hover:border-white/30"
-              style={{ borderColor: "var(--border)", background: "var(--surface2)", color: "var(--text)" }}
-              onClick={() => signInWithGitHub(window.location.href)}
+              style={{ borderColor: "var(--border)", background: "var(--surface2)", color: "var(--text)", ...(inApp ? { opacity: 0.4, cursor: "not-allowed" } : {}) }}
+              disabled={inApp}
+              onClick={() => !inApp && signInWithGitHub(window.location.href)}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
                 <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
