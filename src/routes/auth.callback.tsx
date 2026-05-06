@@ -50,11 +50,13 @@ function AuthCallback() {
         }
 
         if (!cancelled) {
-          // Fire-and-forget welcome email for new signups — never blocks navigation
           const { data: sessionData } = await sb.auth.getSession();
           const accessToken = sessionData.session?.access_token;
+
+          // Await welcome email before navigating so the HTTP request
+          // isn't cancelled by the browser on page unload.
           if (accessToken) {
-            maybeSendWelcomeEmail({ data: { accessToken } }).catch(() => undefined);
+            await maybeSendWelcomeEmail({ data: { accessToken } }).catch(() => undefined);
           }
 
           const next = normalizeNextPath(url.searchParams.get("next"));
