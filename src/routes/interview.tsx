@@ -19,6 +19,7 @@ import { MobileDrawer } from "@/components/interview/MobileDrawer";
 import { SessionStrip, FlowBadge, FlowCard } from "@/components/interview/DevStrip";
 import { AgentPanel, FloatingAgentToggle } from "@/components/interview/AgentPanel";
 import { TypingIndicator } from "@/components/interview/TypingIndicator";
+import { WebcamFeed } from "@/components/interview/WebcamFeed";
 import { useTTS } from "@/hooks/useTTS";
 import { useSpeech } from "@/hooks/useSpeech";
 
@@ -562,6 +563,11 @@ function InterviewPage() {
           sessionId={state.sessionId}
         />
       )}
+
+      {/* Floating webcam — bottom-right corner, PiP style */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2">
+        <WebcamFeed className="h-[135px] w-[180px]" />
+      </div>
     </div>
   );
 }

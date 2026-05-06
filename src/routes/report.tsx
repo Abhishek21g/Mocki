@@ -1,4 +1,4 @@
-import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { store, useAppState } from "@/lib/ghost-store";
@@ -23,7 +23,16 @@ export const Route = createFileRoute("/report")({
 function ReportPage() {
   const state = useAppState();
   const nav = useNavigate();
-  if (!state.report) return <Navigate to="/" />;
+  const routerState = useRouterState();
+
+  // If there's no in-memory report, check if we're on a child route like /report/$sessionId.
+  // If so, render the child (Outlet). If on exact /report with no report, redirect home.
+  if (!state.report) {
+    const isExact = routerState.location.pathname === "/report";
+    if (isExact) return <Navigate to="/" />;
+    return <Outlet />;
+  }
+
   const report = state.report;
 
   return (
