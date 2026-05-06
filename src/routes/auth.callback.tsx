@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase-client";
+import { maybeSendWelcomeEmail } from "@/server/welcome.functions";
 
 const ALLOWED_POST_AUTH_PATHS = new Set(["/", "/history", "/interview", "/report"]);
 
@@ -49,6 +50,13 @@ function AuthCallback() {
         }
 
         if (!cancelled) {
+          // Fire-and-forget welcome email for new signups — never blocks navigation
+          const { data: sessionData } = await sb.auth.getSession();
+          const accessToken = sessionData.session?.access_token;
+          if (accessToken) {
+            maybeSendWelcomeEmail({ data: { accessToken } }).catch(() => undefined);
+          }
+
           const next = normalizeNextPath(url.searchParams.get("next"));
           navigate({ to: next });
         }
