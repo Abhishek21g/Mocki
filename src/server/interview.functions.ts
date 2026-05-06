@@ -24,14 +24,13 @@ import {
   type LearnerMemory,
 } from "./history.server";
 
-const TOTAL_TURNS = 6;
-
 const StartSchema = z.object({
   role: z.string().min(1).max(200),
   company: z.string().min(1).max(200),
   jobDescription: z.string().min(1).max(20000),
   interview_type: z.enum(["technical", "behavioral", "mixed"]),
   resume: z.string().min(1).max(20000),
+  totalRounds: z.union([z.literal(3), z.literal(4), z.literal(6)]).default(4),
   accessToken: z.string().min(10).max(8000).optional(),
 });
 
@@ -135,7 +134,7 @@ export const startInterview = createServerFn({ method: "POST" })
         panelType: "structured",
         roleProfile,
         candidateContext,
-        totalRounds: TOTAL_TURNS,
+        totalRounds: data.totalRounds,
         currentStage: "intro",
         userId,
         learnerMemoryPrompt,
@@ -193,7 +192,7 @@ export const startInterview = createServerFn({ method: "POST" })
         panelType: "structured" as const,
         roleProfile,
         round: 1,
-        totalRounds: TOTAL_TURNS,
+        totalRounds: data.totalRounds,
         stage: plan.stage,
         turnType: plan.turn_type,
         focus: plan.focus,

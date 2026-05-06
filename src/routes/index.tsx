@@ -29,6 +29,7 @@ function SetupPage() {
   const [company, setCompany] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [interviewType, setInterviewType] = useState("technical");
+  const [totalRounds, setTotalRounds] = useState<3 | 4 | 6>(4);
   const [resume, setResume] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -54,6 +55,7 @@ function SetupPage() {
           company,
           jobDescription,
           interview_type: interviewType as "technical" | "behavioral" | "mixed",
+          totalRounds,
           resume,
           ...(accessToken ? { accessToken } : {}),
         },
@@ -164,6 +166,35 @@ function SetupPage() {
                 <option value="behavioral">Behavioral (Experience + Teamwork)</option>
                 <option value="mixed">Mixed (Panel Style)</option>
               </select>
+            </Field>
+            <Field label="Interview Length">
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { val: 3, label: "Quick", sub: "3 questions · ~10 min" },
+                  { val: 4, label: "Standard", sub: "4 questions · ~15 min" },
+                  { val: 6, label: "Full Panel", sub: "6 questions · ~25 min" },
+                ] as const).map(({ val, label, sub }) => (
+                  <button
+                    key={val}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => setTotalRounds(val)}
+                    className="rounded-xl border p-3 text-left transition-all"
+                    style={{
+                      borderColor: totalRounds === val ? "var(--green)" : "var(--border)",
+                      background: totalRounds === val ? "rgba(118,185,0,0.08)" : "var(--surface2)",
+                      opacity: loading ? 0.7 : 1,
+                    }}
+                  >
+                    <div className="text-sm font-semibold" style={{ color: totalRounds === val ? "var(--green)" : "var(--text-1)" }}>
+                      {label}
+                    </div>
+                    <div className="mt-0.5 text-[11px]" style={{ color: "var(--text-3)" }}>
+                      {sub}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </Field>
             <Field label="Your Resume" htmlElement="div">
               <ResumeDropzone
