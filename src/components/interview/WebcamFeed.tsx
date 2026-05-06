@@ -36,19 +36,10 @@ export function WebcamFeed() {
     }
   }, [camState]);
 
-  // Active camera — PiP video card
+  // Camera on — fills the card
   if (camState === "on") {
     return (
-      <div
-        className="relative overflow-hidden shadow-2xl"
-        style={{
-          width: 192,
-          height: 144,
-          borderRadius: 16,
-          border: "1.5px solid rgba(118,185,0,0.35)",
-          background: "#000",
-        }}
-      >
+      <div className="relative w-full overflow-hidden rounded-xl" style={{ aspectRatio: "4/3", background: "#000" }}>
         <video
           ref={videoRef}
           autoPlay
@@ -61,7 +52,7 @@ export function WebcamFeed() {
         {/* Live dot */}
         <div
           className="absolute left-2 top-2 flex items-center gap-1 rounded-full px-1.5 py-0.5"
-          style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }}
+          style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
         >
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
           <span className="text-[9px] font-bold uppercase tracking-widest text-white">Live</span>
@@ -72,16 +63,16 @@ export function WebcamFeed() {
           <button
             onClick={() => setMirrored((m) => !m)}
             title="Flip"
-            className="rounded-lg p-1 transition-colors hover:bg-white/20"
-            style={{ background: "rgba(0,0,0,0.5)" }}
+            className="rounded-lg p-1.5 transition-colors hover:bg-white/20"
+            style={{ background: "rgba(0,0,0,0.55)" }}
           >
             <FlipIcon />
           </button>
           <button
             onClick={stopCamera}
             title="Turn off camera"
-            className="rounded-lg p-1 transition-colors hover:bg-red-600/80"
-            style={{ background: "rgba(0,0,0,0.5)" }}
+            className="rounded-lg p-1.5 transition-colors hover:bg-red-600/80"
+            style={{ background: "rgba(0,0,0,0.55)" }}
           >
             <CamOffIcon />
           </button>
@@ -90,31 +81,35 @@ export function WebcamFeed() {
     );
   }
 
-  // Idle — small icon button
+  // Off / requesting / denied — centered placeholder
   return (
     <button
       onClick={camState === "denied" ? undefined : startCamera}
-      disabled={camState === "denied"}
-      title={
-        camState === "denied"
-          ? "Camera access denied"
-          : camState === "requesting"
-          ? "Requesting camera…"
-          : "Turn on camera"
-      }
-      className="flex h-10 w-10 items-center justify-center rounded-full transition-colors"
+      disabled={camState === "denied" || camState === "requesting"}
+      className="flex w-full flex-col items-center justify-center gap-2 rounded-xl py-6 transition-colors"
       style={{
-        background: "var(--surface2)",
-        border: "1.5px solid var(--border)",
+        background: "var(--surface3)",
+        border: "1.5px dashed var(--border)",
         color: camState === "denied" ? "var(--text-3)" : "var(--text-2)",
-        opacity: camState === "denied" ? 0.4 : 1,
-        cursor: camState === "denied" ? "not-allowed" : "pointer",
+        cursor: camState === "denied" ? "not-allowed" : camState === "requesting" ? "wait" : "pointer",
+        opacity: camState === "denied" ? 0.5 : 1,
       }}
     >
       {camState === "requesting" ? (
-        <span className="gp-spinner" style={{ width: 14, height: 14 }} />
+        <>
+          <span className="gp-spinner" style={{ width: 18, height: 18 }} />
+          <span className="text-xs" style={{ color: "var(--text-3)" }}>Requesting…</span>
+        </>
+      ) : camState === "denied" ? (
+        <>
+          <CamIcon />
+          <span className="text-xs">Camera blocked</span>
+        </>
       ) : (
-        <CamIcon />
+        <>
+          <CamIcon />
+          <span className="text-xs font-medium">Turn on camera</span>
+        </>
       )}
     </button>
   );
@@ -122,7 +117,7 @@ export function WebcamFeed() {
 
 function CamIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
       <path d="M23 7l-7 5 7 5V7z" />
       <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
     </svg>
@@ -131,7 +126,7 @@ function CamIcon() {
 
 function CamOffIcon() {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <line x1="1" y1="1" x2="23" y2="23" />
       <path d="M21 21H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h3m3-3h6l2 3h3a2 2 0 0 1 2 2v9.34" />
     </svg>
@@ -140,7 +135,7 @@ function CamOffIcon() {
 
 function FlipIcon() {
   return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="17 1 21 5 17 9" />
       <path d="M3 11V9a4 4 0 0 1 4-4h14" />
       <polyline points="7 23 3 19 7 15" />

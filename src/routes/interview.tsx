@@ -415,6 +415,19 @@ function InterviewPage() {
               </div>
             </div>
 
+            {/* Webcam — sits below the panel cards in the sidebar */}
+            <div className="gp-card overflow-hidden p-0">
+              <div className="flex items-center justify-between px-4 py-3"
+                style={{ borderBottom: "1px solid var(--border)" }}>
+                <span className="mono text-[11px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+                  Your Camera
+                </span>
+              </div>
+              <div className="flex items-center justify-center p-3">
+                <WebcamFeed />
+              </div>
+            </div>
+
             {devMode && (
               <FlowCard
                 stage={state.currentStage}
@@ -564,10 +577,6 @@ function InterviewPage() {
         />
       )}
 
-      {/* Floating webcam — bottom-right, sits above the agents toggle */}
-      <div className="fixed bottom-24 right-5 z-50">
-        <WebcamFeed />
-      </div>
     </div>
   );
 }
