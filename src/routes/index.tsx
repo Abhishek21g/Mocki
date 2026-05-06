@@ -199,8 +199,27 @@ function SetupPage() {
             <Field label="Your Resume" htmlElement="div">
               <ResumeDropzone
                 disabled={loading}
-                onParsed={(text) => {
-                  setResume(text);
+                onParsed={(text) => setResume(text)}
+                onFileRaw={(file) => {
+                  // Upload raw PDF to DO Spaces in the background
+                  const token = getAccessToken();
+                  if (!token) return;
+                  const tempId = crypto.randomUUID();
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const b64 = (reader.result as string).split(",")[1];
+                    import("@/server/upload.functions").then(({ uploadResumePdf }) => {
+                      uploadResumePdf({
+                        data: {
+                          accessToken: token,
+                          fileName: file.name,
+                          fileBase64: b64,
+                          sessionId: tempId,
+                        },
+                      }).catch(() => undefined);
+                    });
+                  };
+                  reader.readAsDataURL(file);
                 }}
               />
             </Field>
@@ -229,9 +248,11 @@ function SetupPage() {
 function ResumeDropzone({
   disabled,
   onParsed,
+  onFileRaw,
 }: {
   disabled: boolean;
   onParsed: (text: string) => void;
+  onFileRaw?: (file: File) => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -254,6 +275,7 @@ function ResumeDropzone({
       setCharCount(parsed.text.length);
       setTruncated(parsed.truncated);
       onParsed(parsed.text);
+      onFileRaw?.(file);
     } catch (err) {
       if (err instanceof PdfExtractionError) {
         setError(err.message);
