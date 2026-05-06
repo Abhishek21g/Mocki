@@ -63,13 +63,7 @@ function SetupPage() {
         },
       });
 
-      if ("blocked" in res && res.blocked) {
-        setUpgradeModal({ interviewsUsed: res.interviewsUsed });
-        setLoading(false);
-        return;
-      }
-
-      const session = res as Exclude<typeof res, { blocked: true }>;
+      const session = res;
       store.set({
         sessionId: session.sessionId,
         setupData: {
