@@ -32,6 +32,7 @@ export type AdminRoundSummary = {
   strengths: string[];
   weaknesses: string[];
   answerSummary: string;
+  answer: string;
   question: string;
 };
 
@@ -53,6 +54,8 @@ export type AdminSession = {
   studyPlan: string;
   drillQuestions: string[];
   interviewers: { name: string; title: string; focus: string }[];
+  resume: string;
+  jobDescription: string;
 };
 
 export type AdminUser = {
@@ -121,6 +124,7 @@ function extractRounds(payload: InterviewSessionPayload | null): AdminRoundSumma
     strengths: r.evaluation?.strengths ?? [],
     weaknesses: r.evaluation?.weaknesses ?? [],
     answerSummary: r.evaluation?.answer_summary ?? "",
+    answer: r.answer ?? "",
     question: r.question ?? "",
   }));
 }
@@ -314,6 +318,8 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
         studyPlan: payload?.study_plan ?? "",
         drillQuestions: payload?.drill_questions ?? [],
         interviewers,
+        resume: payload?.resume ?? "",
+        jobDescription: payload?.jobDescription ?? "",
       };
     });
 
@@ -408,6 +414,8 @@ export const fetchAdminSession = createServerFn({ method: "POST" })
       studyPlan: payload?.study_plan ?? "",
       drillQuestions: payload?.drill_questions ?? [],
       interviewers,
+      resume: payload?.resume ?? "",
+      jobDescription: payload?.jobDescription ?? "",
     };
 
     return { ok: true as const, session };

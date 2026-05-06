@@ -696,6 +696,30 @@ function SessionDetail({ session: s, open }: { session: AdminSession; open: bool
           </div>
         )}
 
+        {/* Job Description */}
+        {s.jobDescription && (
+          <div className="mb-4">
+            <div className="mono mb-1 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+              Job Description
+            </div>
+            <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text-2)", maxHeight: "120px", overflowY: "auto" }}>
+              {s.jobDescription}
+            </p>
+          </div>
+        )}
+
+        {/* Resume */}
+        {s.resume && (
+          <div className="mb-4">
+            <div className="mono mb-1 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+              Resume
+            </div>
+            <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text-2)", maxHeight: "180px", overflowY: "auto", background: "var(--surface3)", borderRadius: "8px", padding: "10px" }}>
+              {s.resume}
+            </p>
+          </div>
+        )}
+
         {/* View full report link */}
         <a
           href={`/report/${s.id}`}
@@ -711,7 +735,7 @@ function SessionDetail({ session: s, open }: { session: AdminSession; open: bool
   );
 }
 
-function RoundCard({ round: r }: { round: { index: number; interviewerName: string; topic: string; difficulty: string; stage: string; turnType: string; clarity: number; technicalDepth: number; structure: number; overall: number; strengths: string[]; weaknesses: string[]; answerSummary: string; question: string } }) {
+function RoundCard({ round: r }: { round: { index: number; interviewerName: string; topic: string; difficulty: string; stage: string; turnType: string; clarity: number; technicalDepth: number; structure: number; overall: number; strengths: string[]; weaknesses: string[]; answerSummary: string; answer: string; question: string } }) {
   return (
     <div
       className="rounded border p-3"
@@ -808,11 +832,28 @@ function RoundCard({ round: r }: { round: { index: number; interviewerName: stri
         </p>
       )}
 
+      {/* Full answer */}
+      {r.answer && (
+        <div className="mb-2">
+          <div className="mono mb-0.5 text-[9px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+            Their answer
+          </div>
+          <p className="text-xs leading-relaxed whitespace-pre-wrap" style={{ color: "var(--text-1)" }}>
+            {r.answer}
+          </p>
+        </div>
+      )}
+
       {/* Answer summary */}
       {r.answerSummary && (
-        <p className="mb-2 text-xs leading-relaxed" style={{ color: "var(--text-2)" }}>
-          {r.answerSummary}
-        </p>
+        <div className="mb-2">
+          <div className="mono mb-0.5 text-[9px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+            AI summary
+          </div>
+          <p className="text-xs leading-relaxed italic" style={{ color: "var(--text-2)" }}>
+            {r.answerSummary}
+          </p>
+        </div>
       )}
 
       {/* Strengths / weaknesses */}
