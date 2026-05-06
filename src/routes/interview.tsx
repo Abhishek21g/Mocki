@@ -415,19 +415,6 @@ function InterviewPage() {
               </div>
             </div>
 
-            {/* Webcam — sits below the panel cards in the sidebar */}
-            <div className="gp-card overflow-hidden p-0">
-              <div className="flex items-center justify-between px-4 py-3"
-                style={{ borderBottom: "1px solid var(--border)" }}>
-                <span className="mono text-[11px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
-                  Your Camera
-                </span>
-              </div>
-              <div className="flex items-center justify-center p-3">
-                <WebcamFeed />
-              </div>
-            </div>
-
             {devMode && (
               <FlowCard
                 stage={state.currentStage}
@@ -439,16 +426,24 @@ function InterviewPage() {
           </section>
 
           <section className="flex flex-col gap-5">
-            <SpeakerSpotlight
-              interviewer={activeInterviewer}
-              loadingNext={loadingNext}
-              lastClarification={state.lastClarification}
-              ttsStatus={ttsStatus}
-              avatarStatus={avatarStatus}
-              avatarEnabled={avatarEnabled}
-              avatarVideoRef={avatarVideoElRef}
-              onReplayRequest={ttsEnabled ? handleReplayRequest : undefined}
-            />
+            {/* Speaker + webcam side by side */}
+            <div className="flex gap-4">
+              <div className="flex-1 min-w-0">
+                <SpeakerSpotlight
+                  interviewer={activeInterviewer}
+                  loadingNext={loadingNext}
+                  lastClarification={state.lastClarification}
+                  ttsStatus={ttsStatus}
+                  avatarStatus={avatarStatus}
+                  avatarEnabled={avatarEnabled}
+                  avatarVideoRef={avatarVideoElRef}
+                  onReplayRequest={ttsEnabled ? handleReplayRequest : undefined}
+                />
+              </div>
+              <div className="w-44 flex-shrink-0">
+                <WebcamFeed />
+              </div>
+            </div>
 
             <div className="flex flex-col gap-3">
               <div

@@ -39,7 +39,7 @@ export function WebcamFeed() {
   // Camera on — fills the card
   if (camState === "on") {
     return (
-      <div className="relative w-full overflow-hidden rounded-xl" style={{ aspectRatio: "4/3", background: "#000" }}>
+      <div className="relative w-full h-full min-h-[120px] overflow-hidden rounded-xl" style={{ aspectRatio: "4/3", background: "#000" }}>
         <video
           ref={videoRef}
           autoPlay
@@ -86,7 +86,7 @@ export function WebcamFeed() {
     <button
       onClick={camState === "denied" ? undefined : startCamera}
       disabled={camState === "denied" || camState === "requesting"}
-      className="flex w-full flex-col items-center justify-center gap-2 rounded-xl py-6 transition-colors"
+      className="flex w-full h-full min-h-[120px] flex-col items-center justify-center gap-2 rounded-xl transition-colors"
       style={{
         background: "var(--surface3)",
         border: "1.5px dashed var(--border)",
