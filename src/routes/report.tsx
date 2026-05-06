@@ -112,6 +112,7 @@ function ReportPage() {
           >
             ↩ Start New Interview
           </button>
+          <ShareLinkButton />
           <CopyReportButton />
         </div>
       </main>
@@ -479,6 +480,27 @@ function MiniBar({ label, value }: { label: string; value: number }) {
         <div className="h-full" style={{ width: `${pct}%`, background: scoreToColor(value) }} />
       </div>
     </div>
+  );
+}
+
+function ShareLinkButton() {
+  const state = useAppState();
+  const [copied, setCopied] = useState(false);
+
+  function share() {
+    if (!state.sessionId) return;
+    const url = `${window.location.origin}/report/${state.sessionId}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  if (!state.sessionId) return null;
+
+  return (
+    <button className="gp-btn gp-btn-outline w-full md:flex-1" onClick={share}>
+      {copied ? "✓ Link copied!" : "🔗 Share Report"}
+    </button>
   );
 }
 
