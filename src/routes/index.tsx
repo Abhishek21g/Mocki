@@ -24,7 +24,7 @@ export const Route = createFileRoute("/")({
 
 function SetupPage() {
   const nav = useNavigate();
-  const { getAccessToken, status, user, signInWithGoogle, signInWithGitHub } = useSupabaseAuth();
+  const { getAccessToken, status, user, signInWithGoogle, signInWithGitHub, signInWithMagicLink } = useSupabaseAuth();
   const [role, setRole] = useState("");
   const [company, setCompany] = useState("");
   const [jobDescription, setJobDescription] = useState("");
@@ -39,7 +39,7 @@ function SetupPage() {
 
   // Not signed in → show login page
   if (status === "ready" && !user) {
-    return <LoginPage signInWithGoogle={signInWithGoogle} signInWithGitHub={signInWithGitHub} />;
+    return <LoginPage signInWithGoogle={signInWithGoogle} signInWithGitHub={signInWithGitHub} signInWithMagicLink={signInWithMagicLink} />;
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -436,11 +436,30 @@ function InAppBrowserBanner() {
   );
 }
 
-function LoginPage({ signInWithGoogle, signInWithGitHub }: {
+function LoginPage({ signInWithGoogle, signInWithGitHub, signInWithMagicLink }: {
   signInWithGoogle: (redirectTo?: string) => Promise<void>;
   signInWithGitHub: (redirectTo?: string) => Promise<void>;
+  signInWithMagicLink: (email: string) => Promise<void>;
 }) {
   const inApp = typeof window !== "undefined" && isInAppBrowser();
+  const [magicEmail, setMagicEmail] = useState("");
+  const [magicSent, setMagicSent] = useState(false);
+  const [magicLoading, setMagicLoading] = useState(false);
+
+  async function handleMagicLink(e: React.FormEvent) {
+    e.preventDefault();
+    if (!magicEmail.trim() || magicLoading) return;
+    setMagicLoading(true);
+    try {
+      await signInWithMagicLink(magicEmail.trim());
+      setMagicSent(true);
+    } catch {
+      // show nothing — Supabase always returns success to prevent email enumeration
+      setMagicSent(true);
+    } finally {
+      setMagicLoading(false);
+    }
+  }
   return (
     <div className="grid-bg min-h-screen flex items-center justify-center px-5">
       <div className="w-full max-w-md fade-up text-center">
@@ -491,6 +510,41 @@ function LoginPage({ signInWithGoogle, signInWithGitHub }: {
               </svg>
               Continue with GitHub
             </button>
+
+            <div className="flex items-center gap-3" style={{ color: "var(--text-3)" }}>
+              <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+              <span className="text-xs">or</span>
+              <div className="flex-1 h-px" style={{ background: "var(--border)" }} />
+            </div>
+
+            {/* Magic link — works from any browser including in-app */}
+            {magicSent ? (
+              <div className="rounded-xl p-4 text-center text-sm" style={{ background: "rgba(118,185,0,0.08)", border: "1px solid rgba(118,185,0,0.25)" }}>
+                <p className="font-semibold mb-1" style={{ color: "var(--green)" }}>✓ Check your email</p>
+                <p className="text-xs" style={{ color: "var(--text-2)" }}>
+                  We sent a sign-in link to <strong>{magicEmail}</strong>. Tap it to continue.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={handleMagicLink} className="flex flex-col gap-2">
+                <input
+                  className="gp-input"
+                  type="email"
+                  placeholder="Sign in with email link"
+                  value={magicEmail}
+                  onChange={(e) => setMagicEmail(e.target.value)}
+                  disabled={magicLoading}
+                />
+                <button
+                  type="submit"
+                  className="gp-btn-outline w-full rounded-xl border px-4 py-3 text-sm font-semibold transition"
+                  style={{ borderColor: "var(--border)", background: "var(--surface2)", color: "var(--text-2)" }}
+                  disabled={!magicEmail.trim() || magicLoading}
+                >
+                  {magicLoading ? <><span className="gp-spinner" /> Sending…</> : "Send sign-in link →"}
+                </button>
+              </form>
+            )}
 
             <div className="flex items-center gap-3" style={{ color: "var(--text-3)" }}>
               <div className="flex-1 h-px" style={{ background: "var(--border)" }} />

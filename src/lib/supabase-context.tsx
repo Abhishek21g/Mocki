@@ -20,6 +20,7 @@ type SupabaseAuthState = {
   user: User | null;
   signInWithGoogle: (redirectTo?: string) => Promise<void>;
   signInWithGitHub: (redirectTo?: string) => Promise<void>;
+  signInWithMagicLink: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   getAccessToken: () => string | null;
 };
@@ -95,6 +96,22 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     [client],
   );
 
+  const signInWithMagicLink = useCallback(
+    async (email: string) => {
+      if (!client) throw new Error("Supabase is not configured");
+      const redirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/auth/callback`
+          : undefined;
+      const { error } = await client.auth.signInWithOtp({
+        email,
+        options: redirectTo ? { emailRedirectTo: redirectTo } : undefined,
+      });
+      if (error) throw error;
+    },
+    [client],
+  );
+
   const signOut = useCallback(async () => {
     if (!client) return;
     await client.auth.signOut();
@@ -111,10 +128,11 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       user: session?.user ?? null,
       signInWithGoogle,
       signInWithGitHub,
+      signInWithMagicLink,
       signOut,
       getAccessToken,
     }),
-    [status, client, session, signInWithGoogle, signInWithGitHub, signOut, getAccessToken],
+    [status, client, session, signInWithGoogle, signInWithGitHub, signInWithMagicLink, signOut, getAccessToken],
   );
 
   return <SupabaseAuthContext.Provider value={value}>{children}</SupabaseAuthContext.Provider>;
