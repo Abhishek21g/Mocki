@@ -259,3 +259,103 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<voi
     console.log(`[email] Welcome email sent to ${email}`);
   }
 }
+
+export async function sendCheckInEmail(email: string, name: string): Promise<{ ok: boolean; error?: string }> {
+  const resend = getResendClient();
+  if (!resend) return { ok: false, error: "RESEND_API_KEY not set" };
+
+  const firstName = name?.split(" ")[0] || "there";
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Still thinking about that interview?</title>
+</head>
+<body style="margin:0;padding:0;background:#080808;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#e5e5e5;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#080808;padding:48px 20px 32px;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
+
+        <tr>
+          <td style="border-radius:20px;overflow:hidden;background:linear-gradient(160deg,#0f1a00 0%,#0a0a0a 60%,#0d1f00 100%);border:1px solid #1f2e00;padding:0;">
+
+            <!-- Green bar -->
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr><td style="height:3px;background:linear-gradient(90deg,#76b900,#4d7a00,#76b900);"></td></tr>
+            </table>
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="padding:36px 40px 40px;">
+              <tr><td>
+
+                <!-- Logo -->
+                <div style="margin-bottom:24px;">
+                  <span style="font-size:26px;font-weight:900;letter-spacing:-1px;color:#76b900;">mocki</span>
+                </div>
+
+                <!-- Copy -->
+                <h1 style="margin:0 0 12px;font-size:24px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;line-height:1.3;">
+                  Still thinking about that interview, ${firstName}?
+                </h1>
+                <p style="margin:0 0 12px;font-size:15px;line-height:1.7;color:#737373;">
+                  You signed up for Mocki but haven't run a session yet.
+                </p>
+                <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#737373;">
+                  It takes about 15 minutes. Paste in a job description, upload your resume,
+                  and three AI interviewers will drill you on exactly what the role needs —
+                  then give you a full score breakdown and study plan.
+                </p>
+
+                <!-- CTA -->
+                <table cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
+                  <tr>
+                    <td>
+                      <a href="https://mocki.dev"
+                        style="display:inline-block;background:linear-gradient(135deg,#76b900,#4d7a00);color:#000;font-weight:800;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;">
+                        Start your first interview →
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+
+                <!-- Social proof line -->
+                <p style="margin:0;font-size:12px;color:#404040;line-height:1.6;">
+                  Free to use · No credit card · Your answers stay private
+                </p>
+
+              </td></tr>
+            </table>
+
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding-top:20px;text-align:center;font-size:12px;color:#333;line-height:1.8;">
+            Mocki · <a href="https://mocki.dev" style="color:#404040;text-decoration:none;">mocki.dev</a>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+
+</body>
+</html>`;
+
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: `Still thinking about that interview, ${firstName}?`,
+    html,
+  });
+
+  if (error) {
+    console.error("[email] check-in failed:", email, error);
+    return { ok: false, error: String(error) };
+  }
+  console.log(`[email] check-in sent to ${email}`);
+  return { ok: true };
+}

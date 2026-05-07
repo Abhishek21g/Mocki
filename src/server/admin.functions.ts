@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { createSupabaseAdminClient, getUserIdForToken } from "./supabase.server";
 import { getPresignedGetUrl, objectExists, downloadJson } from "./spaces.server";
+import { sendCheckInEmail } from "./email.server";
 import type { InterviewSessionPayload } from "./history.server";
 
 const ADMIN_EMAIL = "enaguthiabhishek@gmail.com";
@@ -451,4 +452,45 @@ export const fetchAdminBehavioral = createServerFn({ method: "POST" })
     const key = `sessions/${data.userId}/${data.sessionId}/behavioral.json`;
     const json = await downloadJson(key);
     return { ok: true, data: json };
+  });
+
+const CheckInSchema = z.object({
+  accessToken: z.string().min(10).max(8000),
+  userIds: z.array(z.string().min(1)).min(1).max(500),
+});
+
+export type CheckInResult = {
+  userId: string;
+  email: string;
+  ok: boolean;
+  error?: string;
+};
+
+export const sendAdminCheckInEmails = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => CheckInSchema.parse(d))
+  .handler(async ({ data }) => {
+    const authResult = await verifyAdminAccess(data.accessToken);
+    if (!authResult.ok) return { ok: false as const, reason: authResult.reason, results: [] };
+    const admin = authResult.admin;
+
+    const { data: usersData, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    if (error) return { ok: false as const, reason: "db_error", results: [] };
+
+    const targetUsers = (usersData?.users ?? []).filter((u) => data.userIds.includes(u.id));
+
+    const results: CheckInResult[] = [];
+    for (const user of targetUsers) {
+      const email = user.email;
+      if (!email) { results.push({ userId: user.id, email: "—", ok: false, error: "no email" }); continue; }
+      const name =
+        (user.user_metadata?.full_name as string | undefined) ??
+        (user.user_metadata?.name as string | undefined) ??
+        email.split("@")[0];
+      const result = await sendCheckInEmail(email, name);
+      results.push({ userId: user.id, email, ok: result.ok, error: result.error });
+    }
+
+    const sent = results.filter((r) => r.ok).length;
+    const failed = results.filter((r) => !r.ok).length;
+    return { ok: true as const, sent, failed, results };
   });

@@ -7,10 +7,12 @@ import {
   fetchAdminStats,
   fetchAdminRecordingUrl,
   fetchAdminBehavioral,
+  sendAdminCheckInEmails,
   type AdminSession,
   type AdminStats,
   type AdminUser,
   type ScoreDistributionBucket,
+  type CheckInResult,
 } from "@/server/admin.functions";
 import type { BehavioralPayload } from "@/hooks/useBehavioralTracker";
 
@@ -243,6 +245,14 @@ function AdminPage() {
               <div className="gp-card overflow-hidden p-0">
                 <AllUsersTable users={stats.users} sessions={stats.sessions} />
               </div>
+            </section>
+
+            {/* ── Outreach ──────────────────────────────────────── */}
+            <section className="fade-up mt-8">
+              <OutreachSection
+                users={stats.users}
+                accessToken={getAccessToken() ?? ""}
+              />
             </section>
           </>
         )}
@@ -1374,6 +1384,137 @@ function BehavioralSection({ data, loading }: { data: BehavioralPayload | null; 
 
       {/* Camera data */}
       <CameraSection cam={(data as any).camera} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Outreach section
+// ---------------------------------------------------------------------------
+
+function OutreachSection({ users, accessToken }: { users: AdminUser[]; accessToken: string }) {
+  const inactive = users.filter((u) => u.interviewCount === 0);
+  const [selected, setSelected] = useState<Set<string>>(new Set(inactive.map((u) => u.id)));
+  const [sending, setSending] = useState(false);
+  const [results, setResults] = useState<CheckInResult[] | null>(null);
+  const [preview, setPreview] = useState(false);
+
+  function toggleAll() {
+    if (selected.size === inactive.length) setSelected(new Set());
+    else setSelected(new Set(inactive.map((u) => u.id)));
+  }
+
+  async function handleSend() {
+    if (!selected.size || sending) return;
+    setSending(true);
+    setResults(null);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await sendAdminCheckInEmails({ data: { accessToken, userIds: Array.from(selected) } }) as any;
+      setResults(res.results ?? []);
+    } catch (e) {
+      console.error("[outreach] send failed", e);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div>
+      <div className="mono mb-4 flex items-center justify-between text-[11px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+        <span>Outreach — Never Interviewed ({inactive.length})</span>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPreview((v) => !v)}
+            style={{ fontSize: 11, padding: "4px 12px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text-2)", cursor: "pointer", textTransform: "none", letterSpacing: 0 }}
+          >
+            {preview ? "Hide preview" : "Preview email"}
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending || selected.size === 0}
+            style={{ fontSize: 11, padding: "4px 14px", borderRadius: 6, border: "none", background: selected.size === 0 ? "var(--surface3)" : "var(--green)", color: selected.size === 0 ? "var(--text-3)" : "#000", cursor: selected.size === 0 ? "default" : "pointer", fontWeight: 700, textTransform: "none", letterSpacing: 0 }}
+          >
+            {sending ? "Sending…" : `Send check-in to ${selected.size}`}
+          </button>
+        </div>
+      </div>
+
+      {/* Email preview */}
+      {preview && (
+        <div className="gp-card mb-4 p-5" style={{ fontSize: 13 }}>
+          <div style={{ color: "var(--text-3)", marginBottom: 8, fontSize: 11 }}>EMAIL PREVIEW</div>
+          <div style={{ color: "var(--text-2)", marginBottom: 4 }}><strong>Subject:</strong> Still thinking about that interview, [name]?</div>
+          <div style={{ color: "var(--text-2)", marginBottom: 4 }}><strong>From:</strong> Mocki</div>
+          <div style={{ color: "var(--text-3)", marginTop: 8, lineHeight: 1.6 }}>
+            "Still thinking about that interview, [name]? You signed up for Mocki but haven't run a session yet. It takes about 15 minutes…"
+            <span style={{ marginLeft: 6, color: "var(--green)" }}>→ Start your first interview</span>
+          </div>
+        </div>
+      )}
+
+      {inactive.length === 0 ? (
+        <div className="gp-card p-6 text-center" style={{ color: "var(--text-3)", fontSize: 13 }}>
+          All users have completed at least one interview 🎉
+        </div>
+      ) : (
+        <div className="gp-card overflow-hidden p-0">
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                <th style={{ padding: "10px 16px", textAlign: "left", width: 36 }}>
+                  <input type="checkbox" checked={selected.size === inactive.length} onChange={toggleAll} style={{ cursor: "pointer" }} />
+                </th>
+                <th style={{ padding: "10px 8px", textAlign: "left", color: "var(--text-3)", fontWeight: 600 }}>Email</th>
+                <th style={{ padding: "10px 8px", textAlign: "left", color: "var(--text-3)", fontWeight: 600 }}>Name</th>
+                <th style={{ padding: "10px 8px", textAlign: "left", color: "var(--text-3)", fontWeight: 600 }}>Signed up</th>
+                <th style={{ padding: "10px 16px", textAlign: "left", color: "var(--text-3)", fontWeight: 600 }}>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inactive.map((u) => {
+                const result = results?.find((r) => r.userId === u.id);
+                const isSelected = selected.has(u.id);
+                return (
+                  <tr
+                    key={u.id}
+                    style={{ borderBottom: "1px solid var(--border)", background: isSelected ? "rgba(118,185,0,0.03)" : undefined, cursor: "pointer" }}
+                    onClick={() => setSelected((prev) => { const next = new Set(prev); isSelected ? next.delete(u.id) : next.add(u.id); return next; })}
+                  >
+                    <td style={{ padding: "10px 16px" }}>
+                      <input type="checkbox" checked={isSelected} onChange={() => {}} style={{ cursor: "pointer" }} />
+                    </td>
+                    <td style={{ padding: "10px 8px", color: "var(--text)" }}>{u.email}</td>
+                    <td style={{ padding: "10px 8px", color: "var(--text-2)" }}>{u.name}</td>
+                    <td style={{ padding: "10px 8px", color: "var(--text-3)" }}>
+                      {new Date(u.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                    </td>
+                    <td style={{ padding: "10px 16px" }}>
+                      {result ? (
+                        result.ok
+                          ? <span style={{ color: "#86efac", fontSize: 11 }}>✓ Sent</span>
+                          : <span style={{ color: "#f87171", fontSize: 11 }}>✗ Failed</span>
+                      ) : (
+                        <span style={{ color: "var(--text-3)", fontSize: 11 }}>Not sent</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Results summary */}
+      {results && (
+        <div className="mt-3 rounded-lg px-4 py-3 text-sm" style={{ background: "var(--surface2)", border: "1px solid var(--border)" }}>
+          ✓ {results.filter((r) => r.ok).length} sent
+          {results.filter((r) => !r.ok).length > 0 && (
+            <span style={{ color: "#f87171", marginLeft: 12 }}>✗ {results.filter((r) => !r.ok).length} failed</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
