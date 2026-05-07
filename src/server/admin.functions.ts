@@ -432,18 +432,14 @@ export const fetchAdminRecordingUrl = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => AdminRecordingSchema.parse(d))
   .handler(async ({ data }) => {
     const authResult = await verifyAdminAccess(data.accessToken);
-    if (!authResult.ok) return { ok: false as const, url: null };
+    if (!authResult.ok) return { ok: false as const, webmUrl: null, mp4Url: null };
 
-    const webmKey = `sessions/${data.userId}/${data.sessionId}/cam.webm`;
-    const mp4Key = `sessions/${data.userId}/${data.sessionId}/cam.mp4`;
+    const [webmUrl, mp4Url] = await Promise.all([
+      getPresignedGetUrl(`sessions/${data.userId}/${data.sessionId}/cam.webm`, 3600),
+      getPresignedGetUrl(`sessions/${data.userId}/${data.sessionId}/cam.mp4`, 3600),
+    ]);
 
-    let key: string | null = null;
-    if (await objectExists(webmKey)) key = webmKey;
-    else if (await objectExists(mp4Key)) key = mp4Key;
-    if (!key) return { ok: true as const, url: null };
-
-    const url = await getPresignedGetUrl(key, 3600);
-    return { ok: true as const, url };
+    return { ok: true as const, webmUrl, mp4Url };
   });
 
 export const fetchAdminBehavioral = createServerFn({ method: "POST" })

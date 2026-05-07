@@ -567,7 +567,8 @@ function AllSessionsTable({ sessions, accessToken }: { sessions: AdminSession[];
 function SessionDetail({ session: s, open, accessToken }: { session: AdminSession; open: boolean; accessToken: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(0);
-  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [webmUrl, setWebmUrl] = useState<string | null>(null);
+  const [mp4Url, setMp4Url] = useState<string | null>(null);
   const [recordingLoading, setRecordingLoading] = useState(false);
   const [recordingChecked, setRecordingChecked] = useState(false);
   const [behavioral, setBehavioral] = useState<BehavioralPayload | null>(null);
@@ -576,7 +577,7 @@ function SessionDetail({ session: s, open, accessToken }: { session: AdminSessio
   useEffect(() => {
     if (!ref.current) return;
     setHeight(open ? ref.current.scrollHeight : 0);
-  }, [open, s.rounds.length, recordingUrl, behavioral]);
+  }, [open, s.rounds.length, webmUrl, mp4Url, behavioral]);
 
   useEffect(() => {
     if (!open || recordingChecked) return;
@@ -584,7 +585,7 @@ function SessionDetail({ session: s, open, accessToken }: { session: AdminSessio
     setRecordingLoading(true);
     setBehavioralLoading(true);
     fetchAdminRecordingUrl({ data: { accessToken, userId: s.userId, sessionId: s.id } })
-      .then((res) => { setRecordingUrl(res.url ?? null); })
+      .then((res: any) => { setWebmUrl(res.webmUrl ?? null); setMp4Url(res.mp4Url ?? null); })
       .catch(() => {})
       .finally(() => setRecordingLoading(false));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -613,12 +614,14 @@ function SessionDetail({ session: s, open, accessToken }: { session: AdminSessio
             <div style={{ display: "flex", alignItems: "center", gap: 8, height: 44, fontSize: 12, color: "var(--text-2)" }}>
               <span className="gp-spinner" /> Fetching recording…
             </div>
-          ) : recordingUrl ? (
+          ) : (webmUrl || mp4Url) ? (
             <video
-              src={recordingUrl}
               controls
               style={{ width: "100%", maxHeight: 280, borderRadius: 10, background: "#000", display: "block" }}
-            />
+            >
+              {webmUrl && <source src={webmUrl} type="video/webm" />}
+              {mp4Url && <source src={mp4Url} type="video/mp4" />}
+            </video>
           ) : (
             <div style={{ height: 44, display: "flex", alignItems: "center", fontSize: 12, color: "var(--text-3)", background: "var(--surface3)", borderRadius: 8, paddingLeft: 12, border: "1px dashed var(--border)" }}>
               No recording for this session
