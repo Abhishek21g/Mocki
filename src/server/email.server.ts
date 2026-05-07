@@ -8,7 +8,7 @@ function getResendClient(): Resend | null {
 
 const FROM =
   process.env.RESEND_FROM_EMAIL?.trim() ?? "Mocki <onboarding@resend.dev>";
-const REPLY_TO = process.env.RESEND_REPLY_TO?.trim() ?? "Abhishek <abhishek@send.mocki.dev>";
+const REPLY_TO = process.env.RESEND_REPLY_TO?.trim() ?? "Abhishek <enaguthiabhishek@gmail.com>";
 const LIST_UNSUBSCRIBE = "<mailto:abhishek@mocki.dev?subject=unsubscribe>";
 
 export async function sendWelcomeEmail(email: string, name: string): Promise<void> {
