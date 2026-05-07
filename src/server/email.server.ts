@@ -346,29 +346,32 @@ export async function sendInviteEmail(email: string): Promise<{ ok: boolean; err
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 </head>
 <body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111111;">
-  <div style="max-width:520px;margin:40px auto;padding:0 24px;">
+  <div style="max-width:540px;margin:40px auto;padding:0 24px;">
+
+    <div style="width:48px;height:4px;border-radius:999px;background:#76b900;margin:0 0 28px;"></div>
 
     <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#111;">
       Hey,
     </p>
 
     <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
-      I built something called Mocki for interview prep. It reads your resume, looks at the job description, then runs a 15 min mock interview with three AI interviewers who ask follow-ups.
+      I built something called <span style="font-weight:700;color:#335200;">Mocki</span> for interview prep. It reads your resume, looks at the job description, then runs a 15 min mock interview with three AI interviewers who ask follow-ups.
     </p>
 
     <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
       The useful part is the debrief after: score, weak spots, and what to practice next.
     </p>
 
-    <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
-      Try one here: <a href="https://mocki.dev" style="color:#111;">mocki.dev</a>
-    </p>
+    <div style="margin:22px 0;padding:16px 18px;border-left:3px solid #76b900;background:#f6faef;border-radius:10px;">
+      <div style="font-size:13px;line-height:1.6;color:#335200;margin-bottom:6px;font-weight:700;">Try one interview</div>
+      <a href="https://mocki.dev" style="font-size:15px;line-height:1.6;color:#111;text-decoration:underline;text-decoration-color:#76b900;text-decoration-thickness:2px;text-underline-offset:3px;">mocki.dev</a>
+    </div>
 
-    <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#111;">
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
       Also, if you have an interview coming up, reply with the role/company and I'll tell you what kind of mock round to run first.
     </p>
 
-    <p style="margin:0;font-size:15px;line-height:1.7;color:#111;">
+    <p style="margin:28px 0 0;font-size:15px;line-height:1.7;color:#111;">
       — Abhishek
     </p>
 
