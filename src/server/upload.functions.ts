@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { uploadToSpaces, getPresignedPutUrl } from "./spaces.server";
+import { uploadToSpaces, getPresignedPutUrl, getPresignedGetUrl, objectExists } from "./spaces.server";
 import { getUserIdForToken } from "./supabase.server";
 
 const UploadResumeSchema = z.object({
@@ -45,6 +45,38 @@ export const getUploadUrl = createServerFn({ method: "POST" })
     const key = `sessions/${userId}/${data.sessionId}/cam.${ext}`;
     const url = await getPresignedPutUrl(key, data.mimeType);
     return { ok: !!url, url };
+  });
+
+const GetRecordingUrlSchema = z.object({
+  accessToken: z.string().min(10).max(8000),
+  sessionId: z.string().min(8).max(80),
+});
+
+export const getSessionRecordingUrl = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => GetRecordingUrlSchema.parse(d))
+  .handler(async ({ data }) => {
+    const userId = await getUserIdForToken(data.accessToken);
+    if (!userId) return { ok: false as const, url: null, ext: null };
+
+    // Try webm first, then mp4
+    const webmKey = `sessions/${userId}/${data.sessionId}/cam.webm`;
+    const mp4Key = `sessions/${userId}/${data.sessionId}/cam.mp4`;
+
+    let key: string | null = null;
+    let ext: "webm" | "mp4" | null = null;
+
+    if (await objectExists(webmKey)) {
+      key = webmKey;
+      ext = "webm";
+    } else if (await objectExists(mp4Key)) {
+      key = mp4Key;
+      ext = "mp4";
+    }
+
+    if (!key) return { ok: true, url: null, ext: null };
+
+    const url = await getPresignedGetUrl(key, 3600);
+    return { ok: true, url, ext };
   });
 
 export const uploadSessionData = createServerFn({ method: "POST" })

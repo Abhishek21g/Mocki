@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 function getClient(): S3Client | null {
@@ -42,6 +42,32 @@ export async function uploadToSpaces(
   } catch (err) {
     console.error("[spaces] upload failed:", err);
     return null;
+  }
+}
+
+export async function getPresignedGetUrl(
+  key: string,
+  expiresIn = 3600,
+): Promise<string | null> {
+  const client = getClient();
+  if (!client) return null;
+  try {
+    const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+    return await getSignedUrl(client, cmd, { expiresIn });
+  } catch (err) {
+    console.error("[spaces] presign get failed:", err);
+    return null;
+  }
+}
+
+export async function objectExists(key: string): Promise<boolean> {
+  const client = getClient();
+  if (!client) return false;
+  try {
+    await client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
+    return true;
+  } catch {
+    return false;
   }
 }
 
