@@ -6,11 +6,13 @@ import { getHireBg, getHireColor, scoreToColor } from "@/lib/ghost-utils";
 import {
   fetchAdminStats,
   fetchAdminRecordingUrl,
+  fetchAdminBehavioral,
   type AdminSession,
   type AdminStats,
   type AdminUser,
   type ScoreDistributionBucket,
 } from "@/server/admin.functions";
+import type { BehavioralPayload } from "@/hooks/useBehavioralTracker";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -568,20 +570,28 @@ function SessionDetail({ session: s, open, accessToken }: { session: AdminSessio
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const [recordingLoading, setRecordingLoading] = useState(false);
   const [recordingChecked, setRecordingChecked] = useState(false);
+  const [behavioral, setBehavioral] = useState<BehavioralPayload | null>(null);
+  const [behavioralLoading, setBehavioralLoading] = useState(false);
 
   useEffect(() => {
     if (!ref.current) return;
     setHeight(open ? ref.current.scrollHeight : 0);
-  }, [open, s.rounds.length, recordingUrl]);
+  }, [open, s.rounds.length, recordingUrl, behavioral]);
 
   useEffect(() => {
     if (!open || recordingChecked) return;
     setRecordingChecked(true);
     setRecordingLoading(true);
+    setBehavioralLoading(true);
     fetchAdminRecordingUrl({ data: { accessToken, userId: s.userId, sessionId: s.id } })
       .then((res) => { setRecordingUrl(res.url ?? null); })
       .catch(() => {})
       .finally(() => setRecordingLoading(false));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    fetchAdminBehavioral({ data: { accessToken, userId: s.userId, sessionId: s.id } })
+      .then((res: any) => { if (res?.ok && res?.data) setBehavioral(res.data as BehavioralPayload); })
+      .catch(() => {})
+      .finally(() => setBehavioralLoading(false));
   }, [open, recordingChecked, accessToken, s.userId, s.id]);
 
   return (
@@ -615,6 +625,9 @@ function SessionDetail({ session: s, open, accessToken }: { session: AdminSessio
             </div>
           )}
         </div>
+
+        {/* Behavioral analytics */}
+        <BehavioralSection data={behavioral} loading={behavioralLoading} />
 
         {/* Interviewers panel */}
         {s.interviewers.length > 0 && (
@@ -1137,6 +1150,178 @@ function UserSessionsDetail({
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Behavioral analytics section
+// ---------------------------------------------------------------------------
+
+function BehavioralSection({ data, loading }: { data: BehavioralPayload | null; loading: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="mb-5">
+        <div className="mono mb-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>Behavioral Data</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-2)" }}>
+          <span className="gp-spinner" /> Loading…
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="mb-5">
+        <div className="mono mb-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>Behavioral Data</div>
+        <div style={{ fontSize: 12, color: "var(--text-3)" }}>No behavioral data — session predates tracking.</div>
+      </div>
+    );
+  }
+
+  const { summary, fingerprint, pasteEvents, rightClickEvents, tabEvents, questions } = data;
+  const flagged = summary.totalTabSwitches > 2 || summary.totalPastes > 0;
+
+  return (
+    <div className="mb-5">
+      <div className="mono mb-2 flex items-center gap-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+        Behavioral Data
+        {flagged && (
+          <span style={{ background: "rgba(239,68,68,0.15)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, padding: "1px 6px", fontSize: 9, fontWeight: 700 }}>
+            ⚠ FLAGS
+          </span>
+        )}
+      </div>
+
+      {/* Summary stat pills */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        <BPill label="Tab Switches" value={summary.totalTabSwitches} danger={summary.totalTabSwitches > 2} />
+        <BPill label="Time Hidden" value={fmtMs(summary.totalTimeHiddenMs)} danger={summary.totalTimeHiddenMs > 30000} />
+        <BPill label="Pastes" value={summary.totalPastes} danger={summary.totalPastes > 0} />
+        <BPill label="Right Clicks" value={summary.totalRightClicks} />
+        <BPill label="Avg WPM" value={summary.avgWpm} />
+        <BPill label="Avg Backspace %" value={`${summary.avgBackspaceRate}%`} />
+      </div>
+
+      {/* Per-question table */}
+      {questions.length > 0 && (
+        <div style={{ marginBottom: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+            <thead>
+              <tr style={{ color: "var(--text-3)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>
+                <th style={{ padding: "4px 8px 4px 0" }}>Q#</th>
+                <th style={{ padding: "4px 8px" }}>Time to 1st key</th>
+                <th style={{ padding: "4px 8px" }}>WPM</th>
+                <th style={{ padding: "4px 8px" }}>Backspace%</th>
+                <th style={{ padding: "4px 8px" }}>Pauses</th>
+                <th style={{ padding: "4px 8px" }}>Tab Switches</th>
+                <th style={{ padding: "4px 8px" }}>Pastes</th>
+                <th style={{ padding: "4px 8px" }}>Fillers</th>
+              </tr>
+            </thead>
+            <tbody>
+              {questions.map((q) => (
+                <tr key={q.qIdx} style={{ borderBottom: "1px solid var(--border)", color: "var(--text-2)" }}>
+                  <td style={{ padding: "5px 8px 5px 0", fontWeight: 600 }}>{q.qIdx + 1}</td>
+                  <td style={{ padding: "5px 8px", color: q.timeToFirstKeystrokeMs !== null && q.timeToFirstKeystrokeMs > 15000 ? "#fca5a5" : undefined }}>
+                    {q.timeToFirstKeystrokeMs !== null ? fmtMs(q.timeToFirstKeystrokeMs) : "—"}
+                  </td>
+                  <td style={{ padding: "5px 8px" }}>{q.wpm || "—"}</td>
+                  <td style={{ padding: "5px 8px", color: q.backspaceRate > 30 ? "#fca5a5" : undefined }}>{q.backspaceRate}%</td>
+                  <td style={{ padding: "5px 8px" }}>{q.pauseCount > 0 ? `${q.pauseCount} (${fmtMs(q.longestPauseMs)} max)` : "—"}</td>
+                  <td style={{ padding: "5px 8px", color: q.tabSwitchesWhileAnswering > 0 ? "#fca5a5" : undefined }}>{q.tabSwitchesWhileAnswering || "—"}</td>
+                  <td style={{ padding: "5px 8px", color: q.pasteCount > 0 ? "#fca5a5" : undefined }}>{q.pasteCount || "—"}</td>
+                  <td style={{ padding: "5px 8px", color: q.fillerRate > 5 ? "#fca5a5" : undefined }}>{q.fillerRate > 0 ? `${q.fillerRate}%` : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Paste events detail */}
+      {pasteEvents.length > 0 && (
+        <div style={{ marginBottom: 8, background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, padding: "8px 12px" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>Paste Events</div>
+          {pasteEvents.map((p, i) => (
+            <div key={i} style={{ fontSize: 11, color: "var(--text-2)" }}>
+              Q{p.qIdx + 1} — pasted {p.pastedLen} chars (had {p.answerLenBefore} chars before)
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tab switch timeline */}
+      {summary.totalTabSwitches > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Tab switch timeline:</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {tabEvents.filter(e => e.type === "hidden").map((e, i) => (
+              <span key={i} style={{ fontSize: 10, background: "rgba(239,68,68,0.1)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 4, padding: "1px 6px" }}>
+                Q{e.qIdx + 1}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Device fingerprint — collapsed by default */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{ fontSize: 11, color: "var(--text-3)", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 4 }}
+      >
+        {expanded ? "▲ Hide" : "▼ Show"} device fingerprint
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "2px 16px", fontSize: 11, color: "var(--text-2)" }}>
+          <FPRow label="Screen" value={`${fingerprint.screenWidth}×${fingerprint.screenHeight} @${fingerprint.devicePixelRatio}x`} />
+          <FPRow label="Timezone" value={fingerprint.timezone} />
+          <FPRow label="Language" value={fingerprint.language} />
+          <FPRow label="Platform" value={fingerprint.platform} />
+          <FPRow label="CPU cores" value={String(fingerprint.hardwareConcurrency)} />
+          <FPRow label="Color depth" value={`${fingerprint.colorDepth}-bit`} />
+          <FPRow label="Browser" value={fingerprint.userAgent.slice(0, 60) + "…"} />
+          {fingerprint.referrer && <FPRow label="Referrer" value={fingerprint.referrer} />}
+        </div>
+      )}
+
+      {/* Right click log */}
+      {rightClickEvents.length > 0 && (
+        <div style={{ marginTop: 6, fontSize: 11, color: "var(--text-3)" }}>
+          Right-clicks: {rightClickEvents.map((r, i) => `Q${r.qIdx + 1}`).join(", ")}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BPill({ label, value, danger }: { label: string; value: string | number; danger?: boolean }) {
+  return (
+    <div style={{
+      padding: "4px 10px", borderRadius: 6, fontSize: 11, border: "1px solid",
+      borderColor: danger ? "rgba(239,68,68,0.35)" : "var(--border)",
+      background: danger ? "rgba(239,68,68,0.08)" : "var(--surface3)",
+      color: danger ? "#fca5a5" : "var(--text-2)",
+    }}>
+      <span style={{ color: danger ? "#f87171" : "var(--text-3)", marginRight: 4 }}>{label}</span>
+      <span style={{ fontWeight: 700 }}>{value}</span>
+    </div>
+  );
+}
+
+function FPRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "contents" }}>
+      <span style={{ color: "var(--text-3)" }}>{label}</span>
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</span>
+    </div>
+  );
+}
+
+function fmtMs(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
 }
 
 // ---------------------------------------------------------------------------

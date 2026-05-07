@@ -17,9 +17,11 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReportSessionIdRouteImport } from './routes/report.$sessionId'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as ApiUploadCamRouteImport } from './routes/api/upload-cam'
 import { Route as ApiTtsAvatarRouteImport } from './routes/api/tts-avatar'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiSttRouteImport } from './routes/api/stt'
+import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
 import { Route as AgentsSessionIdRouteImport } from './routes/agents.$sessionId'
 
 const ReportRoute = ReportRouteImport.update({
@@ -62,6 +64,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiUploadCamRoute = ApiUploadCamRouteImport.update({
+  id: '/api/upload-cam',
+  path: '/api/upload-cam',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTtsAvatarRoute = ApiTtsAvatarRouteImport.update({
   id: '/api/tts-avatar',
   path: '/api/tts-avatar',
@@ -75,6 +82,11 @@ const ApiTtsRoute = ApiTtsRouteImport.update({
 const ApiSttRoute = ApiSttRouteImport.update({
   id: '/api/stt',
   path: '/api/stt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
+  id: '/api/stripe-webhook',
+  path: '/api/stripe-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgentsSessionIdRoute = AgentsSessionIdRouteImport.update({
@@ -91,9 +103,11 @@ export interface FileRoutesByFullPath {
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRouteWithChildren
   '/agents/$sessionId': typeof AgentsSessionIdRoute
+  '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/tts-avatar': typeof ApiTtsAvatarRoute
+  '/api/upload-cam': typeof ApiUploadCamRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/report/$sessionId': typeof ReportSessionIdRoute
 }
@@ -105,9 +119,11 @@ export interface FileRoutesByTo {
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRouteWithChildren
   '/agents/$sessionId': typeof AgentsSessionIdRoute
+  '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/tts-avatar': typeof ApiTtsAvatarRoute
+  '/api/upload-cam': typeof ApiUploadCamRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/report/$sessionId': typeof ReportSessionIdRoute
 }
@@ -120,9 +136,11 @@ export interface FileRoutesById {
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRouteWithChildren
   '/agents/$sessionId': typeof AgentsSessionIdRoute
+  '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
   '/api/tts-avatar': typeof ApiTtsAvatarRoute
+  '/api/upload-cam': typeof ApiUploadCamRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/report/$sessionId': typeof ReportSessionIdRoute
 }
@@ -136,9 +154,11 @@ export interface FileRouteTypes {
     | '/interview'
     | '/report'
     | '/agents/$sessionId'
+    | '/api/stripe-webhook'
     | '/api/stt'
     | '/api/tts'
     | '/api/tts-avatar'
+    | '/api/upload-cam'
     | '/auth/callback'
     | '/report/$sessionId'
   fileRoutesByTo: FileRoutesByTo
@@ -150,9 +170,11 @@ export interface FileRouteTypes {
     | '/interview'
     | '/report'
     | '/agents/$sessionId'
+    | '/api/stripe-webhook'
     | '/api/stt'
     | '/api/tts'
     | '/api/tts-avatar'
+    | '/api/upload-cam'
     | '/auth/callback'
     | '/report/$sessionId'
   id:
@@ -164,9 +186,11 @@ export interface FileRouteTypes {
     | '/interview'
     | '/report'
     | '/agents/$sessionId'
+    | '/api/stripe-webhook'
     | '/api/stt'
     | '/api/tts'
     | '/api/tts-avatar'
+    | '/api/upload-cam'
     | '/auth/callback'
     | '/report/$sessionId'
   fileRoutesById: FileRoutesById
@@ -179,9 +203,11 @@ export interface RootRouteChildren {
   InterviewRoute: typeof InterviewRoute
   ReportRoute: typeof ReportRouteWithChildren
   AgentsSessionIdRoute: typeof AgentsSessionIdRoute
+  ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
   ApiTtsAvatarRoute: typeof ApiTtsAvatarRoute
+  ApiUploadCamRoute: typeof ApiUploadCamRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
 }
 
@@ -243,6 +269,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/upload-cam': {
+      id: '/api/upload-cam'
+      path: '/api/upload-cam'
+      fullPath: '/api/upload-cam'
+      preLoaderRoute: typeof ApiUploadCamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tts-avatar': {
       id: '/api/tts-avatar'
       path: '/api/tts-avatar'
@@ -262,6 +295,13 @@ declare module '@tanstack/react-router' {
       path: '/api/stt'
       fullPath: '/api/stt'
       preLoaderRoute: typeof ApiSttRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/stripe-webhook': {
+      id: '/api/stripe-webhook'
+      path: '/api/stripe-webhook'
+      fullPath: '/api/stripe-webhook'
+      preLoaderRoute: typeof ApiStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agents/$sessionId': {
@@ -293,9 +333,11 @@ const rootRouteChildren: RootRouteChildren = {
   InterviewRoute: InterviewRoute,
   ReportRoute: ReportRouteWithChildren,
   AgentsSessionIdRoute: AgentsSessionIdRoute,
+  ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,
   ApiTtsAvatarRoute: ApiTtsAvatarRoute,
+  ApiUploadCamRoute: ApiUploadCamRoute,
   AuthCallbackRoute: AuthCallbackRoute,
 }
 export const routeTree = rootRouteImport

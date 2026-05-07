@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { createSupabaseAdminClient, getUserIdForToken } from "./supabase.server";
-import { getPresignedGetUrl, objectExists } from "./spaces.server";
+import { getPresignedGetUrl, objectExists, downloadJson } from "./spaces.server";
 import type { InterviewSessionPayload } from "./history.server";
 
 const ADMIN_EMAIL = "enaguthiabhishek@gmail.com";
@@ -444,4 +444,15 @@ export const fetchAdminRecordingUrl = createServerFn({ method: "POST" })
 
     const url = await getPresignedGetUrl(key, 3600);
     return { ok: true as const, url };
+  });
+
+export const fetchAdminBehavioral = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => AdminRecordingSchema.parse(d))
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  .handler(async ({ data }): Promise<any> => {
+    const authResult = await verifyAdminAccess(data.accessToken);
+    if (!authResult.ok) return { ok: false, data: null };
+    const key = `sessions/${data.userId}/${data.sessionId}/behavioral.json`;
+    const json = await downloadJson(key);
+    return { ok: true, data: json };
   });

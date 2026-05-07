@@ -60,6 +60,19 @@ export async function getPresignedGetUrl(
   }
 }
 
+export async function downloadJson<T = unknown>(key: string): Promise<T | null> {
+  const client = getClient();
+  if (!client) return null;
+  try {
+    const res = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+    const body = await res.Body?.transformToString("utf-8");
+    if (!body) return null;
+    return JSON.parse(body) as T;
+  } catch {
+    return null;
+  }
+}
+
 export async function objectExists(key: string): Promise<boolean> {
   const client = getClient();
   if (!client) return false;
