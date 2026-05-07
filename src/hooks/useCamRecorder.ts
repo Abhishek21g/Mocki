@@ -4,6 +4,8 @@ export function useCamRecorder(stream: MediaStream | null) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const mimeRef = useRef("video/webm");
+  // Resolves after the cleanup stop's final ondataavailable fires
+  const cleanupStopRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     if (!stream || typeof MediaRecorder === "undefined") return;
@@ -18,6 +20,7 @@ export function useCamRecorder(stream: MediaStream | null) {
 
     mimeRef.current = mimeType || "video/webm";
     chunksRef.current = [];
+    cleanupStopRef.current = null;
 
     let recorder: MediaRecorder;
     try {
@@ -36,7 +39,13 @@ export function useCamRecorder(stream: MediaStream | null) {
     recorderRef.current = recorder;
 
     return () => {
-      if (recorder.state !== "inactive") recorder.stop();
+      if (recorder.state !== "inactive") {
+        // Track when the final ondataavailable fires so getBlob() can await it
+        cleanupStopRef.current = new Promise<void>((resolve) => {
+          recorder.addEventListener("stop", () => resolve(), { once: true });
+          recorder.stop();
+        });
+      }
       recorderRef.current = null;
     };
   }, [stream]);
@@ -45,10 +54,14 @@ export function useCamRecorder(stream: MediaStream | null) {
     const recorder = recorderRef.current;
 
     if (recorder && recorder.state !== "inactive") {
+      // Still recording — stop it and wait for final data
       await new Promise<void>((resolve) => {
         recorder.addEventListener("stop", () => resolve(), { once: true });
         recorder.stop();
       });
+    } else if (cleanupStopRef.current) {
+      // Cleanup already stopped it — wait for the final ondataavailable
+      await cleanupStopRef.current;
     }
 
     if (!chunksRef.current.length) return null;

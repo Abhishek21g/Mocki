@@ -8,7 +8,7 @@ import { createAvatarController, type AvatarController, type AvatarStatus } from
 import { primeAudio } from "@/lib/tts";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview.functions";
-import { getUploadUrl, uploadSessionData } from "@/server/upload.functions";
+import { uploadSessionData } from "@/server/upload.functions";
 import { useKeystrokeTracker } from "@/hooks/useKeystrokeTracker";
 import { useCamRecorder } from "@/hooks/useCamRecorder";
 import { cn } from "@/lib/utils";
@@ -325,18 +325,16 @@ function InterviewPage() {
             }).catch((err) => {
               console.error("[upload] keystrokes failed", err);
             });
-            // Fire-and-forget: upload cam recording via presigned URL
+            // Fire-and-forget: upload cam recording via server route (avoids CORS)
             getCamBlob().then(async (result) => {
-              console.log("[upload] cam blob", result ? `${result.mimeType} ${result.blob.size}b` : "null");
+              console.log("[upload] cam blob", result ? `${result.mimeType} ${result.blob.size}b` : camStream ? "no chunks (camera on but empty)" : "no stream (camera was off)");
               if (!result) return;
-              const r = await getUploadUrl({
-                data: { accessToken, sessionId: sid, type: "cam", mimeType: result.mimeType },
-              });
-              console.log("[upload] presign", r);
-              if (r.url) {
-                const res = await fetch(r.url, { method: "PUT", body: result.blob, headers: { "Content-Type": result.mimeType } });
-                console.log("[upload] cam PUT", res.status, res.ok);
-              }
+              const fd = new FormData();
+              fd.append("file", new File([result.blob], `cam.${result.mimeType.includes("mp4") ? "mp4" : "webm"}`, { type: result.mimeType }));
+              fd.append("accessToken", accessToken);
+              fd.append("sessionId", sid);
+              const res = await fetch("/api/upload-cam", { method: "POST", body: fd });
+              console.log("[upload] cam", res.status, await res.json().catch(() => null));
             }).catch((err) => {
               console.error("[upload] cam failed", err);
             });
