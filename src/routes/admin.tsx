@@ -293,6 +293,7 @@ function AdminPage() {
               <InviteSection
                 accessToken={getAccessToken() ?? ""}
                 logs={stats.outreachLogs}
+                users={stats.users}
               />
             </section>
               </>
@@ -1753,11 +1754,13 @@ function OutreachSection({
 function InviteSection({
   accessToken,
   logs,
+  users,
 }: {
   accessToken: string;
   logs: AdminOutreachLog[];
+  users: AdminUser[];
 }) {
-  const [raw, setRaw] = useState("srijapalla1960@gmail.com\ndhaya.nadhana@gmail.com");
+  const [raw, setRaw] = useState("");
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState<InviteResult[] | null>(null);
 
@@ -1770,6 +1773,12 @@ function InviteSection({
       .filter((log) => log.kind === "invite" && log.status === "sent")
       .map((log) => [log.email.toLowerCase(), log]),
   );
+  const signedUpEmails = new Set(users.map((u) => u.email.toLowerCase()));
+  const sentInviteRows = Array.from(sentInvites.values()).sort((a, b) =>
+    a.createdAt < b.createdAt ? 1 : -1,
+  );
+  const waitingInvites = sentInviteRows.filter((log) => !signedUpEmails.has(log.email.toLowerCase()));
+  const convertedInvites = sentInviteRows.filter((log) => signedUpEmails.has(log.email.toLowerCase()));
   const alreadySent = emails.filter((email) => sentInvites.has(email.toLowerCase())).length;
   const remaining = emails.length - alreadySent;
 
@@ -1780,6 +1789,8 @@ function InviteSection({
     try {
       const res = await sendAdminInviteEmails({ data: { accessToken, emails } }) as any;
       setResults(res.results ?? []);
+      const sentOrSkipped = (res.results ?? []).every((r: InviteResult) => r.ok);
+      if (sentOrSkipped) setRaw("");
     } catch (e) {
       console.error("[invites] send failed", e);
     } finally {
@@ -1793,7 +1804,7 @@ function InviteSection({
         className="mono mb-4 flex items-center justify-between text-[11px] uppercase tracking-wider"
         style={{ color: "var(--text-3)" }}
       >
-        <span>Invites</span>
+        <span>Invite New People</span>
         <button
           onClick={handleSend}
           disabled={sending || emails.length === 0}
@@ -1811,7 +1822,7 @@ function InviteSection({
 
       <div className="gp-card p-5">
         <p className="mb-3 text-xs" style={{ color: "var(--text-3)" }}>
-          One email per line, or comma-separated. These people haven't signed up yet — they'll get a personal invite from you.
+          Paste new emails here. Once an invite is sent, it moves into the sent list below and the composer clears.
         </p>
         {emails.length > 0 && (
           <div className="mb-4 rounded-md border p-3" style={{ borderColor: "var(--border)", background: "var(--surface2)" }}>
@@ -1902,6 +1913,94 @@ function InviteSection({
           </div>
         )}
       </div>
+
+      <div className="mt-6">
+        <div
+          className="mono mb-4 flex items-center justify-between text-[11px] uppercase tracking-wider"
+          style={{ color: "var(--text-3)" }}
+        >
+          <span>Sent Invites</span>
+          <span>{waitingInvites.length} waiting · {convertedInvites.length} signed up</span>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <InviteStatusList
+            title="Waiting to Sign Up"
+            empty="No pending invites yet."
+            logs={waitingInvites}
+            tone="waiting"
+          />
+          <InviteStatusList
+            title="Signed Up"
+            empty="No invite conversions yet."
+            logs={convertedInvites}
+            tone="converted"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InviteStatusList({
+  title,
+  empty,
+  logs,
+  tone,
+}: {
+  title: string;
+  empty: string;
+  logs: AdminOutreachLog[];
+  tone: "waiting" | "converted";
+}) {
+  return (
+    <div className="gp-card overflow-hidden p-0">
+      <div
+        className="flex items-center justify-between border-b px-4 py-3"
+        style={{ borderColor: "var(--border)" }}
+      >
+        <span className="mono text-[11px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+          {title}
+        </span>
+        <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
+          {logs.length}
+        </span>
+      </div>
+      {logs.length === 0 ? (
+        <div className="p-4 text-sm" style={{ color: "var(--text-3)" }}>
+          {empty}
+        </div>
+      ) : (
+        <div>
+          {logs.map((log) => (
+            <div
+              key={log.id}
+              className="flex items-center justify-between gap-3 border-b px-4 py-3 text-sm last:border-b-0"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <div style={{ minWidth: 0 }}>
+                <div style={{ color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {log.email}
+                </div>
+                <div className="mono mt-1 text-[11px]" style={{ color: "var(--text-3)" }}>
+                  sent {new Date(log.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                </div>
+              </div>
+              <span
+                className="mono rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider"
+                style={{
+                  color: tone === "converted" ? "#86efac" : "var(--text-3)",
+                  border: tone === "converted" ? "1px solid rgba(134,239,172,0.35)" : "1px solid var(--border)",
+                  background: tone === "converted" ? "rgba(134,239,172,0.08)" : "var(--surface2)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {tone === "converted" ? "Signed up" : "Waiting"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
