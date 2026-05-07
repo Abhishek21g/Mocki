@@ -12,6 +12,7 @@ import {
   type AdminSession,
   type AdminStats,
   type AdminUser,
+  type AdminOutreachLog,
   type ScoreDistributionBucket,
   type CheckInResult,
   type InviteResult,
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 const ADMIN_EMAILS = ["enaguthiabhishek@gmail.com", "muralikinti@gmail.com"];
+type AdminTab = "overview" | "sessions" | "users" | "outreach";
 
 // ---------------------------------------------------------------------------
 // Page
@@ -37,6 +39,7 @@ function AdminPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState<AdminTab>("overview");
 
   const load = useCallback(() => {
     const accessToken = getAccessToken();
@@ -152,6 +155,14 @@ function AdminPage() {
 
         {stats && (
           <>
+            <AdminTabs
+              activeTab={activeTab}
+              onChange={setActiveTab}
+              stats={stats}
+            />
+
+            {activeTab === "overview" && (
+              <>
             {/* ── Overview cards row 1 ───────────────────────────── */}
             <section className="fade-up">
               <SectionLabel>Overview</SectionLabel>
@@ -245,38 +256,104 @@ function AdminPage() {
                 </div>
               </div>
             </section>
+              </>
+            )}
 
             {/* ── All Sessions ──────────────────────────────────── */}
+            {activeTab === "sessions" && (
             <section className="fade-up mt-8">
               <SectionLabel>All Sessions ({stats.sessions.length})</SectionLabel>
               <div className="gp-card overflow-hidden p-0">
                 <AllSessionsTable sessions={stats.sessions} accessToken={getAccessToken() ?? ""} />
               </div>
             </section>
+            )}
 
             {/* ── All Users ─────────────────────────────────────── */}
+            {activeTab === "users" && (
             <section className="fade-up mt-8">
               <SectionLabel>All Users ({stats.users.length})</SectionLabel>
               <div className="gp-card overflow-hidden p-0">
                 <AllUsersTable users={stats.users} sessions={stats.sessions} />
               </div>
             </section>
+            )}
 
             {/* ── Outreach ──────────────────────────────────────── */}
+            {activeTab === "outreach" && (
+              <>
             <section className="fade-up mt-8">
               <OutreachSection
                 users={stats.users}
+                logs={stats.outreachLogs}
                 accessToken={getAccessToken() ?? ""}
               />
             </section>
+            <section className="fade-up mt-8">
+              <InviteSection
+                accessToken={getAccessToken() ?? ""}
+                logs={stats.outreachLogs}
+              />
+            </section>
+              </>
+            )}
           </>
         )}
-
-        {/* ── Invites — shown as soon as page loads, no stats needed ── */}
-        <section className="fade-up mt-8">
-          <InviteSection accessToken={getAccessToken() ?? ""} />
-        </section>
       </main>
+    </div>
+  );
+}
+
+function AdminTabs({
+  activeTab,
+  onChange,
+  stats,
+}: {
+  activeTab: AdminTab;
+  onChange: (tab: AdminTab) => void;
+  stats: AdminStats;
+}) {
+  const inactiveUsers = stats.users.filter((u) => u.interviewCount === 0).length;
+  const sentCheckIns = new Set(
+    stats.outreachLogs
+      .filter((log) => log.kind === "check_in" && log.status === "sent" && log.userId)
+      .map((log) => log.userId),
+  ).size;
+  const tabs: { id: AdminTab; label: string; count?: number }[] = [
+    { id: "overview", label: "Overview" },
+    { id: "sessions", label: "Sessions", count: stats.sessions.length },
+    { id: "users", label: "Users", count: stats.users.length },
+    { id: "outreach", label: "Outreach", count: Math.max(inactiveUsers - sentCheckIns, 0) },
+  ];
+
+  return (
+    <div className="fade-up sticky top-0 z-20 -mx-6 mb-8 border-b px-6 py-3 backdrop-blur"
+      style={{ borderColor: "var(--border)", background: "rgba(8,8,8,0.82)" }}
+    >
+      <div className="flex flex-wrap gap-2">
+        {tabs.map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onChange(tab.id)}
+              className="mono rounded-md border px-3 py-2 text-[11px] uppercase tracking-wider"
+              style={{
+                borderColor: active ? "rgba(118,185,0,0.55)" : "var(--border)",
+                background: active ? "rgba(118,185,0,0.12)" : "var(--surface2)",
+                color: active ? "var(--green)" : "var(--text-3)",
+              }}
+            >
+              {tab.label}
+              {typeof tab.count === "number" && (
+                <span style={{ marginLeft: 8, color: active ? "var(--text)" : "var(--text-3)" }}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1467,16 +1544,38 @@ function BehavioralSection({ data, loading }: { data: BehavioralPayload | null; 
 // Outreach section
 // ---------------------------------------------------------------------------
 
-function OutreachSection({ users, accessToken }: { users: AdminUser[]; accessToken: string }) {
+function OutreachSection({
+  users,
+  logs,
+  accessToken,
+}: {
+  users: AdminUser[];
+  logs: AdminOutreachLog[];
+  accessToken: string;
+}) {
   const inactive = users.filter((u) => u.interviewCount === 0);
-  const [selected, setSelected] = useState<Set<string>>(new Set(inactive.map((u) => u.id)));
+  const successfulCheckIns = new Map(
+    logs
+      .filter((log) => log.kind === "check_in" && log.status === "sent" && log.userId)
+      .map((log) => [log.userId as string, log]),
+  );
+  const unsentInactive = inactive.filter((u) => !successfulCheckIns.has(u.id));
+  const [selected, setSelected] = useState<Set<string>>(
+    new Set(unsentInactive.map((u) => u.id)),
+  );
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState<CheckInResult[] | null>(null);
   const [preview, setPreview] = useState(false);
+  const sentCount = inactive.length - unsentInactive.length;
+  const progress = inactive.length > 0 ? (sentCount / inactive.length) * 100 : 100;
+
+  useEffect(() => {
+    setSelected(new Set(unsentInactive.map((u) => u.id)));
+  }, [logs, users]);
 
   function toggleAll() {
-    if (selected.size === inactive.length) setSelected(new Set());
-    else setSelected(new Set(inactive.map((u) => u.id)));
+    if (selected.size === unsentInactive.length) setSelected(new Set());
+    else setSelected(new Set(unsentInactive.map((u) => u.id)));
   }
 
   async function handleSend() {
@@ -1515,12 +1614,33 @@ function OutreachSection({ users, accessToken }: { users: AdminUser[]; accessTok
         </div>
       </div>
 
+      <div className="gp-card mb-4 p-4">
+        <div className="mb-2 flex items-center justify-between text-xs" style={{ color: "var(--text-2)" }}>
+          <span>{sentCount} already sent</span>
+          <span>{unsentInactive.length} remaining</span>
+        </div>
+        <div style={{ height: 8, borderRadius: 999, background: "var(--surface3)", overflow: "hidden" }}>
+          <div
+            style={{
+              width: `${progress}%`,
+              height: "100%",
+              borderRadius: 999,
+              background: "var(--green)",
+              transition: "width 180ms ease",
+            }}
+          />
+        </div>
+        <p className="mt-3 text-xs" style={{ color: "var(--text-3)" }}>
+          People who already got a successful check-in are not selected by default. The server also skips them if they slip into a send batch.
+        </p>
+      </div>
+
       {/* Email preview */}
       {preview && (
         <div className="gp-card mb-4 p-5" style={{ fontSize: 13 }}>
           <div style={{ color: "var(--text-3)", marginBottom: 8, fontSize: 11 }}>EMAIL PREVIEW</div>
-          <div style={{ color: "var(--text-2)", marginBottom: 4 }}><strong>Subject:</strong> Still thinking about that interview, [name]?</div>
-          <div style={{ color: "var(--text-2)", marginBottom: 4 }}><strong>From:</strong> Mocki</div>
+          <div style={{ color: "var(--text-2)", marginBottom: 4 }}><strong>Subject:</strong> hey [name], still up for that mock interview?</div>
+          <div style={{ color: "var(--text-2)", marginBottom: 4 }}><strong>From:</strong> Abhishek &lt;abhishek@send.mocki.dev&gt;</div>
           <div style={{ color: "var(--text-3)", marginTop: 8, lineHeight: 1.6 }}>
             "Still thinking about that interview, [name]? You signed up for Mocki but haven't run a session yet. It takes about 15 minutes…"
             <span style={{ marginLeft: 6, color: "var(--green)" }}>→ Start your first interview</span>
@@ -1538,7 +1658,7 @@ function OutreachSection({ users, accessToken }: { users: AdminUser[]; accessTok
             <thead>
               <tr style={{ borderBottom: "1px solid var(--border)" }}>
                 <th style={{ padding: "10px 16px", textAlign: "left", width: 36 }}>
-                  <input type="checkbox" checked={selected.size === inactive.length} onChange={toggleAll} style={{ cursor: "pointer" }} />
+                  <input type="checkbox" checked={unsentInactive.length > 0 && selected.size === unsentInactive.length} onChange={toggleAll} style={{ cursor: "pointer" }} />
                 </th>
                 <th style={{ padding: "10px 8px", textAlign: "left", color: "var(--text-3)", fontWeight: 600 }}>Email</th>
                 <th style={{ padding: "10px 8px", textAlign: "left", color: "var(--text-3)", fontWeight: 600 }}>Name</th>
@@ -1549,15 +1669,29 @@ function OutreachSection({ users, accessToken }: { users: AdminUser[]; accessTok
             <tbody>
               {inactive.map((u) => {
                 const result = results?.find((r) => r.userId === u.id);
+                const alreadySent = successfulCheckIns.get(u.id);
                 const isSelected = selected.has(u.id);
                 return (
                   <tr
                     key={u.id}
                     style={{ borderBottom: "1px solid var(--border)", background: isSelected ? "rgba(118,185,0,0.03)" : undefined, cursor: "pointer" }}
-                    onClick={() => setSelected((prev) => { const next = new Set(prev); isSelected ? next.delete(u.id) : next.add(u.id); return next; })}
+                    onClick={() => {
+                      if (alreadySent) return;
+                      setSelected((prev) => {
+                        const next = new Set(prev);
+                        isSelected ? next.delete(u.id) : next.add(u.id);
+                        return next;
+                      });
+                    }}
                   >
                     <td style={{ padding: "10px 16px" }}>
-                      <input type="checkbox" checked={isSelected} onChange={() => {}} style={{ cursor: "pointer" }} />
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        disabled={Boolean(alreadySent)}
+                        onChange={() => {}}
+                        style={{ cursor: alreadySent ? "not-allowed" : "pointer" }}
+                      />
                     </td>
                     <td style={{ padding: "10px 8px", color: "var(--text)" }}>{u.email}</td>
                     <td style={{ padding: "10px 8px", color: "var(--text-2)" }}>{u.name}</td>
@@ -1566,7 +1700,9 @@ function OutreachSection({ users, accessToken }: { users: AdminUser[]; accessTok
                     </td>
                     <td style={{ padding: "10px 16px" }}>
                       {result ? (
-                        result.ok
+                        result.status === "skipped"
+                          ? <span style={{ color: "var(--text-3)", fontSize: 11 }}>Skipped — already sent</span>
+                          : result.ok
                           ? <span style={{ color: "#86efac", fontSize: 11 }}>✓ Sent</span>
                           : (
                             <span
@@ -1576,6 +1712,10 @@ function OutreachSection({ users, accessToken }: { users: AdminUser[]; accessTok
                               ✗ Failed{result.error ? ` — ${result.error.length > 40 ? result.error.slice(0, 40) + "…" : result.error}` : ""}
                             </span>
                           )
+                      ) : alreadySent ? (
+                        <span title={new Date(alreadySent.createdAt).toLocaleString()} style={{ color: "#86efac", fontSize: 11, cursor: "help" }}>
+                          ✓ Already sent
+                        </span>
                       ) : (
                         <span style={{ color: "var(--text-3)", fontSize: 11 }}>Not sent</span>
                       )}
@@ -1591,9 +1731,14 @@ function OutreachSection({ users, accessToken }: { users: AdminUser[]; accessTok
       {/* Results summary */}
       {results && (
         <div className="mt-3 rounded-lg px-4 py-3 text-sm" style={{ background: "var(--surface2)", border: "1px solid var(--border)" }}>
-          ✓ {results.filter((r) => r.ok).length} sent
-          {results.filter((r) => !r.ok).length > 0 && (
-            <span style={{ color: "#f87171", marginLeft: 12 }}>✗ {results.filter((r) => !r.ok).length} failed</span>
+          ✓ {results.filter((r) => r.status === "sent").length} sent
+          {results.filter((r) => r.status === "skipped").length > 0 && (
+            <span style={{ color: "var(--text-3)", marginLeft: 12 }}>
+              {results.filter((r) => r.status === "skipped").length} skipped
+            </span>
+          )}
+          {results.filter((r) => r.status === "failed").length > 0 && (
+            <span style={{ color: "#f87171", marginLeft: 12 }}>✗ {results.filter((r) => r.status === "failed").length} failed</span>
           )}
         </div>
       )}
@@ -1605,7 +1750,13 @@ function OutreachSection({ users, accessToken }: { users: AdminUser[]; accessTok
 // Invite section
 // ---------------------------------------------------------------------------
 
-function InviteSection({ accessToken }: { accessToken: string }) {
+function InviteSection({
+  accessToken,
+  logs,
+}: {
+  accessToken: string;
+  logs: AdminOutreachLog[];
+}) {
   const [raw, setRaw] = useState("srijapalla1960@gmail.com\ndhaya.nadhana@gmail.com");
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState<InviteResult[] | null>(null);
@@ -1614,6 +1765,13 @@ function InviteSection({ accessToken }: { accessToken: string }) {
     .split(/[\n,\s]+/)
     .map((e) => e.trim())
     .filter((e) => e.includes("@"));
+  const sentInvites = new Map(
+    logs
+      .filter((log) => log.kind === "invite" && log.status === "sent")
+      .map((log) => [log.email.toLowerCase(), log]),
+  );
+  const alreadySent = emails.filter((email) => sentInvites.has(email.toLowerCase())).length;
+  const remaining = emails.length - alreadySent;
 
   async function handleSend() {
     if (!emails.length || sending) return;
@@ -1655,6 +1813,24 @@ function InviteSection({ accessToken }: { accessToken: string }) {
         <p className="mb-3 text-xs" style={{ color: "var(--text-3)" }}>
           One email per line, or comma-separated. These people haven't signed up yet — they'll get a personal invite from you.
         </p>
+        {emails.length > 0 && (
+          <div className="mb-4 rounded-md border p-3" style={{ borderColor: "var(--border)", background: "var(--surface2)" }}>
+            <div className="mb-2 flex items-center justify-between text-xs" style={{ color: "var(--text-2)" }}>
+              <span>{alreadySent} already invited</span>
+              <span>{remaining} new</span>
+            </div>
+            <div style={{ height: 7, borderRadius: 999, background: "var(--surface3)", overflow: "hidden" }}>
+              <div
+                style={{
+                  width: `${emails.length ? (alreadySent / emails.length) * 100 : 0}%`,
+                  height: "100%",
+                  borderRadius: 999,
+                  background: "var(--green)",
+                }}
+              />
+            </div>
+          </div>
+        )}
         <textarea
           value={raw}
           onChange={(e) => { setRaw(e.target.value); setResults(null); }}
@@ -1675,9 +1851,14 @@ function InviteSection({ accessToken }: { accessToken: string }) {
               <span
                 key={e}
                 className="mono text-[11px] rounded-full px-2.5 py-0.5"
-                style={{ background: "var(--surface3)", border: "1px solid var(--border)", color: "var(--text-2)" }}
+                title={sentInvites.has(e.toLowerCase()) ? "Already invited" : undefined}
+                style={{
+                  background: sentInvites.has(e.toLowerCase()) ? "rgba(118,185,0,0.08)" : "var(--surface3)",
+                  border: sentInvites.has(e.toLowerCase()) ? "1px solid rgba(118,185,0,0.35)" : "1px solid var(--border)",
+                  color: sentInvites.has(e.toLowerCase()) ? "var(--green)" : "var(--text-2)",
+                }}
               >
-                {e}
+                {e}{sentInvites.has(e.toLowerCase()) ? " · sent" : ""}
               </span>
             ))}
           </div>
@@ -1689,7 +1870,11 @@ function InviteSection({ accessToken }: { accessToken: string }) {
             {results.map((r) => (
               <div key={r.email} className="flex items-center justify-between gap-3 text-sm">
                 <span style={{ color: "var(--text-2)" }}>{r.email}</span>
-                {r.ok ? (
+                {r.status === "skipped" ? (
+                  <span style={{ color: "var(--text-3)", fontSize: 11, whiteSpace: "nowrap" }}>
+                    Skipped — already sent
+                  </span>
+                ) : r.ok ? (
                   <span style={{ color: "#86efac", fontSize: 11, whiteSpace: "nowrap" }}>✓ Sent</span>
                 ) : (
                   <span
@@ -1702,10 +1887,15 @@ function InviteSection({ accessToken }: { accessToken: string }) {
               </div>
             ))}
             <div className="mt-2 text-xs" style={{ color: "var(--text-3)" }}>
-              ✓ {results.filter((r) => r.ok).length} sent
-              {results.filter((r) => !r.ok).length > 0 && (
+              ✓ {results.filter((r) => r.status === "sent").length} sent
+              {results.filter((r) => r.status === "skipped").length > 0 && (
+                <span style={{ marginLeft: 10 }}>
+                  {results.filter((r) => r.status === "skipped").length} skipped
+                </span>
+              )}
+              {results.filter((r) => r.status === "failed").length > 0 && (
                 <span style={{ color: "#f87171", marginLeft: 10 }}>
-                  ✗ {results.filter((r) => !r.ok).length} failed
+                  ✗ {results.filter((r) => r.status === "failed").length} failed
                 </span>
               )}
             </div>

@@ -37,10 +37,32 @@ create index if not exists interview_sessions_user_idx
   on public.interview_sessions (user_id, created_at desc);
 
 -- =============================================================================
+-- email_outreach_log: admin-triggered check-ins/invites, used to prevent
+-- accidental repeat sends and to audit deliverability errors.
+-- =============================================================================
+create table if not exists public.email_outreach_log (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users (id) on delete set null,
+  email text not null,
+  kind text not null check (kind in ('check_in', 'invite')),
+  status text not null check (status in ('sent', 'failed')),
+  error text,
+  sent_by text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists email_outreach_log_email_kind_idx
+  on public.email_outreach_log (lower(email), kind, created_at desc);
+
+create index if not exists email_outreach_log_user_kind_idx
+  on public.email_outreach_log (user_id, kind, created_at desc);
+
+-- =============================================================================
 -- Row Level Security: each user only sees their own rows.
 -- =============================================================================
 alter table public.profiles enable row level security;
 alter table public.interview_sessions enable row level security;
+alter table public.email_outreach_log enable row level security;
 
 drop policy if exists "Profiles are self-readable" on public.profiles;
 create policy "Profiles are self-readable"
@@ -72,6 +94,12 @@ drop policy if exists "Sessions are self-deletable" on public.interview_sessions
 create policy "Sessions are self-deletable"
   on public.interview_sessions for delete
   using (auth.uid() = user_id);
+
+drop policy if exists "Outreach log is service-role only" on public.email_outreach_log;
+create policy "Outreach log is service-role only"
+  on public.email_outreach_log for all
+  using (false)
+  with check (false);
 
 -- =============================================================================
 -- Auto-create a profile row when a new auth.users record is created.

@@ -77,6 +77,17 @@ export type AdminUser = {
 
 export type ScoreDistributionBucket = { bucket: string; count: number };
 
+export type AdminOutreachLog = {
+  id: string;
+  userId: string | null;
+  email: string;
+  kind: "check_in" | "invite";
+  status: "sent" | "failed";
+  error: string | null;
+  sentBy: string | null;
+  createdAt: string;
+};
+
 export type AdminStats = {
   // counts
   totalUsers: number;
@@ -96,6 +107,7 @@ export type AdminStats = {
   // detailed data
   sessions: AdminSession[];
   users: AdminUser[];
+  outreachLogs: AdminOutreachLog[];
 };
 
 // ---------------------------------------------------------------------------
@@ -149,7 +161,11 @@ function extractInterviewers(
 async function verifyAdminAccess(
   accessToken: string,
 ): Promise<
-  | { ok: true; admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>> }
+  | {
+      ok: true;
+      admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
+      adminEmail: string;
+    }
   | { ok: false; reason: string }
 > {
   const admin = createSupabaseAdminClient();
@@ -160,9 +176,65 @@ async function verifyAdminAccess(
 
   const { data: userRecord, error: userError } = await admin.auth.admin.getUserById(userId);
   if (userError || !userRecord?.user) return { ok: false, reason: "unauthorized" };
-  if (!ADMIN_EMAILS.includes(userRecord.user.email ?? "")) return { ok: false, reason: "unauthorized" };
+  const adminEmail = userRecord.user.email ?? "";
+  if (!ADMIN_EMAILS.includes(adminEmail)) return { ok: false, reason: "unauthorized" };
 
-  return { ok: true, admin };
+  return { ok: true, admin, adminEmail };
+}
+
+async function logOutreach(
+  admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  entry: {
+    userId?: string | null;
+    email: string;
+    kind: "check_in" | "invite";
+    status: "sent" | "failed";
+    error?: string | null;
+    sentBy: string;
+  },
+): Promise<void> {
+  const { error } = await admin.from("email_outreach_log").insert({
+    user_id: entry.userId ?? null,
+    email: entry.email,
+    kind: entry.kind,
+    status: entry.status,
+    error: entry.error ?? null,
+    sent_by: entry.sentBy,
+  });
+  if (error) console.error("[admin] failed to log outreach:", error);
+}
+
+async function findSentOutreach(
+  admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  data: { kind: "check_in" | "invite"; email: string; userId?: string | null },
+): Promise<AdminOutreachLog | null> {
+  let query = admin
+    .from("email_outreach_log")
+    .select("*")
+    .eq("kind", data.kind)
+    .eq("status", "sent")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  query = data.userId ? query.eq("user_id", data.userId) : query.eq("email", data.email);
+
+  const { data: rows, error } = await query;
+  if (error) {
+    console.error("[admin] failed to check outreach log:", error);
+    return null;
+  }
+  const row = rows?.[0];
+  if (!row) return null;
+  return {
+    id: row.id as string,
+    userId: (row.user_id as string | null) ?? null,
+    email: (row.email as string | null) ?? data.email,
+    kind: row.kind as "check_in" | "invite",
+    status: row.status as "sent" | "failed",
+    error: (row.error as string | null) ?? null,
+    sentBy: (row.sent_by as string | null) ?? null,
+    createdAt: row.created_at as string,
+  };
 }
 
 export const fetchAdminStats = createServerFn({ method: "POST" })
@@ -191,6 +263,25 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
     if (sessionsError || !allSessions) {
       return { ok: false as const, reason: "db_error" as string };
     }
+
+    const { data: outreachData, error: outreachError } = await admin
+      .from("email_outreach_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (outreachError) {
+      console.error("[admin] failed to load outreach log:", outreachError);
+    }
+    const outreachLogs: AdminOutreachLog[] = (outreachData ?? []).map((row) => ({
+      id: row.id as string,
+      userId: (row.user_id as string | null) ?? null,
+      email: (row.email as string | null) ?? "—",
+      kind: row.kind as "check_in" | "invite",
+      status: row.status as "sent" | "failed",
+      error: (row.error as string | null) ?? null,
+      sentBy: (row.sent_by as string | null) ?? null,
+      createdAt: row.created_at as string,
+    }));
 
     const totalInterviews = allSessions.length;
 
@@ -370,6 +461,7 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
       completionRate,
       sessions,
       users,
+      outreachLogs,
     };
 
     return { ok: true as const, stats };
@@ -462,8 +554,10 @@ const CheckInSchema = z.object({
 export type CheckInResult = {
   userId: string;
   email: string;
+  status: "sent" | "failed" | "skipped";
   ok: boolean;
   error?: string;
+  sentAt?: string;
 };
 
 export const sendAdminCheckInEmails = createServerFn({ method: "POST" })
@@ -482,20 +576,59 @@ export const sendAdminCheckInEmails = createServerFn({ method: "POST" })
     for (let i = 0; i < targetUsers.length; i++) {
       const user = targetUsers[i];
       const email = user.email;
-      if (!email) { results.push({ userId: user.id, email: "—", ok: false, error: "no email" }); continue; }
+      if (!email) {
+        results.push({
+          userId: user.id,
+          email: "—",
+          status: "failed",
+          ok: false,
+          error: "no email",
+        });
+        continue;
+      }
       const name =
         (user.user_metadata?.full_name as string | undefined) ??
         (user.user_metadata?.name as string | undefined) ??
         email.split("@")[0];
+      const existing = await findSentOutreach(admin, {
+        kind: "check_in",
+        email,
+        userId: user.id,
+      });
+      if (existing) {
+        results.push({
+          userId: user.id,
+          email,
+          status: "skipped",
+          ok: true,
+          sentAt: existing.createdAt,
+        });
+        continue;
+      }
       // Throttle: 300ms between sends to stay under Resend's rate limit
       if (i > 0) await new Promise((resolve) => setTimeout(resolve, 300));
       const result = await sendCheckInEmail(email, name);
-      results.push({ userId: user.id, email, ok: result.ok, error: result.error });
+      await logOutreach(admin, {
+        userId: user.id,
+        email,
+        kind: "check_in",
+        status: result.ok ? "sent" : "failed",
+        error: result.error,
+        sentBy: authResult.adminEmail,
+      });
+      results.push({
+        userId: user.id,
+        email,
+        status: result.ok ? "sent" : "failed",
+        ok: result.ok,
+        error: result.error,
+      });
     }
 
-    const sent = results.filter((r) => r.ok).length;
-    const failed = results.filter((r) => !r.ok).length;
-    return { ok: true as const, sent, failed, results };
+    const sent = results.filter((r) => r.status === "sent").length;
+    const failed = results.filter((r) => r.status === "failed").length;
+    const skipped = results.filter((r) => r.status === "skipped").length;
+    return { ok: true as const, sent, failed, skipped, results };
   });
 
 const InviteSchema = z.object({
@@ -505,8 +638,10 @@ const InviteSchema = z.object({
 
 export type InviteResult = {
   email: string;
+  status: "sent" | "failed" | "skipped";
   ok: boolean;
   error?: string;
+  sentAt?: string;
 };
 
 export const sendAdminInviteEmails = createServerFn({ method: "POST" })
@@ -514,15 +649,42 @@ export const sendAdminInviteEmails = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const authResult = await verifyAdminAccess(data.accessToken);
     if (!authResult.ok) return { ok: false as const, reason: authResult.reason, results: [] };
+    const admin = authResult.admin;
 
     const results: InviteResult[] = [];
     for (let i = 0; i < data.emails.length; i++) {
+      const existing = await findSentOutreach(admin, {
+        kind: "invite",
+        email: data.emails[i],
+      });
+      if (existing) {
+        results.push({
+          email: data.emails[i],
+          status: "skipped",
+          ok: true,
+          sentAt: existing.createdAt,
+        });
+        continue;
+      }
       if (i > 0) await new Promise((resolve) => setTimeout(resolve, 300));
       const result = await sendInviteEmail(data.emails[i]);
-      results.push({ email: data.emails[i], ok: result.ok, error: result.error });
+      await logOutreach(admin, {
+        email: data.emails[i],
+        kind: "invite",
+        status: result.ok ? "sent" : "failed",
+        error: result.error,
+        sentBy: authResult.adminEmail,
+      });
+      results.push({
+        email: data.emails[i],
+        status: result.ok ? "sent" : "failed",
+        ok: result.ok,
+        error: result.error,
+      });
     }
 
-    const sent = results.filter((r) => r.ok).length;
-    const failed = results.filter((r) => !r.ok).length;
-    return { ok: true as const, sent, failed, results };
+    const sent = results.filter((r) => r.status === "sent").length;
+    const failed = results.filter((r) => r.status === "failed").length;
+    const skipped = results.filter((r) => r.status === "skipped").length;
+    return { ok: true as const, sent, failed, skipped, results };
   });

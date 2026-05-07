@@ -8,6 +8,8 @@ function getResendClient(): Resend | null {
 
 const FROM =
   process.env.RESEND_FROM_EMAIL?.trim() ?? "Mocki <onboarding@resend.dev>";
+const REPLY_TO = process.env.RESEND_REPLY_TO?.trim() ?? "Abhishek <abhishek@send.mocki.dev>";
+const LIST_UNSUBSCRIBE = "<mailto:abhishek@mocki.dev?subject=unsubscribe>";
 
 export async function sendWelcomeEmail(email: string, name: string): Promise<void> {
   const resend = getResendClient();
@@ -317,6 +319,10 @@ mocki.dev`;
     from: FROM,
     to: email,
     subject: `hey ${firstName}, still up for that mock interview?`,
+    replyTo: REPLY_TO,
+    headers: {
+      "List-Unsubscribe": LIST_UNSUBSCRIBE,
+    },
     html,
     text,
   });
@@ -374,6 +380,10 @@ Thought you'd find it useful before your next interview. mocki.dev
     from: FROM,
     to: email,
     subject: "you should try this",
+    replyTo: REPLY_TO,
+    headers: {
+      "List-Unsubscribe": LIST_UNSUBSCRIBE,
+    },
     html,
     text,
   });
