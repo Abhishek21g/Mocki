@@ -347,20 +347,15 @@ export async function sendInviteEmail(email: string): Promise<{ ok: boolean; err
     </p>
 
     <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
-      I built something I think you'd find useful — it's called Mocki. You go in, paste a job description and your resume, and three AI interviewers run a full mock interview with you. Follow-up questions, pushbacks, the whole thing. Takes about 15 minutes.
-    </p>
-
-    <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
-      At the end you get a score, a breakdown of where you did well and where you didn't, and a study plan for what to work on before the real thing.
+      Been working on something called Mocki — it's an AI mock interview that actually feels like a real panel. Three interviewers, reads your resume, asks follow-ups. Takes 15 min.
     </p>
 
     <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#111;">
-      <a href="https://mocki.dev" style="color:#111;font-weight:600;">Try it here →</a>
+      Thought you'd find it useful before your next interview. <a href="https://mocki.dev" style="color:#111;">mocki.dev</a>
     </p>
 
     <p style="margin:0;font-size:15px;line-height:1.7;color:#111;">
-      — Abhishek<br/>
-      <span style="color:#888;font-size:13px;">mocki.dev</span>
+      — Abhishek
     </p>
 
   </div>
@@ -369,19 +364,16 @@ export async function sendInviteEmail(email: string): Promise<{ ok: boolean; err
 
   const text = `Hey,
 
-I built something I think you'd find useful — it's called Mocki. You go in, paste a job description and your resume, and three AI interviewers run a full mock interview with you. Follow-up questions, pushbacks, the whole thing. Takes about 15 minutes.
+Been working on something called Mocki — it's an AI mock interview that actually feels like a real panel. Three interviewers, reads your resume, asks follow-ups. Takes 15 min.
 
-At the end you get a score, a breakdown of where you did well and where you didn't, and a study plan for what to work on before the real thing.
+Thought you'd find it useful before your next interview. mocki.dev
 
-Try it here: https://mocki.dev
-
-— Abhishek
-mocki.dev`;
+— Abhishek`;
 
   const { error } = await resend.emails.send({
     from: FROM,
     to: email,
-    subject: "thought you'd like this",
+    subject: "you should try this",
     html,
     text,
   });
