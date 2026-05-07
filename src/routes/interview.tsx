@@ -12,6 +12,9 @@ import { uploadSessionData } from "@/server/upload.functions";
 import { useKeystrokeTracker } from "@/hooks/useKeystrokeTracker";
 import { useCamRecorder } from "@/hooks/useCamRecorder";
 import { useBehavioralTracker } from "@/hooks/useBehavioralTracker";
+import { useAudioAnalyzer } from "@/hooks/useAudioAnalyzer";
+import { useCameraAnalyzer } from "@/hooks/useCameraAnalyzer";
+import { ConsentModal, type ConsentChoices } from "@/components/interview/ConsentModal";
 import { cn } from "@/lib/utils";
 
 import { TopBar } from "@/components/interview/TopBar";
@@ -58,9 +61,12 @@ function InterviewPage() {
   const avatarVideoElRef = useRef<HTMLVideoElement | null>(null);
   const sinceRef = useRef(0);
   const [camStream, setCamStream] = useState<MediaStream | null>(null);
+  const [consent, setConsent] = useState<ConsentChoices | null>(null);
   const { getPayload: getKeystrokes } = useKeystrokeTracker(!!state.sessionId);
   const { getBlob: getCamBlob } = useCamRecorder(camStream);
-  const { onQuestionShown, onAnswerSubmitted, onKeyDown: onAnswerKeyDown, onPaste: onAnswerPaste, getPayload: getBehavioral } = useBehavioralTracker();
+  const { onQuestionShown, onAnswerSubmitted, onKeyDown: onAnswerKeyDown, onPaste: onAnswerPaste, getPayload: getBehavioral, locationRef } = useBehavioralTracker(consent ?? { microphone: false, camera: false, location: false });
+  const audio = useAudioAnalyzer(consent?.microphone ?? false);
+  const camAnalyzer = useCameraAnalyzer(consent?.camera ?? false, camStream);
 
   const sttProxyUrl = (import.meta.env.VITE_STT_PROXY_URL as string | undefined)?.trim() || "/api/stt";
   const ttsProxyUrl =
@@ -265,11 +271,38 @@ function InterviewPage() {
   }, [state.sessionId]);
 
 
+  // Start consent-gated analyzers once user confirms
+  useEffect(() => {
+    if (!consent) return;
+    if (consent.microphone) void audio.start();
+    if (consent.camera) void camAnalyzer.start();
+    if (consent.location) {
+      navigator.geolocation?.getCurrentPosition(
+        (pos) => {
+          locationRef.current = {
+            lat: Math.round(pos.coords.latitude * 10) / 10,
+            lng: Math.round(pos.coords.longitude * 10) / 10,
+            accuracy: Math.round(pos.coords.accuracy),
+          };
+        },
+        () => {},
+        { timeout: 8000 },
+      );
+    }
+    return () => {
+      audio.stop();
+      camAnalyzer.stop();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [consent]);
+
   // Track question changes for behavioral analytics
   const questionIndexRef = useRef(0);
   useEffect(() => {
     if (!state.currentQuestion) return;
     onQuestionShown(questionIndexRef.current, state.currentQuestion);
+    audio.onQuestionShown(questionIndexRef.current);
+    camAnalyzer.onQuestionShown(questionIndexRef.current);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.currentQuestion]);
 
@@ -295,6 +328,8 @@ function InterviewPage() {
 
       // Record answer for behavioral analytics
       onAnswerSubmitted(questionIndexRef.current, answer);
+      audio.onAnswerSubmitted(questionIndexRef.current);
+      camAnalyzer.onAnswerSubmitted(questionIndexRef.current);
 
       if (res.clarification) {
         store.set({
@@ -340,9 +375,14 @@ function InterviewPage() {
             }).catch((err) => {
               console.error("[upload] keystrokes failed", err);
             });
-            // Fire-and-forget: upload behavioral analytics
+            // Fire-and-forget: upload behavioral analytics (merged with mic + camera)
+            const behavioralPayload = {
+              ...getBehavioral(),
+              microphone: audio.getPayload(),
+              camera: camAnalyzer.getPayload(),
+            };
             uploadSessionData({
-              data: { accessToken, sessionId: sid, type: "behavioral", payload: JSON.stringify(getBehavioral()) },
+              data: { accessToken, sessionId: sid, type: "behavioral", payload: JSON.stringify(behavioralPayload) },
             }).then((r) => {
               console.log("[upload] behavioral", r);
             }).catch((err) => {
@@ -411,6 +451,7 @@ function InterviewPage() {
 
   return (
     <div className="min-h-screen">
+      {consent === null && <ConsentModal onConfirm={setConsent} />}
       <TopBar
         role={setup.role}
         company={setup.company}

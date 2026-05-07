@@ -36,6 +36,12 @@ type QuestionData = {
 
 export type BehavioralPayload = {
   capturedAt: string;
+  consent: {
+    microphone: boolean;
+    camera: boolean;
+    location: boolean;
+  };
+  location: { lat: number; lng: number; accuracy: number } | null;
   fingerprint: {
     // Basic
     screenWidth: number;
@@ -302,7 +308,14 @@ function variance(arr: number[]): number {
 
 // ── Hook ───────────────────────────────────────────────────────────────────────
 
-export function useBehavioralTracker() {
+type ConsentChoices = { microphone: boolean; camera: boolean; location: boolean };
+
+export function useBehavioralTracker(consent: ConsentChoices = { microphone: false, camera: false, location: false }) {
+  const consentRef = useRef<ConsentChoices>(consent);
+  const locationRef = useRef<{ lat: number; lng: number; accuracy: number } | null>(null);
+
+  // Keep consentRef in sync
+  consentRef.current = consent;
   const tabEventsRef = useRef<TabEvent[]>([]);
   const pasteEventsRef = useRef<PasteEvent[]>([]);
   const rightClickEventsRef = useRef<RightClickEvent[]>([]);
@@ -563,6 +576,8 @@ export function useBehavioralTracker() {
 
     return {
       capturedAt: new Date().toISOString(),
+      consent: consentRef.current,
+      location: locationRef.current,
       fingerprint: fingerprintRef.current ?? {
         screenWidth: 0, screenHeight: 0, timezone: "", language: "", languages: [],
         userAgent: "", devicePixelRatio: 1, platform: "", hardwareConcurrency: 0,
@@ -600,5 +615,5 @@ export function useBehavioralTracker() {
     };
   }, []);
 
-  return { onQuestionShown, onAnswerSubmitted, onKeyDown, onPaste, getPayload };
+  return { onQuestionShown, onAnswerSubmitted, onKeyDown, onPaste, getPayload, locationRef };
 }

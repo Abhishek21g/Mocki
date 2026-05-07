@@ -1350,6 +1350,27 @@ function BehavioralSection({ data, loading }: { data: BehavioralPayload | null; 
           {fingerprint.referrer && <FPRow label="Referrer" value={fingerprint.referrer} />}
         </div>
       )}
+
+      {/* Consent + Location */}
+      {data.consent && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 6 }}>CONSENT GIVEN</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            <BPill label="Microphone" value={data.consent.microphone ? "Yes" : "No"} />
+            <BPill label="Camera" value={data.consent.camera ? "Yes" : "No"} />
+            <BPill label="Location" value={data.consent.location ? "Yes" : "No"} />
+            {data.location && (
+              <BPill label="GPS" value={`${data.location.lat}, ${data.location.lng} (±${data.location.accuracy}m)`} />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Microphone data */}
+      <MicrophoneSection mic={(data as any).microphone} />
+
+      {/* Camera data */}
+      <CameraSection cam={(data as any).camera} />
     </div>
   );
 }
@@ -1373,6 +1394,121 @@ function FPRow({ label, value }: { label: string; value: string }) {
     <div style={{ display: "contents" }}>
       <span style={{ color: "var(--text-3)" }}>{label}</span>
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{value}</span>
+    </div>
+  );
+}
+
+function MicrophoneSection({ mic }: { mic: import("@/hooks/useAudioAnalyzer").MicrophonePayload | null | undefined }) {
+  if (!mic) return null;
+  const avgWpm = mic.perQuestion.length
+    ? Math.round(mic.perQuestion.reduce((s, q) => s + q.wpm, 0) / mic.perQuestion.length)
+    : 0;
+  const totalFillers = mic.perQuestion.reduce((s, q) => s + q.fillerWordTotal, 0);
+  const totalSilence = mic.perQuestion.reduce((s, q) => s + q.silencePeriods, 0);
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 6 }}>MICROPHONE ANALYSIS</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+        <BPill label="Speech API" value={mic.speechApiAvailable ? "Available" : "Unavailable"} />
+        <BPill label="Avg WPM" value={avgWpm} />
+        <BPill label="Total Fillers" value={totalFillers} danger={totalFillers > 15} />
+        <BPill label="Total Silence Periods" value={totalSilence} />
+      </div>
+      {mic.perQuestion.length > 0 && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+            <thead>
+              <tr style={{ color: "var(--text-3)", borderBottom: "1px solid var(--border)" }}>
+                {["Q#","WPM","Fillers","Filler/min","Avg Vol","Silence Periods","Silence Time","Speaking Time"].map(h => (
+                  <th key={h} style={{ padding: "3px 8px 3px 0", textAlign: "left", whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {mic.perQuestion.map((q) => (
+                <tr key={q.questionIndex} style={{ borderBottom: "1px solid var(--border-muted, var(--border))" }}>
+                  <td style={{ padding: "4px 8px 4px 0", color: "var(--text-3)" }}>Q{q.questionIndex + 1}</td>
+                  <td style={{ padding: "4px 8px 4px 0" }}>{q.wpm}</td>
+                  <td style={{ padding: "4px 8px 4px 0", color: q.fillerWordTotal > 3 ? "#f87171" : undefined }}>{q.fillerWordTotal}</td>
+                  <td style={{ padding: "4px 8px 4px 0" }}>{q.fillerWordRate}</td>
+                  <td style={{ padding: "4px 8px 4px 0" }}>{q.avgVolume}</td>
+                  <td style={{ padding: "4px 8px 4px 0" }}>{q.silencePeriods}</td>
+                  <td style={{ padding: "4px 8px 4px 0" }}>{fmtMs(q.totalSilenceMs)}</td>
+                  <td style={{ padding: "4px 8px 4px 0" }}>{fmtMs(q.speakingTimeMs)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {/* Per-question transcripts + filler breakdown */}
+      {mic.perQuestion.filter(q => q.transcript).map(q => (
+        <details key={q.questionIndex} style={{ marginTop: 6, fontSize: 11 }}>
+          <summary style={{ cursor: "pointer", color: "var(--text-3)" }}>Q{q.questionIndex + 1} transcript & fillers</summary>
+          <div style={{ marginTop: 4, padding: 8, background: "var(--surface2)", borderRadius: 6 }}>
+            {q.transcript && <p style={{ color: "var(--text-2)", marginBottom: 4 }}>{q.transcript}</p>}
+            {Object.entries(q.fillerWords).filter(([, v]) => v > 0).length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                {Object.entries(q.fillerWords).filter(([, v]) => v > 0).map(([word, count]) => (
+                  <span key={word} style={{ background: "rgba(239,68,68,0.1)", color: "#f87171", borderRadius: 4, padding: "1px 6px" }}>
+                    {word}: {count}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function CameraSection({ cam }: { cam: import("@/hooks/useCameraAnalyzer").CameraPayload | null | undefined }) {
+  if (!cam) return null;
+  const totalFrames = cam.perQuestion.reduce((s, q) => s + q.framesSampled, 0);
+  const totalAwayFrames = cam.perQuestion.reduce((s, q) => s + q.lookingAwayFrames, 0);
+  const totalMultiFrames = cam.perQuestion.reduce((s, q) => s + q.multipleFacesFrames, 0);
+  const awayPct = totalFrames > 0 ? Math.round((totalAwayFrames / totalFrames) * 100) : 0;
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 6 }}>CAMERA ANALYSIS</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+        <BPill label="Face Detector" value={cam.faceDetectorAvailable ? "Available" : "Unavailable"} />
+        <BPill label="Frames Sampled" value={totalFrames} />
+        <BPill label="Looking Away" value={`${awayPct}%`} danger={awayPct > 20} />
+        <BPill label="Multiple Faces" value={totalMultiFrames} danger={totalMultiFrames > 0} />
+      </div>
+      {cam.perQuestion.length > 0 && cam.faceDetectorAvailable && (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+            <thead>
+              <tr style={{ color: "var(--text-3)", borderBottom: "1px solid var(--border)" }}>
+                {["Q#","Frames","Avg Faces","Away Frames","Away %","Multi-Face Frames","Multi-Face %"].map(h => (
+                  <th key={h} style={{ padding: "3px 8px 3px 0", textAlign: "left", whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {cam.perQuestion.map((q) => (
+                <tr key={q.questionIndex} style={{ borderBottom: "1px solid var(--border-muted, var(--border))" }}>
+                  <td style={{ padding: "4px 8px 4px 0", color: "var(--text-3)" }}>Q{q.questionIndex + 1}</td>
+                  <td style={{ padding: "4px 8px 4px 0" }}>{q.framesSampled}</td>
+                  <td style={{ padding: "4px 8px 4px 0" }}>{q.facesDetectedAvg}</td>
+                  <td style={{ padding: "4px 8px 4px 0", color: q.lookingAwayPct > 20 ? "#f87171" : undefined }}>{q.lookingAwayFrames}</td>
+                  <td style={{ padding: "4px 8px 4px 0", color: q.lookingAwayPct > 20 ? "#f87171" : undefined }}>{q.lookingAwayPct}%</td>
+                  <td style={{ padding: "4px 8px 4px 0", color: q.multipleFacesPct > 0 ? "#f87171" : undefined }}>{q.multipleFacesFrames}</td>
+                  <td style={{ padding: "4px 8px 4px 0", color: q.multipleFacesPct > 0 ? "#f87171" : undefined }}>{q.multipleFacesPct}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {!cam.faceDetectorAvailable && (
+        <p style={{ fontSize: 11, color: "var(--text-3)" }}>Face detection API not available in this browser — only frame count recorded.</p>
+      )}
     </div>
   );
 }
