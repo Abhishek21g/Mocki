@@ -1157,81 +1157,94 @@ function UserSessionsDetail({
 // ---------------------------------------------------------------------------
 
 function BehavioralSection({ data, loading }: { data: BehavioralPayload | null; loading: boolean }) {
-  const [expanded, setExpanded] = useState(false);
+  const [fpOpen, setFpOpen] = useState(false);
+  const [rhythmOpen, setRhythmOpen] = useState(false);
 
-  if (loading) {
-    return (
-      <div className="mb-5">
-        <div className="mono mb-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>Behavioral Data</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-2)" }}>
-          <span className="gp-spinner" /> Loading…
-        </div>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="mb-5">
+      <div className="mono mb-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>Behavioral Data</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "var(--text-2)" }}><span className="gp-spinner" /> Loading…</div>
+    </div>
+  );
 
-  if (!data) {
-    return (
-      <div className="mb-5">
-        <div className="mono mb-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>Behavioral Data</div>
-        <div style={{ fontSize: 12, color: "var(--text-3)" }}>No behavioral data — session predates tracking.</div>
-      </div>
-    );
-  }
+  if (!data) return (
+    <div className="mb-5">
+      <div className="mono mb-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>Behavioral Data</div>
+      <div style={{ fontSize: 12, color: "var(--text-3)" }}>No behavioral data — session predates tracking.</div>
+    </div>
+  );
 
-  const { summary, fingerprint, pasteEvents, rightClickEvents, tabEvents, questions } = data;
-  const flagged = summary.totalTabSwitches > 2 || summary.totalPastes > 0;
+  const { summary, fingerprint, pasteEvents, rightClickEvents, tabEvents, questions, copyEvents, selectionEvents, mouseIdlePeriods, mouseClicks } = data;
+  const flags = [
+    summary.totalTabSwitches > 2 && `${summary.totalTabSwitches} tab switches`,
+    summary.totalPastes > 0 && `${summary.totalPastes} paste(s)`,
+    summary.totalCopies > 0 && `${summary.totalCopies} copy event(s)`,
+    summary.totalTimeHiddenMs > 30000 && `${fmtMs(summary.totalTimeHiddenMs)} hidden`,
+    fingerprint.adBlockerDetected && "ad blocker",
+    fingerprint.localIP && fingerprint.localIP.startsWith("10.") && "possible VPN",
+  ].filter(Boolean) as string[];
+
+  const outsideClicks = mouseClicks.filter(c => c.target === "outside").length;
 
   return (
-    <div className="mb-5">
-      <div className="mono mb-2 flex items-center gap-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
-        Behavioral Data
-        {flagged && (
-          <span style={{ background: "rgba(239,68,68,0.15)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, padding: "1px 6px", fontSize: 9, fontWeight: 700 }}>
-            ⚠ FLAGS
-          </span>
-        )}
+    <div className="mb-5" style={{ borderTop: "1px solid var(--border)", paddingTop: 16 }}>
+      {/* Header + flags */}
+      <div className="mono mb-3 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+        Behavioral Analytics
+        {flags.map((f, i) => (
+          <span key={i} style={{ background: "rgba(239,68,68,0.15)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 4, padding: "1px 6px", fontSize: 9, fontWeight: 700 }}>⚠ {f}</span>
+        ))}
       </div>
 
-      {/* Summary stat pills */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+      {/* Summary pills row 1 — cheating signals */}
+      <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 4 }}>CHEATING SIGNALS</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
         <BPill label="Tab Switches" value={summary.totalTabSwitches} danger={summary.totalTabSwitches > 2} />
         <BPill label="Time Hidden" value={fmtMs(summary.totalTimeHiddenMs)} danger={summary.totalTimeHiddenMs > 30000} />
         <BPill label="Pastes" value={summary.totalPastes} danger={summary.totalPastes > 0} />
-        <BPill label="Right Clicks" value={summary.totalRightClicks} />
+        <BPill label="Copies" value={summary.totalCopies} danger={summary.totalCopies > 0} />
+        <BPill label="Right Clicks" value={summary.totalRightClicks} danger={summary.totalRightClicks > 3} />
+        <BPill label="Selections" value={summary.totalSelections} />
+        <BPill label="Clicks Outside Box" value={outsideClicks} danger={outsideClicks > 5} />
+      </div>
+
+      {/* Summary pills row 2 — typing */}
+      <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 4 }}>TYPING BEHAVIOR</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
         <BPill label="Avg WPM" value={summary.avgWpm} />
-        <BPill label="Avg Backspace %" value={`${summary.avgBackspaceRate}%`} />
+        <BPill label="Avg Backspace%" value={`${summary.avgBackspaceRate}%`} danger={summary.avgBackspaceRate > 25} />
+        <BPill label="Mouse Idle" value={fmtMs(summary.totalMouseIdleMs)} />
+        <BPill label="Scroll Events" value={summary.totalScrollEvents} />
+        {fingerprint.adBlockerDetected && <BPill label="Ad Blocker" value="Yes" danger />}
+        {fingerprint.hasVisitedBefore && <BPill label="Return Visitor" value={`Visit #${fingerprint.visitCount + 1}`} />}
       </div>
 
       {/* Per-question table */}
       {questions.length > 0 && (
-        <div style={{ marginBottom: 10 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+        <div style={{ marginBottom: 12, overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, minWidth: 640 }}>
             <thead>
               <tr style={{ color: "var(--text-3)", textAlign: "left", borderBottom: "1px solid var(--border)" }}>
-                <th style={{ padding: "4px 8px 4px 0" }}>Q#</th>
-                <th style={{ padding: "4px 8px" }}>Time to 1st key</th>
-                <th style={{ padding: "4px 8px" }}>WPM</th>
-                <th style={{ padding: "4px 8px" }}>Backspace%</th>
-                <th style={{ padding: "4px 8px" }}>Pauses</th>
-                <th style={{ padding: "4px 8px" }}>Tab Switches</th>
-                <th style={{ padding: "4px 8px" }}>Pastes</th>
-                <th style={{ padding: "4px 8px" }}>Fillers</th>
+                {["Q#","1st Key","WPM","Bksp%","Pauses","Tab Sw","Pastes","Fillers","Correction Bursts","Rhythm σ"].map(h => (
+                  <th key={h} style={{ padding: "3px 8px 3px 0", whiteSpace: "nowrap" }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {questions.map((q) => (
                 <tr key={q.qIdx} style={{ borderBottom: "1px solid var(--border)", color: "var(--text-2)" }}>
-                  <td style={{ padding: "5px 8px 5px 0", fontWeight: 600 }}>{q.qIdx + 1}</td>
-                  <td style={{ padding: "5px 8px", color: q.timeToFirstKeystrokeMs !== null && q.timeToFirstKeystrokeMs > 15000 ? "#fca5a5" : undefined }}>
+                  <td style={{ padding: "4px 8px 4px 0", fontWeight: 700 }}>{q.qIdx + 1}</td>
+                  <td style={{ padding: "4px 8px", color: q.timeToFirstKeystrokeMs !== null && q.timeToFirstKeystrokeMs > 15000 ? "#fca5a5" : undefined }}>
                     {q.timeToFirstKeystrokeMs !== null ? fmtMs(q.timeToFirstKeystrokeMs) : "—"}
                   </td>
-                  <td style={{ padding: "5px 8px" }}>{q.wpm || "—"}</td>
-                  <td style={{ padding: "5px 8px", color: q.backspaceRate > 30 ? "#fca5a5" : undefined }}>{q.backspaceRate}%</td>
-                  <td style={{ padding: "5px 8px" }}>{q.pauseCount > 0 ? `${q.pauseCount} (${fmtMs(q.longestPauseMs)} max)` : "—"}</td>
-                  <td style={{ padding: "5px 8px", color: q.tabSwitchesWhileAnswering > 0 ? "#fca5a5" : undefined }}>{q.tabSwitchesWhileAnswering || "—"}</td>
-                  <td style={{ padding: "5px 8px", color: q.pasteCount > 0 ? "#fca5a5" : undefined }}>{q.pasteCount || "—"}</td>
-                  <td style={{ padding: "5px 8px", color: q.fillerRate > 5 ? "#fca5a5" : undefined }}>{q.fillerRate > 0 ? `${q.fillerRate}%` : "—"}</td>
+                  <td style={{ padding: "4px 8px" }}>{q.wpm || "—"}</td>
+                  <td style={{ padding: "4px 8px", color: q.backspaceRate > 30 ? "#fca5a5" : undefined }}>{q.backspaceRate}%</td>
+                  <td style={{ padding: "4px 8px" }}>{q.pauseCount > 0 ? `${q.pauseCount} (${fmtMs(q.longestPauseMs)})` : "—"}</td>
+                  <td style={{ padding: "4px 8px", color: q.tabSwitchesWhileAnswering > 0 ? "#fca5a5" : undefined }}>{q.tabSwitchesWhileAnswering || "—"}</td>
+                  <td style={{ padding: "4px 8px", color: q.pasteCount > 0 ? "#fca5a5" : undefined }}>{q.pasteCount || "—"}</td>
+                  <td style={{ padding: "4px 8px", color: q.fillerRate > 5 ? "#fca5a5" : undefined }}>{q.fillerRate > 0 ? `${q.fillerRate}%` : "—"}</td>
+                  <td style={{ padding: "4px 8px", color: q.correctionBursts > 2 ? "#fca5a5" : undefined }}>{q.correctionBursts || "—"}</td>
+                  <td style={{ padding: "4px 8px" }}>{q.keystrokeRhythmVariance > 0 ? `${q.keystrokeRhythmVariance}ms²` : "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -1239,56 +1252,102 @@ function BehavioralSection({ data, loading }: { data: BehavioralPayload | null; 
         </div>
       )}
 
-      {/* Paste events detail */}
-      {pasteEvents.length > 0 && (
-        <div style={{ marginBottom: 8, background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, padding: "8px 12px" }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>Paste Events</div>
-          {pasteEvents.map((p, i) => (
-            <div key={i} style={{ fontSize: 11, color: "var(--text-2)" }}>
-              Q{p.qIdx + 1} — pasted {p.pastedLen} chars (had {p.answerLenBefore} chars before)
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Tab switch timeline */}
-      {summary.totalTabSwitches > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Tab switch timeline:</div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {tabEvents.filter(e => e.type === "hidden").map((e, i) => (
-              <span key={i} style={{ fontSize: 10, background: "rgba(239,68,68,0.1)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 4, padding: "1px 6px" }}>
-                Q{e.qIdx + 1}
-              </span>
+      {/* Flagged event details */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
+        {pasteEvents.length > 0 && (
+          <div style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, padding: "8px 12px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>Paste Events</div>
+            {pasteEvents.map((p, i) => (
+              <div key={i} style={{ fontSize: 11, color: "var(--text-2)" }}>Q{p.qIdx + 1} — pasted {p.pastedLen} chars (had {p.answerLenBefore} chars typed)</div>
             ))}
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Device fingerprint — collapsed by default */}
-      <button
-        onClick={() => setExpanded(e => !e)}
-        style={{ fontSize: 11, color: "var(--text-3)", background: "none", border: "none", cursor: "pointer", padding: 0, marginTop: 4 }}
-      >
-        {expanded ? "▲ Hide" : "▼ Show"} device fingerprint
+        {copyEvents.length > 0 && (
+          <div style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, padding: "8px 12px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#f87171", marginBottom: 4 }}>Copy Events</div>
+            {copyEvents.map((c, i) => (
+              <div key={i} style={{ fontSize: 11, color: "var(--text-2)" }}>Q{c.qIdx + 1} — copied: "{c.copiedText}"</div>
+            ))}
+          </div>
+        )}
+
+        {selectionEvents.length > 0 && (
+          <div style={{ background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", borderRadius: 8, padding: "8px 12px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#fbbf24", marginBottom: 4 }}>Text Selections (highlighted question text)</div>
+            {selectionEvents.slice(0, 5).map((s, i) => (
+              <div key={i} style={{ fontSize: 11, color: "var(--text-2)" }}>Q{s.qIdx + 1} — "{s.selectedText}"</div>
+            ))}
+            {selectionEvents.length > 5 && <div style={{ fontSize: 11, color: "var(--text-3)" }}>+{selectionEvents.length - 5} more</div>}
+          </div>
+        )}
+
+        {summary.totalTabSwitches > 0 && (
+          <div>
+            <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>Tab switches by question:</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              {tabEvents.filter(e => e.type === "hidden").map((e, i) => (
+                <span key={i} style={{ fontSize: 10, background: "rgba(239,68,68,0.1)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 4, padding: "1px 6px" }}>Q{e.qIdx + 1}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {mouseIdlePeriods.length > 0 && (
+          <div style={{ fontSize: 11, color: "var(--text-3)" }}>
+            Mouse idle periods: {mouseIdlePeriods.map((m, i) => `Q${m.qIdx + 1} (${fmtMs(m.duration)})`).join(", ")}
+          </div>
+        )}
+
+        {rightClickEvents.length > 0 && (
+          <div style={{ fontSize: 11, color: "var(--text-3)" }}>
+            Right-clicks: {rightClickEvents.map(r => `Q${r.qIdx + 1}`).join(", ")}
+          </div>
+        )}
+      </div>
+
+      {/* Typing rhythm (collapsible) */}
+      <button onClick={() => setRhythmOpen(o => !o)} style={{ fontSize: 11, color: "var(--text-3)", background: "none", border: "none", cursor: "pointer", padding: 0, marginBottom: 4 }}>
+        {rhythmOpen ? "▲ Hide" : "▼ Show"} keystroke rhythm intervals
       </button>
-      {expanded && (
-        <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "2px 16px", fontSize: 11, color: "var(--text-2)" }}>
+      {rhythmOpen && questions.map(q => q.interKeystrokeIntervals.length > 0 && (
+        <div key={q.qIdx} style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 10, color: "var(--text-3)", marginBottom: 2 }}>Q{q.qIdx + 1} intervals (ms) — avg {q.avgInterKeystrokeMs}ms</div>
+          <div style={{ fontSize: 10, color: "var(--text-2)", wordBreak: "break-all", lineHeight: 1.6 }}>
+            {q.interKeystrokeIntervals.slice(0, 60).join(" · ")}
+            {q.interKeystrokeIntervals.length > 60 && ` … +${q.interKeystrokeIntervals.length - 60} more`}
+          </div>
+        </div>
+      ))}
+
+      {/* Device fingerprint (collapsible) */}
+      <button onClick={() => setFpOpen(o => !o)} style={{ fontSize: 11, color: "var(--text-3)", background: "none", border: "none", cursor: "pointer", padding: "4px 0 0" }}>
+        {fpOpen ? "▲ Hide" : "▼ Show"} device fingerprint
+      </button>
+      {fpOpen && (
+        <div style={{ marginTop: 6, display: "grid", gridTemplateColumns: "140px 1fr", gap: "3px 12px", fontSize: 11, color: "var(--text-2)" }}>
           <FPRow label="Screen" value={`${fingerprint.screenWidth}×${fingerprint.screenHeight} @${fingerprint.devicePixelRatio}x`} />
           <FPRow label="Timezone" value={fingerprint.timezone} />
-          <FPRow label="Language" value={fingerprint.language} />
+          <FPRow label="Languages" value={(fingerprint.languages ?? [fingerprint.language]).join(", ")} />
           <FPRow label="Platform" value={fingerprint.platform} />
-          <FPRow label="CPU cores" value={String(fingerprint.hardwareConcurrency)} />
-          <FPRow label="Color depth" value={`${fingerprint.colorDepth}-bit`} />
-          <FPRow label="Browser" value={fingerprint.userAgent.slice(0, 60) + "…"} />
+          <FPRow label="CPU Cores" value={String(fingerprint.hardwareConcurrency)} />
+          <FPRow label="RAM" value={fingerprint.deviceMemory != null ? `${fingerprint.deviceMemory} GB` : "—"} />
+          <FPRow label="Color Depth" value={`${fingerprint.colorDepth}-bit`} />
+          <FPRow label="Touch Points" value={String(fingerprint.touchPoints)} />
+          <FPRow label="Dark Mode" value={fingerprint.darkMode ? "Yes" : "No"} />
+          <FPRow label="Reduced Motion" value={fingerprint.reducedMotion ? "Yes" : "No"} />
+          <FPRow label="Do Not Track" value={fingerprint.doNotTrack ?? "unset"} />
+          <FPRow label="Ad Blocker" value={fingerprint.adBlockerDetected ? "Detected" : "No"} />
+          <FPRow label="PDF Viewer" value={fingerprint.pdfViewerEnabled ? "Yes" : "No"} />
+          <FPRow label="Local IP" value={fingerprint.localIP ?? "—"} />
+          <FPRow label="Visit Count" value={`#${(fingerprint.visitCount ?? 0) + 1}${fingerprint.hasVisitedBefore ? " (return)" : " (new)"}`} />
+          {fingerprint.connection && <FPRow label="Network" value={`${fingerprint.connection.effectiveType} / ${fingerprint.connection.downlink}Mbps / ${fingerprint.connection.rtt}ms RTT`} />}
+          {fingerprint.battery && <FPRow label="Battery" value={`${fingerprint.battery.level}% ${fingerprint.battery.charging ? "⚡charging" : ""}`} />}
+          {fingerprint.webgl && <FPRow label="GPU" value={fingerprint.webgl.renderer} />}
+          {fingerprint.detectedFonts && fingerprint.detectedFonts.length > 0 && <FPRow label="Fonts" value={fingerprint.detectedFonts.join(", ")} />}
+          {fingerprint.canvasFingerprint && <FPRow label="Canvas FP" value={fingerprint.canvasFingerprint} />}
+          <FPRow label="Browser" value={fingerprint.userAgent.slice(0, 80)} />
           {fingerprint.referrer && <FPRow label="Referrer" value={fingerprint.referrer} />}
-        </div>
-      )}
-
-      {/* Right click log */}
-      {rightClickEvents.length > 0 && (
-        <div style={{ marginTop: 6, fontSize: 11, color: "var(--text-3)" }}>
-          Right-clicks: {rightClickEvents.map((r, i) => `Q${r.qIdx + 1}`).join(", ")}
         </div>
       )}
     </div>
