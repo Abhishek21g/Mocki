@@ -353,11 +353,19 @@ export async function sendInviteEmail(email: string): Promise<{ ok: boolean; err
     </p>
 
     <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
-      Been working on something called Mocki — it's an AI mock interview that actually feels like a real panel. Three interviewers, reads your resume, asks follow-ups. Takes 15 min.
+      I built something called Mocki for interview prep. It reads your resume, looks at the job description, then runs a 15 min mock interview with three AI interviewers who ask follow-ups.
+    </p>
+
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
+      The useful part is the debrief after: score, weak spots, and what to practice next.
+    </p>
+
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
+      Try one here: <a href="https://mocki.dev" style="color:#111;">mocki.dev</a>
     </p>
 
     <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#111;">
-      Thought you'd find it useful before your next interview. <a href="https://mocki.dev" style="color:#111;">mocki.dev</a>
+      Also, if you have an interview coming up, reply with the role/company and I'll tell you what kind of mock round to run first.
     </p>
 
     <p style="margin:0;font-size:15px;line-height:1.7;color:#111;">
@@ -370,16 +378,20 @@ export async function sendInviteEmail(email: string): Promise<{ ok: boolean; err
 
   const text = `Hey,
 
-Been working on something called Mocki — it's an AI mock interview that actually feels like a real panel. Three interviewers, reads your resume, asks follow-ups. Takes 15 min.
+I built something called Mocki for interview prep. It reads your resume, looks at the job description, then runs a 15 min mock interview with three AI interviewers who ask follow-ups.
 
-Thought you'd find it useful before your next interview. mocki.dev
+The useful part is the debrief after: score, weak spots, and what to practice next.
+
+Try one here: https://mocki.dev
+
+Also, if you have an interview coming up, reply with the role/company and I'll tell you what kind of mock round to run first.
 
 — Abhishek`;
 
   const { error } = await resend.emails.send({
     from: FROM,
     to: email,
-    subject: "you should try this",
+    subject: "quick thing for interview prep",
     replyTo: REPLY_TO,
     headers: {
       "List-Unsubscribe": LIST_UNSUBSCRIBE,
