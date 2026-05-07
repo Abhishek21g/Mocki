@@ -33,6 +33,7 @@ export type MicrophonePayload = {
   consent: true;
   speechApiAvailable: boolean;
   perQuestion: QuestionMicData[];
+  postInterview: QuestionMicData | null;
 };
 
 function variance(nums: number[]): number {
@@ -66,6 +67,7 @@ export function useAudioAnalyzer(enabled: boolean) {
   const fillerCountsRef = useRef<Record<string, number>>({});
 
   const perQuestionRef = useRef<QuestionMicData[]>([]);
+  const postInterviewRef = useRef<QuestionMicData | null>(null);
 
   function flushQuestion() {
     const samples = volumeSamplesRef.current;
@@ -139,12 +141,66 @@ export function useAudioAnalyzer(enabled: boolean) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const startPostInterview = useCallback((durationMs = 30000) => {
+    if (!enabled) return;
+    // Reset accumulators for post-interview segment
+    volumeSamplesRef.current = [];
+    maxVolumeRef.current = 0;
+    silenceStartRef.current = null;
+    silenceCountRef.current = 0;
+    totalSilenceMsRef.current = 0;
+    speakingStartRef.current = null;
+    speakingMsRef.current = 0;
+    transcriptRef.current = "";
+    wordCountRef.current = 0;
+    fillerCountsRef.current = {};
+    questionStartRef.current = Date.now();
+
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch { /* noop */ }
+      try { recognitionRef.current.start(); } catch { /* noop */ }
+    }
+
+    // After duration, flush into postInterview and stop mic
+    setTimeout(() => {
+      const samples = volumeSamplesRef.current;
+      const avgVol = samples.length > 0 ? samples.reduce((a, b) => a + b, 0) / samples.length : 0;
+      const now = Date.now();
+      const elapsed = now - questionStartRef.current;
+      if (speakingStartRef.current) {
+        speakingMsRef.current += now - speakingStartRef.current;
+        speakingStartRef.current = null;
+      }
+      const fillerTotal = Object.values(fillerCountsRef.current).reduce((a, b) => a + b, 0);
+      const wpm = speakingMsRef.current > 0 ? Math.round((wordCountRef.current / speakingMsRef.current) * 60000) : 0;
+      postInterviewRef.current = {
+        questionIndex: -1,
+        wpm,
+        fillerWords: { ...fillerCountsRef.current },
+        fillerWordTotal: fillerTotal,
+        fillerWordRate: elapsed > 0 ? Math.round((fillerTotal / elapsed) * 60000) : 0,
+        avgVolume: Math.round(avgVol * 1000) / 1000,
+        maxVolume: Math.round(maxVolumeRef.current * 1000) / 1000,
+        silencePeriods: silenceCountRef.current,
+        totalSilenceMs: totalSilenceMsRef.current,
+        speakingTimeMs: speakingMsRef.current,
+        transcript: transcriptRef.current.trim(),
+      };
+      // Stop mic after capturing
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      try { recognitionRef.current?.abort(); } catch { /* noop */ }
+      audioCtxRef.current?.close().catch(() => {});
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    }, durationMs);
+  }, [enabled]);
+
   const getPayload = useCallback((): MicrophonePayload | null => {
     if (!enabled) return null;
     return {
       consent: true,
       speechApiAvailable: speechApiAvailableRef.current,
       perQuestion: perQuestionRef.current,
+      postInterview: postInterviewRef.current,
     };
   }, [enabled]);
 
@@ -242,5 +298,5 @@ export function useAudioAnalyzer(enabled: boolean) {
     streamRef.current?.getTracks().forEach((t) => t.stop());
   }, []);
 
-  return { start, stop, onQuestionShown, onAnswerSubmitted, getPayload };
+  return { start, stop, onQuestionShown, onAnswerSubmitted, getPayload, startPostInterview };
 }

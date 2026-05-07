@@ -33,12 +33,14 @@ export function AgentPanel({
   open,
   totalTurns,
   sessionId,
+  onClose,
 }: {
   events: AgentEvent[];
   mode: "inline" | "drawer";
   open: boolean;
   totalTurns: number;
   sessionId: string | null;
+  onClose?: () => void;
 }) {
   if (!open) return null;
 
@@ -102,6 +104,15 @@ export function AgentPanel({
             />
             LIVE
           </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-3)", fontSize: 20, lineHeight: 1, padding: "2px 6px" }}
+              title="Close"
+            >
+              ×
+            </button>
+          )}
         </div>
       </div>
       <AgentDashboard events={events} totalTurns={totalTurns} variant={mode} />

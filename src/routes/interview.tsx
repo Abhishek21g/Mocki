@@ -15,6 +15,7 @@ import { useBehavioralTracker } from "@/hooks/useBehavioralTracker";
 import { useAudioAnalyzer } from "@/hooks/useAudioAnalyzer";
 import { useCameraAnalyzer } from "@/hooks/useCameraAnalyzer";
 import { ConsentModal, type ConsentChoices } from "@/components/interview/ConsentModal";
+import { TutorialOverlay, shouldShowTutorial } from "@/components/interview/TutorialOverlay";
 import { cn } from "@/lib/utils";
 
 import { TopBar } from "@/components/interview/TopBar";
@@ -62,10 +63,12 @@ function InterviewPage() {
   const sinceRef = useRef(0);
   const [camStream, setCamStream] = useState<MediaStream | null>(null);
   const [consent, setConsent] = useState<ConsentChoices | null>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
   const { getPayload: getKeystrokes } = useKeystrokeTracker(!!state.sessionId);
   const { getBlob: getCamBlob } = useCamRecorder(camStream);
   const { onQuestionShown, onAnswerSubmitted, onKeyDown: onAnswerKeyDown, onPaste: onAnswerPaste, getPayload: getBehavioral, locationRef } = useBehavioralTracker(consent ?? { microphone: false, camera: false, location: false });
   const audio = useAudioAnalyzer(consent?.microphone ?? false);
+  const audioStoppedRef = useRef(false);
   const camAnalyzer = useCameraAnalyzer(consent?.camera ?? false, camStream);
 
   const sttProxyUrl = (import.meta.env.VITE_STT_PROXY_URL as string | undefined)?.trim() || "/api/stt";
@@ -369,6 +372,15 @@ function InterviewPage() {
           });
           store.set({ report });
 
+          // Start 30s post-interview mic capture, then stop
+          if (consent?.microphone && !audioStoppedRef.current) {
+            audioStoppedRef.current = true;
+            audio.startPostInterview(30000);
+          } else if (!audioStoppedRef.current) {
+            audioStoppedRef.current = true;
+            audio.stop();
+          }
+
           if (accessToken && state.sessionId) {
             const sid = state.sessionId;
             // Fire-and-forget: upload keystrokes
@@ -379,19 +391,21 @@ function InterviewPage() {
             }).catch((err) => {
               console.error("[upload] keystrokes failed", err);
             });
-            // Fire-and-forget: upload behavioral analytics (merged with mic + camera)
-            const behavioralPayload = {
-              ...getBehavioral(),
-              microphone: audio.getPayload(),
-              camera: camAnalyzer.getPayload(),
-            };
-            uploadSessionData({
-              data: { accessToken, sessionId: sid, type: "behavioral", payload: JSON.stringify(behavioralPayload) },
-            }).then((r) => {
-              console.log("[upload] behavioral", r);
-            }).catch((err) => {
-              console.error("[upload] behavioral failed", err);
-            });
+            // Upload behavioral after 31s so post-interview mic segment is captured
+            setTimeout(() => {
+              const behavioralPayload = {
+                ...getBehavioral(),
+                microphone: audio.getPayload(),
+                camera: camAnalyzer.getPayload(),
+              };
+              uploadSessionData({
+                data: { accessToken, sessionId: sid, type: "behavioral", payload: JSON.stringify(behavioralPayload) },
+              }).then((r) => {
+                console.log("[upload] behavioral", r);
+              }).catch((err) => {
+                console.error("[upload] behavioral failed", err);
+              });
+            }, consent?.microphone ? 31000 : 0);
             // Fire-and-forget: upload cam recording via server route (avoids CORS)
             getCamBlob().then(async (result) => {
               console.log("[upload] cam blob", result ? `${result.mimeType} ${result.blob.size}b` : camStream ? "no chunks (camera on but empty)" : "no stream (camera was off)");
@@ -455,7 +469,12 @@ function InterviewPage() {
 
   return (
     <div className="min-h-screen">
-      {consent === null && <ConsentModal onConfirm={setConsent} />}
+      {consent === null && (
+        <ConsentModal onConfirm={(c) => { setConsent(c); setShowTutorial(shouldShowTutorial()); }} />
+      )}
+      {showTutorial && consent !== null && (
+        <TutorialOverlay onDone={() => setShowTutorial(false)} />
+      )}
       <TopBar
         role={setup.role}
         company={setup.company}
@@ -663,10 +682,11 @@ function InterviewPage() {
       {showDrawerAgents && (
         <AgentPanel
           events={events}
-          mode={isMobile ? "drawer" : "drawer"}
+          mode="drawer"
           open
           totalTurns={state.totalRounds}
           sessionId={state.sessionId}
+          onClose={() => setShowAgents(false)}
         />
       )}
 
