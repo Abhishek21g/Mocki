@@ -146,6 +146,7 @@ function InterviewPage() {
   }
 
   useEffect(() => {
+    if (consent === null) return; // don't speak until user dismisses consent modal
     if (!ttsEnabled || avatarEnabled) {
       ttsRef.current?.stop();
       // Keep lastSuccessfullySpokenKeyRef populated so re-enabling doesn't replay the
@@ -193,6 +194,7 @@ function InterviewPage() {
       cancelled = true;
     };
   }, [
+    consent,
     ttsEnabled,
     avatarEnabled,
     currentQuestion,
@@ -206,6 +208,7 @@ function InterviewPage() {
   // Avatar auto-speak: when avatarEnabled, fetch+play the lip-synced video
   // and suppress the plain TTS so audio doesn't play twice.
   useEffect(() => {
+    if (consent === null) return; // don't speak until user dismisses consent modal
     if (!avatarEnabled) {
       avatarRef.current?.stop();
       return;
@@ -236,6 +239,7 @@ function InterviewPage() {
       cancelled = true;
     };
   }, [
+    consent,
     avatarEnabled,
     currentQuestion,
     activeInterviewerId,
