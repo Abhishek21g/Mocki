@@ -2,10 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { createSupabaseAdminClient, getUserIdForToken } from "./supabase.server";
 import { getPresignedGetUrl, objectExists, downloadJson } from "./spaces.server";
-import { sendCheckInEmail } from "./email.server";
+import { sendCheckInEmail, sendInviteEmail } from "./email.server";
 import type { InterviewSessionPayload } from "./history.server";
 
-const ADMIN_EMAIL = "enaguthiabhishek@gmail.com";
+const ADMIN_EMAILS = ["enaguthiabhishek@gmail.com", "muralikinti@gmail.com"];
 
 const TokenSchema = z.object({ accessToken: z.string().min(10).max(8000) });
 const SessionDetailSchema = z.object({
@@ -160,7 +160,7 @@ async function verifyAdminAccess(
 
   const { data: userRecord, error: userError } = await admin.auth.admin.getUserById(userId);
   if (userError || !userRecord?.user) return { ok: false, reason: "unauthorized" };
-  if (userRecord.user.email !== ADMIN_EMAIL) return { ok: false, reason: "unauthorized" };
+  if (!ADMIN_EMAILS.includes(userRecord.user.email ?? "")) return { ok: false, reason: "unauthorized" };
 
   return { ok: true, admin };
 }
@@ -479,15 +479,47 @@ export const sendAdminCheckInEmails = createServerFn({ method: "POST" })
     const targetUsers = (usersData?.users ?? []).filter((u) => data.userIds.includes(u.id));
 
     const results: CheckInResult[] = [];
-    for (const user of targetUsers) {
+    for (let i = 0; i < targetUsers.length; i++) {
+      const user = targetUsers[i];
       const email = user.email;
       if (!email) { results.push({ userId: user.id, email: "—", ok: false, error: "no email" }); continue; }
       const name =
         (user.user_metadata?.full_name as string | undefined) ??
         (user.user_metadata?.name as string | undefined) ??
         email.split("@")[0];
+      // Throttle: 300ms between sends to stay under Resend's rate limit
+      if (i > 0) await new Promise((resolve) => setTimeout(resolve, 300));
       const result = await sendCheckInEmail(email, name);
       results.push({ userId: user.id, email, ok: result.ok, error: result.error });
+    }
+
+    const sent = results.filter((r) => r.ok).length;
+    const failed = results.filter((r) => !r.ok).length;
+    return { ok: true as const, sent, failed, results };
+  });
+
+const InviteSchema = z.object({
+  accessToken: z.string().min(10).max(8000),
+  emails: z.array(z.string().email()).min(1).max(200),
+});
+
+export type InviteResult = {
+  email: string;
+  ok: boolean;
+  error?: string;
+};
+
+export const sendAdminInviteEmails = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => InviteSchema.parse(d))
+  .handler(async ({ data }) => {
+    const authResult = await verifyAdminAccess(data.accessToken);
+    if (!authResult.ok) return { ok: false as const, reason: authResult.reason, results: [] };
+
+    const results: InviteResult[] = [];
+    for (let i = 0; i < data.emails.length; i++) {
+      if (i > 0) await new Promise((resolve) => setTimeout(resolve, 300));
+      const result = await sendInviteEmail(data.emails[i]);
+      results.push({ email: data.emails[i], ok: result.ok, error: result.error });
     }
 
     const sent = results.filter((r) => r.ok).length;

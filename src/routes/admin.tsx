@@ -1,4 +1,4 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { useSupabaseAuth } from "@/lib/supabase-context";
@@ -8,11 +8,13 @@ import {
   fetchAdminRecordingUrl,
   fetchAdminBehavioral,
   sendAdminCheckInEmails,
+  sendAdminInviteEmails,
   type AdminSession,
   type AdminStats,
   type AdminUser,
   type ScoreDistributionBucket,
   type CheckInResult,
+  type InviteResult,
 } from "@/server/admin.functions";
 import type { BehavioralPayload } from "@/hooks/useBehavioralTracker";
 
@@ -23,14 +25,14 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
-const ADMIN_EMAIL = "enaguthiabhishek@gmail.com";
+const ADMIN_EMAILS = ["enaguthiabhishek@gmail.com", "muralikinti@gmail.com"];
 
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 function AdminPage() {
-  const { status, user, getAccessToken } = useSupabaseAuth();
+  const { status, user, getAccessToken, signInWithGoogle } = useSupabaseAuth();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,7 +58,7 @@ function AdminPage() {
 
   useEffect(() => {
     if (status !== "ready") return;
-    if (!user || user.email !== ADMIN_EMAIL) return;
+    if (!user || !ADMIN_EMAILS.includes(user.email ?? "")) return;
     load();
   }, [status, user, load]);
 
@@ -70,8 +72,21 @@ function AdminPage() {
     );
   }
 
-  if (status === "ready" && (!user || user.email !== ADMIN_EMAIL)) {
-    return <Navigate to="/" />;
+  if (status === "ready" && !user) {
+    return <AdminLoginPage signInWithGoogle={signInWithGoogle} />;
+  }
+
+  if (status === "ready" && user && !ADMIN_EMAILS.includes(user.email ?? "")) {
+    return (
+      <div className="grid-bg flex min-h-screen items-center justify-center px-5">
+        <div className="fade-up text-center">
+          <HomeLogo className="text-4xl font-extrabold tracking-tight" />
+          <p className="mt-4 text-sm" style={{ color: "var(--text-3)" }}>
+            {user.email} is not authorised to access this page.
+          </p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -256,7 +271,67 @@ function AdminPage() {
             </section>
           </>
         )}
+
+        {/* ── Invites — shown as soon as page loads, no stats needed ── */}
+        <section className="fade-up mt-8">
+          <InviteSection accessToken={getAccessToken() ?? ""} />
+        </section>
       </main>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Admin login page
+// ---------------------------------------------------------------------------
+
+function AdminLoginPage({ signInWithGoogle }: { signInWithGoogle: () => Promise<void> }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleGoogle() {
+    setLoading(true);
+    try {
+      // Store intended destination — auth callback reads this after sign-in
+      sessionStorage.setItem("auth:next", "/admin");
+      await signInWithGoogle();
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="grid-bg flex min-h-screen items-center justify-center px-5">
+      <div className="fade-up w-full max-w-sm text-center">
+        <HomeLogo className="text-4xl font-extrabold tracking-tight" />
+        <p className="mt-2 mb-1 text-xs uppercase tracking-widest mono" style={{ color: "var(--green)" }}>
+          Admin
+        </p>
+        <p className="mb-8 text-sm" style={{ color: "var(--text-3)" }}>
+          Sign in with an authorised account to continue.
+        </p>
+
+        <div className="gp-card p-8" style={{ boxShadow: "0 0 40px rgba(118,185,0,0.08)" }}>
+          <button
+            className="gp-btn w-full"
+            disabled={loading}
+            onClick={handleGoogle}
+          >
+            {loading ? (
+              <><span className="gp-spinner" /> Signing in…</>
+            ) : (
+              <>
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
+                  <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
+                  <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"/>
+                  <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
+                  <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
+                </svg>
+                Continue with Google
+              </>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1493,7 +1568,14 @@ function OutreachSection({ users, accessToken }: { users: AdminUser[]; accessTok
                       {result ? (
                         result.ok
                           ? <span style={{ color: "#86efac", fontSize: 11 }}>✓ Sent</span>
-                          : <span style={{ color: "#f87171", fontSize: 11 }}>✗ Failed</span>
+                          : (
+                            <span
+                              title={result.error ?? "unknown error"}
+                              style={{ color: "#f87171", fontSize: 11, cursor: "help", borderBottom: "1px dotted #f87171" }}
+                            >
+                              ✗ Failed{result.error ? ` — ${result.error.length > 40 ? result.error.slice(0, 40) + "…" : result.error}` : ""}
+                            </span>
+                          )
                       ) : (
                         <span style={{ color: "var(--text-3)", fontSize: 11 }}>Not sent</span>
                       )}
@@ -1515,6 +1597,121 @@ function OutreachSection({ users, accessToken }: { users: AdminUser[]; accessTok
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Invite section
+// ---------------------------------------------------------------------------
+
+function InviteSection({ accessToken }: { accessToken: string }) {
+  const [raw, setRaw] = useState("srijapalla1960@gmail.com\ndhaya.nadhana@gmail.com");
+  const [sending, setSending] = useState(false);
+  const [results, setResults] = useState<InviteResult[] | null>(null);
+
+  const emails = raw
+    .split(/[\n,\s]+/)
+    .map((e) => e.trim())
+    .filter((e) => e.includes("@"));
+
+  async function handleSend() {
+    if (!emails.length || sending) return;
+    setSending(true);
+    setResults(null);
+    try {
+      const res = await sendAdminInviteEmails({ data: { accessToken, emails } }) as any;
+      setResults(res.results ?? []);
+    } catch (e) {
+      console.error("[invites] send failed", e);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div>
+      <div
+        className="mono mb-4 flex items-center justify-between text-[11px] uppercase tracking-wider"
+        style={{ color: "var(--text-3)" }}
+      >
+        <span>Invites</span>
+        <button
+          onClick={handleSend}
+          disabled={sending || emails.length === 0}
+          style={{
+            fontSize: 11, padding: "4px 14px", borderRadius: 6, border: "none",
+            background: emails.length === 0 ? "var(--surface3)" : "var(--green)",
+            color: emails.length === 0 ? "var(--text-3)" : "#000",
+            cursor: emails.length === 0 ? "default" : "pointer",
+            fontWeight: 700, textTransform: "none", letterSpacing: 0,
+          }}
+        >
+          {sending ? "Sending…" : `Send invite to ${emails.length}`}
+        </button>
+      </div>
+
+      <div className="gp-card p-5">
+        <p className="mb-3 text-xs" style={{ color: "var(--text-3)" }}>
+          One email per line, or comma-separated. These people haven't signed up yet — they'll get a personal invite from you.
+        </p>
+        <textarea
+          value={raw}
+          onChange={(e) => { setRaw(e.target.value); setResults(null); }}
+          rows={5}
+          placeholder="friend@example.com&#10;another@example.com"
+          style={{
+            width: "100%", boxSizing: "border-box", resize: "vertical",
+            background: "var(--surface2)", border: "1px solid var(--border)",
+            borderRadius: 8, padding: "10px 12px", fontSize: 13,
+            color: "var(--text)", fontFamily: "inherit", outline: "none",
+          }}
+        />
+
+        {/* Parsed preview */}
+        {emails.length > 0 && !results && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {emails.map((e) => (
+              <span
+                key={e}
+                className="mono text-[11px] rounded-full px-2.5 py-0.5"
+                style={{ background: "var(--surface3)", border: "1px solid var(--border)", color: "var(--text-2)" }}
+              >
+                {e}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Results */}
+        {results && (
+          <div className="mt-4 flex flex-col gap-2">
+            {results.map((r) => (
+              <div key={r.email} className="flex items-center justify-between gap-3 text-sm">
+                <span style={{ color: "var(--text-2)" }}>{r.email}</span>
+                {r.ok ? (
+                  <span style={{ color: "#86efac", fontSize: 11, whiteSpace: "nowrap" }}>✓ Sent</span>
+                ) : (
+                  <span
+                    title={r.error}
+                    style={{ color: "#f87171", fontSize: 11, whiteSpace: "nowrap", cursor: "help", borderBottom: "1px dotted #f87171" }}
+                  >
+                    ✗ Failed{r.error ? ` — ${r.error.length > 40 ? r.error.slice(0, 40) + "…" : r.error}` : ""}
+                  </span>
+                )}
+              </div>
+            ))}
+            <div className="mt-2 text-xs" style={{ color: "var(--text-3)" }}>
+              ✓ {results.filter((r) => r.ok).length} sent
+              {results.filter((r) => !r.ok).length > 0 && (
+                <span style={{ color: "#f87171", marginLeft: 10 }}>
+                  ✗ {results.filter((r) => !r.ok).length} failed
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

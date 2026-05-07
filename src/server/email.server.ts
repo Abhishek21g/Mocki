@@ -328,3 +328,68 @@ mocki.dev`;
   console.log(`[email] check-in sent to ${email}`);
   return { ok: true };
 }
+
+export async function sendInviteEmail(email: string): Promise<{ ok: boolean; error?: string }> {
+  const resend = getResendClient();
+  if (!resend) return { ok: false, error: "RESEND_API_KEY not set" };
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111111;">
+  <div style="max-width:520px;margin:40px auto;padding:0 24px;">
+
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#111;">
+      Hey,
+    </p>
+
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
+      I built something I think you'd find useful — it's called Mocki. You go in, paste a job description and your resume, and three AI interviewers run a full mock interview with you. Follow-up questions, pushbacks, the whole thing. Takes about 15 minutes.
+    </p>
+
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
+      At the end you get a score, a breakdown of where you did well and where you didn't, and a study plan for what to work on before the real thing.
+    </p>
+
+    <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#111;">
+      <a href="https://mocki.dev" style="color:#111;font-weight:600;">Try it here →</a>
+    </p>
+
+    <p style="margin:0;font-size:15px;line-height:1.7;color:#111;">
+      — Abhishek<br/>
+      <span style="color:#888;font-size:13px;">mocki.dev</span>
+    </p>
+
+  </div>
+</body>
+</html>`;
+
+  const text = `Hey,
+
+I built something I think you'd find useful — it's called Mocki. You go in, paste a job description and your resume, and three AI interviewers run a full mock interview with you. Follow-up questions, pushbacks, the whole thing. Takes about 15 minutes.
+
+At the end you get a score, a breakdown of where you did well and where you didn't, and a study plan for what to work on before the real thing.
+
+Try it here: https://mocki.dev
+
+— Abhishek
+mocki.dev`;
+
+  const { error } = await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: "thought you'd like this",
+    html,
+    text,
+  });
+
+  if (error) {
+    console.error("[email] invite failed:", email, error);
+    return { ok: false, error: String(error) };
+  }
+  console.log(`[email] invite sent to ${email}`);
+  return { ok: true };
+}

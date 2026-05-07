@@ -22,7 +22,10 @@ export async function getBrowserSupabase(): Promise<SupabaseClient | null> {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: true,
+        // We handle the PKCE code exchange explicitly in /auth/callback.
+        // Leaving detectSessionInUrl: true causes a double-exchange (client
+        // auto-exchanges the code, then our callback tries again → error).
+        detectSessionInUrl: false,
       },
     });
     return cachedClient;

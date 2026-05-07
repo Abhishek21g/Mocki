@@ -3,13 +3,13 @@ import { useEffect, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase-client";
 import { maybeSendWelcomeEmail } from "@/server/welcome.functions";
 
-const ALLOWED_POST_AUTH_PATHS = new Set(["/", "/history", "/interview", "/report"]);
+const ALLOWED_POST_AUTH_PATHS = new Set(["/", "/history", "/interview", "/report", "/admin"]);
 
 function normalizeNextPath(rawNext: string | null) {
   if (!rawNext) return "/" as const;
   if (!rawNext.startsWith("/") || rawNext.startsWith("//")) return "/" as const;
   if (!ALLOWED_POST_AUTH_PATHS.has(rawNext)) return "/" as const;
-  return rawNext as "/" | "/history" | "/interview" | "/report";
+  return rawNext as "/" | "/history" | "/interview" | "/report" | "/admin";
 }
 
 export const Route = createFileRoute("/auth/callback")({
@@ -59,7 +59,10 @@ function AuthCallback() {
             await maybeSendWelcomeEmail({ data: { accessToken } }).catch(() => undefined);
           }
 
-          const next = normalizeNextPath(url.searchParams.get("next"));
+          // Check sessionStorage first (set by admin login page), then URL param
+          const storedNext = sessionStorage.getItem("auth:next");
+          if (storedNext) sessionStorage.removeItem("auth:next");
+          const next = normalizeNextPath(storedNext ?? url.searchParams.get("next"));
           navigate({ to: next });
         }
       } catch (err) {
