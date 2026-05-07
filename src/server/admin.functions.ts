@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { createSupabaseAdminClient, getUserIdForToken } from "./supabase.server";
+import { getPresignedGetUrl, objectExists } from "./spaces.server";
 import type { InterviewSessionPayload } from "./history.server";
 
 const ADMIN_EMAIL = "enaguthiabhishek@gmail.com";
@@ -419,4 +420,28 @@ export const fetchAdminSession = createServerFn({ method: "POST" })
     };
 
     return { ok: true as const, session };
+  });
+
+const AdminRecordingSchema = z.object({
+  accessToken: z.string().min(10).max(8000),
+  userId: z.string().min(1),
+  sessionId: z.string().min(1),
+});
+
+export const fetchAdminRecordingUrl = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => AdminRecordingSchema.parse(d))
+  .handler(async ({ data }) => {
+    const authResult = await verifyAdminAccess(data.accessToken);
+    if (!authResult.ok) return { ok: false as const, url: null };
+
+    const webmKey = `sessions/${data.userId}/${data.sessionId}/cam.webm`;
+    const mp4Key = `sessions/${data.userId}/${data.sessionId}/cam.mp4`;
+
+    let key: string | null = null;
+    if (await objectExists(webmKey)) key = webmKey;
+    else if (await objectExists(mp4Key)) key = mp4Key;
+    if (!key) return { ok: true as const, url: null };
+
+    const url = await getPresignedGetUrl(key, 3600);
+    return { ok: true as const, url };
   });

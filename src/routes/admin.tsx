@@ -5,6 +5,7 @@ import { useSupabaseAuth } from "@/lib/supabase-context";
 import { getHireBg, getHireColor, scoreToColor } from "@/lib/ghost-utils";
 import {
   fetchAdminStats,
+  fetchAdminRecordingUrl,
   type AdminSession,
   type AdminStats,
   type AdminUser,
@@ -230,7 +231,7 @@ function AdminPage() {
             <section className="fade-up mt-8">
               <SectionLabel>All Sessions ({stats.sessions.length})</SectionLabel>
               <div className="gp-card overflow-hidden p-0">
-                <AllSessionsTable sessions={stats.sessions} />
+                <AllSessionsTable sessions={stats.sessions} accessToken={getAccessToken() ?? ""} />
               </div>
             </section>
 
@@ -483,7 +484,7 @@ function ExpandIcon({ open }: { open: boolean }) {
 // All Sessions Table
 // ---------------------------------------------------------------------------
 
-function AllSessionsTable({ sessions }: { sessions: AdminSession[] }) {
+function AllSessionsTable({ sessions, accessToken }: { sessions: AdminSession[]; accessToken: string }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   if (sessions.length === 0) {
@@ -553,7 +554,7 @@ function AllSessionsTable({ sessions }: { sessions: AdminSession[] }) {
             </button>
 
             {/* Expandable detail */}
-            <SessionDetail session={s} open={open} />
+            <SessionDetail session={s} open={open} accessToken={accessToken} />
           </div>
         );
       })}
@@ -561,14 +562,27 @@ function AllSessionsTable({ sessions }: { sessions: AdminSession[] }) {
   );
 }
 
-function SessionDetail({ session: s, open }: { session: AdminSession; open: boolean }) {
+function SessionDetail({ session: s, open, accessToken }: { session: AdminSession; open: boolean; accessToken: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(0);
+  const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
+  const [recordingLoading, setRecordingLoading] = useState(false);
+  const [recordingChecked, setRecordingChecked] = useState(false);
 
   useEffect(() => {
     if (!ref.current) return;
     setHeight(open ? ref.current.scrollHeight : 0);
-  }, [open, s.rounds.length]);
+  }, [open, s.rounds.length, recordingUrl]);
+
+  useEffect(() => {
+    if (!open || recordingChecked) return;
+    setRecordingChecked(true);
+    setRecordingLoading(true);
+    fetchAdminRecordingUrl({ data: { accessToken, userId: s.userId, sessionId: s.id } })
+      .then((res) => { setRecordingUrl(res.url ?? null); })
+      .catch(() => {})
+      .finally(() => setRecordingLoading(false));
+  }, [open, recordingChecked, accessToken, s.userId, s.id]);
 
   return (
     <div
@@ -580,6 +594,28 @@ function SessionDetail({ session: s, open }: { session: AdminSession; open: bool
       }}
     >
       <div ref={ref} className="px-5 py-4">
+        {/* Recording */}
+        <div className="mb-5">
+          <div className="mono mb-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+            Interview Recording
+          </div>
+          {recordingLoading ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, height: 44, fontSize: 12, color: "var(--text-2)" }}>
+              <span className="gp-spinner" /> Fetching recording…
+            </div>
+          ) : recordingUrl ? (
+            <video
+              src={recordingUrl}
+              controls
+              style={{ width: "100%", maxHeight: 280, borderRadius: 10, background: "#000", display: "block" }}
+            />
+          ) : (
+            <div style={{ height: 44, display: "flex", alignItems: "center", fontSize: 12, color: "var(--text-3)", background: "var(--surface3)", borderRadius: 8, paddingLeft: 12, border: "1px dashed var(--border)" }}>
+              No recording for this session
+            </div>
+          )}
+        </div>
+
         {/* Interviewers panel */}
         {s.interviewers.length > 0 && (
           <div className="mb-4 flex flex-wrap gap-2">
