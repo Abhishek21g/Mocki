@@ -17,6 +17,8 @@ export function AnswerInput({
   stopHoldToTalk,
   devMode,
   setDevMode,
+  onKeyDown,
+  onPaste,
 }: {
   answer: string;
   setAnswer: (value: string) => void;
@@ -37,6 +39,8 @@ export function AnswerInput({
   currentFocus?: string;
   currentDifficulty?: string;
   primeAudioFn?: typeof primeAudio;
+  onKeyDown?: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -135,6 +139,8 @@ export function AnswerInput({
           onChange={(e) => {
             if (!controlsDisabled) setAnswer(e.target.value);
           }}
+          onKeyDown={onKeyDown}
+          onPaste={onPaste}
           disabled={controlsDisabled}
         />
         {/* Char count + recording status */}

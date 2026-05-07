@@ -11,6 +11,7 @@ import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview
 import { uploadSessionData } from "@/server/upload.functions";
 import { useKeystrokeTracker } from "@/hooks/useKeystrokeTracker";
 import { useCamRecorder } from "@/hooks/useCamRecorder";
+import { useBehavioralTracker } from "@/hooks/useBehavioralTracker";
 import { cn } from "@/lib/utils";
 
 import { TopBar } from "@/components/interview/TopBar";
@@ -59,6 +60,7 @@ function InterviewPage() {
   const [camStream, setCamStream] = useState<MediaStream | null>(null);
   const { getPayload: getKeystrokes } = useKeystrokeTracker(!!state.sessionId);
   const { getBlob: getCamBlob } = useCamRecorder(camStream);
+  const { onQuestionShown, onAnswerSubmitted, onKeyDown: onAnswerKeyDown, onPaste: onAnswerPaste, getPayload: getBehavioral } = useBehavioralTracker();
 
   const sttProxyUrl = (import.meta.env.VITE_STT_PROXY_URL as string | undefined)?.trim() || "/api/stt";
   const ttsProxyUrl =
@@ -263,6 +265,14 @@ function InterviewPage() {
   }, [state.sessionId]);
 
 
+  // Track question changes for behavioral analytics
+  const questionIndexRef = useRef(0);
+  useEffect(() => {
+    if (!state.currentQuestion) return;
+    onQuestionShown(questionIndexRef.current, state.currentQuestion);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.currentQuestion]);
+
   if (!state.sessionId || !state.setupData || !state.activeInterviewer || !state.roleProfile) {
     return <Navigate to="/" />;
   }
@@ -283,6 +293,9 @@ function InterviewPage() {
         data: { sessionId: state.sessionId!, answer },
       });
 
+      // Record answer for behavioral analytics
+      onAnswerSubmitted(questionIndexRef.current, answer);
+
       if (res.clarification) {
         store.set({
           currentQuestion: res.follow_up!,
@@ -294,6 +307,8 @@ function InterviewPage() {
         setLoadingAnswer(false);
         return;
       }
+
+      questionIndexRef.current += 1;
 
       const currentRounds = store.get().rounds;
       store.set({
@@ -324,6 +339,14 @@ function InterviewPage() {
               console.log("[upload] keystrokes", r);
             }).catch((err) => {
               console.error("[upload] keystrokes failed", err);
+            });
+            // Fire-and-forget: upload behavioral analytics
+            uploadSessionData({
+              data: { accessToken, sessionId: sid, type: "behavioral", payload: JSON.stringify(getBehavioral()) },
+            }).then((r) => {
+              console.log("[upload] behavioral", r);
+            }).catch((err) => {
+              console.error("[upload] behavioral failed", err);
             });
             // Fire-and-forget: upload cam recording via server route (avoids CORS)
             getCamBlob().then(async (result) => {
@@ -525,6 +548,8 @@ function InterviewPage() {
               stopHoldToTalk={stopHoldToTalk}
               devMode={devMode}
               setDevMode={setDevMode}
+              onKeyDown={onAnswerKeyDown}
+              onPaste={onAnswerPaste}
             />
 
             {!generating && (

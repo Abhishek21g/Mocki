@@ -13,7 +13,7 @@ const UploadResumeSchema = z.object({
 const UploadDataSchema = z.object({
   accessToken: z.string().min(10).max(8000),
   sessionId: z.string().min(8).max(80),
-  type: z.enum(["keystrokes", "session_meta"]),
+  type: z.enum(["keystrokes", "session_meta", "behavioral"]),
   payload: z.string().max(5_000_000),
 });
 
