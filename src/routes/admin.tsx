@@ -10,6 +10,7 @@ import {
   sendAdminCheckInEmails,
   sendAdminInviteEmails,
   markAdminInviteEmailsSent,
+  deleteAdminOutreachLog,
   type AdminSession,
   type AdminStats,
   type AdminUser,
@@ -1828,6 +1829,8 @@ function InviteSection({
   const [raw, setRaw] = useState("");
   const [sending, setSending] = useState(false);
   const [marking, setMarking] = useState(false);
+  const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+  const [hiddenLogIds, setHiddenLogIds] = useState<Set<string>>(() => new Set());
   const [results, setResults] = useState<InviteResult[] | null>(null);
   const [localSentLogs, setLocalSentLogs] = useState<AdminOutreachLog[]>([]);
 
@@ -1837,6 +1840,7 @@ function InviteSection({
     .filter((e) => e.includes("@"));
   const sentInvites = new Map(
     [...localSentLogs, ...logs]
+      .filter((log) => !hiddenLogIds.has(log.id))
       .filter((log) => log.kind === "invite" && log.status === "sent")
       .map((log) => [log.email.toLowerCase(), log]),
   );
@@ -1958,6 +1962,30 @@ function InviteSection({
         }
         return merged;
       });
+    }
+  }
+
+  async function handleDeleteInvite(log: AdminOutreachLog) {
+    const confirmed = window.confirm(`Remove ${log.email} from Sent Invites? This only deletes the outreach log.`);
+    if (!confirmed || deletingLogId) return;
+    setDeletingLogId(log.id);
+    try {
+      if (!log.id.startsWith("local-")) {
+        const res = await deleteAdminOutreachLog({ data: { accessToken, outreachLogId: log.id } }) as any;
+        if (!res.ok) throw new Error(res.reason ?? "Failed to delete invite log");
+      }
+      setHiddenLogIds((prev) => {
+        const next = new Set(prev);
+        next.add(log.id);
+        return next;
+      });
+      setLocalSentLogs((prev) => prev.filter((item) => item.id !== log.id));
+      onSent?.();
+    } catch (e) {
+      console.error("[invites] delete failed", e);
+      alert(e instanceof Error ? e.message : "Failed to delete invite log");
+    } finally {
+      setDeletingLogId(null);
     }
   }
 
@@ -2104,12 +2132,16 @@ function InviteSection({
             empty="No pending invites yet."
             logs={waitingInvites}
             tone="waiting"
+            deletingLogId={deletingLogId}
+            onDelete={handleDeleteInvite}
           />
           <InviteStatusList
             title="Signed Up"
             empty="No invite conversions yet."
             logs={convertedInvites}
             tone="converted"
+            deletingLogId={deletingLogId}
+            onDelete={handleDeleteInvite}
           />
         </div>
       </div>
@@ -2122,11 +2154,15 @@ function InviteStatusList({
   empty,
   logs,
   tone,
+  deletingLogId,
+  onDelete,
 }: {
   title: string;
   empty: string;
   logs: AdminOutreachLog[];
   tone: "waiting" | "converted";
+  deletingLogId?: string | null;
+  onDelete?: (log: AdminOutreachLog) => void;
 }) {
   return (
     <div className="gp-card overflow-hidden p-0">
@@ -2165,17 +2201,35 @@ function InviteStatusList({
                   {log.bouncedAt && <span style={{ color: "#f87171" }}>bounced</span>}
                 </div>
               </div>
-              <span
-                className="mono rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider"
-                style={{
-                  color: tone === "converted" ? "#86efac" : "var(--text-3)",
-                  border: tone === "converted" ? "1px solid rgba(134,239,172,0.35)" : "1px solid var(--border)",
-                  background: tone === "converted" ? "rgba(134,239,172,0.08)" : "var(--surface2)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {tone === "converted" ? "Signed up" : "Waiting"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span
+                  className="mono rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider"
+                  style={{
+                    color: tone === "converted" ? "#86efac" : "var(--text-3)",
+                    border: tone === "converted" ? "1px solid rgba(134,239,172,0.35)" : "1px solid var(--border)",
+                    background: tone === "converted" ? "rgba(134,239,172,0.08)" : "var(--surface2)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {tone === "converted" ? "Signed up" : "Waiting"}
+                </span>
+                {onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(log)}
+                    disabled={deletingLogId === log.id}
+                    className="mono rounded border px-2 py-0.5 text-[10px] uppercase tracking-wider disabled:opacity-50"
+                    style={{
+                      borderColor: "rgba(248,113,113,0.28)",
+                      background: "rgba(248,113,113,0.07)",
+                      color: "#fca5a5",
+                    }}
+                    title="Remove from sent invites"
+                  >
+                    {deletingLogId === log.id ? "..." : "Delete"}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

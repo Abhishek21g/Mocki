@@ -748,6 +748,11 @@ const InviteSchema = z.object({
   emails: z.array(z.string().email()).min(1).max(200),
 });
 
+const DeleteOutreachSchema = z.object({
+  accessToken: z.string().min(10).max(8000),
+  outreachLogId: z.string().min(1).max(200),
+});
+
 export type InviteResult = {
   email: string;
   status: "sent" | "failed" | "skipped";
@@ -839,4 +844,24 @@ export const markAdminInviteEmailsSent = createServerFn({ method: "POST" })
     const failed = results.filter((r) => r.status === "failed").length;
     const skipped = results.filter((r) => r.status === "skipped").length;
     return { ok: true as const, sent, failed, skipped, results };
+  });
+
+export const deleteAdminOutreachLog = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => DeleteOutreachSchema.parse(d))
+  .handler(async ({ data }) => {
+    const authResult = await verifyAdminAccess(data.accessToken);
+    if (!authResult.ok) return { ok: false as const, reason: authResult.reason };
+
+    const { error } = await authResult.admin
+      .from("email_outreach_log")
+      .delete()
+      .eq("id", data.outreachLogId)
+      .eq("kind", "invite");
+
+    if (error) {
+      console.error("[admin] failed to delete outreach log:", error);
+      return { ok: false as const, reason: error.message };
+    }
+
+    return { ok: true as const };
   });
