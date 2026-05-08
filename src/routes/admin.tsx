@@ -369,7 +369,9 @@ function InviteAnalyticsPanel({ stats }: { stats: AdminStats }) {
   const a = stats.inviteAnalytics;
   const pct = (v: number) => `${Math.round(v * 100)}%`;
   const metricCards = [
-    { label: "Invited", value: a.invited },
+    { label: "DB Logged", value: a.invited },
+    { label: "Recovered", value: a.recoveredFromLogs },
+    { label: "Missing From DB", value: a.recoveredMissing },
     { label: "Signed Up", value: a.signedUp },
     { label: "First Interview", value: a.completedFirstInterview },
     { label: "Conversion", value: pct(a.conversionRate) },
@@ -419,6 +421,26 @@ function InviteAnalyticsPanel({ stats }: { stats: AdminStats }) {
           </span>
         )}
       </div>
+      <details className="gp-card mt-3 p-4 text-sm">
+        <summary className="mono cursor-pointer text-[11px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+          Recovered invite recipients from Vercel logs
+        </summary>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {a.recoveredEmails.map((email) => (
+            <span
+              key={email}
+              className="mono rounded-full px-2.5 py-0.5 text-[11px]"
+              style={{
+                border: "1px solid var(--border)",
+                background: "var(--surface2)",
+                color: "var(--text-2)",
+              }}
+            >
+              {email}
+            </span>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }

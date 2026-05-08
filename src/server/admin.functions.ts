@@ -7,6 +7,39 @@ import type { InterviewSessionPayload } from "./history.server";
 
 const ADMIN_EMAILS = ["enaguthiabhishek@gmail.com", "muralikinti@gmail.com"];
 
+const RECOVERED_INVITE_EMAILS = [
+  "abhishek.enaguthi@pcc.edu",
+  "adityashyam28@gmail.com",
+  "ajinkyagokule@gmail.com",
+  "brycetruong@gmail.com",
+  "d.varma8774@gmail.com",
+  "dhaya.nadhana@gmail.com",
+  "dhushmk@gmail.com",
+  "eabhishek2004@gmail.com",
+  "eabhishek2005@gmail.com",
+  "enagutha@oregonstate.edu",
+  "enaguthia@gmail.com",
+  "enaguthiabhishek2004@gmail.com",
+  "enaguthiabhishek@gmail.com",
+  "evasu.sapsd@gmail.com",
+  "hendeross@gmail.com",
+  "intim@oregonstate.edu",
+  "josiahliebert@gmail.com",
+  "kaveeom@gmail.com",
+  "kavitha.enaguthi@gmail.com",
+  "lucasjm0323@gmail.com",
+  "meetashwin2000@gmail.com",
+  "meetnraval@gmail.com",
+  "muralikinti@gmail.com",
+  "patenira@oregonstate.edu",
+  "rajansaranya176@gmail.com",
+  "sarveshthiruppathi@gmail.com",
+  "shah.harshil187@gmail.com",
+  "snehasannidhi97@gmail.com",
+  "srijapalla1960@gmail.com",
+  "tejassrirama1@gmail.com",
+];
+
 const TokenSchema = z.object({ accessToken: z.string().min(10).max(8000) });
 const SessionDetailSchema = z.object({
   accessToken: z.string().min(10).max(8000),
@@ -100,6 +133,9 @@ export type AdminOutreachLog = {
 
 export type AdminInviteAnalytics = {
   invited: number;
+  recoveredFromLogs: number;
+  recoveredMissing: number;
+  recoveredEmails: string[];
   signedUp: number;
   completedFirstInterview: number;
   delivered: number;
@@ -518,6 +554,10 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
 
     const inviteLogs = outreachLogs.filter((log) => log.kind === "invite" && log.status === "sent");
     const invitedEmails = new Set(inviteLogs.map((log) => log.email.toLowerCase()));
+    const recoveredEmails = Array.from(
+      new Set(RECOVERED_INVITE_EMAILS.map((email) => email.toLowerCase())),
+    ).sort();
+    const recoveredMissing = recoveredEmails.filter((email) => !invitedEmails.has(email)).length;
     const signedUpInviteUsers = users.filter((u) => invitedEmails.has(u.email.toLowerCase()));
     const signedUpInviteEmails = new Set(signedUpInviteUsers.map((u) => u.email.toLowerCase()));
     const completedInviteUsers = signedUpInviteUsers.filter((u) => u.interviewCount > 0);
@@ -532,6 +572,9 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
     const readyForNextBatch = sentToday < 8 && !deliverabilityRisk;
     const inviteAnalytics: AdminInviteAnalytics = {
       invited: invitedEmails.size,
+      recoveredFromLogs: recoveredEmails.length,
+      recoveredMissing,
+      recoveredEmails,
       signedUp: signedUpInviteEmails.size,
       completedFirstInterview: completedInviteUsers.length,
       delivered,
