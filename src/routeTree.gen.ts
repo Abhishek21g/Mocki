@@ -22,6 +22,8 @@ import { Route as ApiTtsAvatarRouteImport } from './routes/api/tts-avatar'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiSttRouteImport } from './routes/api/stt'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
+import { Route as ApiResendWebhookRouteImport } from './routes/api/resend-webhook'
+import { Route as ApiAdminRecordingRouteImport } from './routes/api/admin-recording'
 import { Route as AgentsSessionIdRouteImport } from './routes/agents.$sessionId'
 
 const ReportRoute = ReportRouteImport.update({
@@ -89,6 +91,16 @@ const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   path: '/api/stripe-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiResendWebhookRoute = ApiResendWebhookRouteImport.update({
+  id: '/api/resend-webhook',
+  path: '/api/resend-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminRecordingRoute = ApiAdminRecordingRouteImport.update({
+  id: '/api/admin-recording',
+  path: '/api/admin-recording',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AgentsSessionIdRoute = AgentsSessionIdRouteImport.update({
   id: '/agents/$sessionId',
   path: '/agents/$sessionId',
@@ -103,6 +115,8 @@ export interface FileRoutesByFullPath {
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRouteWithChildren
   '/agents/$sessionId': typeof AgentsSessionIdRoute
+  '/api/admin-recording': typeof ApiAdminRecordingRoute
+  '/api/resend-webhook': typeof ApiResendWebhookRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
@@ -119,6 +133,8 @@ export interface FileRoutesByTo {
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRouteWithChildren
   '/agents/$sessionId': typeof AgentsSessionIdRoute
+  '/api/admin-recording': typeof ApiAdminRecordingRoute
+  '/api/resend-webhook': typeof ApiResendWebhookRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
@@ -136,6 +152,8 @@ export interface FileRoutesById {
   '/interview': typeof InterviewRoute
   '/report': typeof ReportRouteWithChildren
   '/agents/$sessionId': typeof AgentsSessionIdRoute
+  '/api/admin-recording': typeof ApiAdminRecordingRoute
+  '/api/resend-webhook': typeof ApiResendWebhookRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
@@ -154,6 +172,8 @@ export interface FileRouteTypes {
     | '/interview'
     | '/report'
     | '/agents/$sessionId'
+    | '/api/admin-recording'
+    | '/api/resend-webhook'
     | '/api/stripe-webhook'
     | '/api/stt'
     | '/api/tts'
@@ -170,6 +190,8 @@ export interface FileRouteTypes {
     | '/interview'
     | '/report'
     | '/agents/$sessionId'
+    | '/api/admin-recording'
+    | '/api/resend-webhook'
     | '/api/stripe-webhook'
     | '/api/stt'
     | '/api/tts'
@@ -186,6 +208,8 @@ export interface FileRouteTypes {
     | '/interview'
     | '/report'
     | '/agents/$sessionId'
+    | '/api/admin-recording'
+    | '/api/resend-webhook'
     | '/api/stripe-webhook'
     | '/api/stt'
     | '/api/tts'
@@ -203,6 +227,8 @@ export interface RootRouteChildren {
   InterviewRoute: typeof InterviewRoute
   ReportRoute: typeof ReportRouteWithChildren
   AgentsSessionIdRoute: typeof AgentsSessionIdRoute
+  ApiAdminRecordingRoute: typeof ApiAdminRecordingRoute
+  ApiResendWebhookRoute: typeof ApiResendWebhookRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
@@ -304,6 +330,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/resend-webhook': {
+      id: '/api/resend-webhook'
+      path: '/api/resend-webhook'
+      fullPath: '/api/resend-webhook'
+      preLoaderRoute: typeof ApiResendWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin-recording': {
+      id: '/api/admin-recording'
+      path: '/api/admin-recording'
+      fullPath: '/api/admin-recording'
+      preLoaderRoute: typeof ApiAdminRecordingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/agents/$sessionId': {
       id: '/agents/$sessionId'
       path: '/agents/$sessionId'
@@ -333,6 +373,8 @@ const rootRouteChildren: RootRouteChildren = {
   InterviewRoute: InterviewRoute,
   ReportRoute: ReportRouteWithChildren,
   AgentsSessionIdRoute: AgentsSessionIdRoute,
+  ApiAdminRecordingRoute: ApiAdminRecordingRoute,
+  ApiResendWebhookRoute: ApiResendWebhookRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,

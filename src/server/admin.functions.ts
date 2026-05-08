@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { createSupabaseAdminClient, getUserIdForToken } from "./supabase.server";
-import { getPresignedGetUrl, objectExists, downloadJson } from "./spaces.server";
+import { downloadJson } from "./spaces.server";
 import { sendCheckInEmail, sendInviteEmail } from "./email.server";
 import type { InterviewSessionPayload } from "./history.server";
 
@@ -85,7 +85,35 @@ export type AdminOutreachLog = {
   status: "sent" | "failed";
   error: string | null;
   sentBy: string | null;
+  providerMessageId: string | null;
+  deliveredAt: string | null;
+  openedAt: string | null;
+  clickedAt: string | null;
+  bouncedAt: string | null;
+  complainedAt: string | null;
+  failedAt: string | null;
+  lastEventAt: string | null;
+  lastEventType: string | null;
+  lastClickUrl: string | null;
   createdAt: string;
+};
+
+export type AdminInviteAnalytics = {
+  invited: number;
+  signedUp: number;
+  completedFirstInterview: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  bounced: number;
+  complained: number;
+  conversionRate: number;
+  firstInterviewRate: number;
+  openRate: number;
+  clickRate: number;
+  sentToday: number;
+  readyForNextBatch: boolean;
+  nextBatchReason: string;
 };
 
 export type AdminStats = {
@@ -108,6 +136,7 @@ export type AdminStats = {
   sessions: AdminSession[];
   users: AdminUser[];
   outreachLogs: AdminOutreachLog[];
+  inviteAnalytics: AdminInviteAnalytics;
 };
 
 // ---------------------------------------------------------------------------
@@ -191,6 +220,7 @@ async function logOutreach(
     status: "sent" | "failed";
     error?: string | null;
     sentBy: string;
+    providerMessageId?: string | null;
   },
 ): Promise<void> {
   const { error } = await admin.from("email_outreach_log").insert({
@@ -200,6 +230,7 @@ async function logOutreach(
     status: entry.status,
     error: entry.error ?? null,
     sent_by: entry.sentBy,
+    provider_message_id: entry.providerMessageId ?? null,
   });
   if (error) console.error("[admin] failed to log outreach:", error);
 }
@@ -233,6 +264,16 @@ async function findSentOutreach(
     status: row.status as "sent" | "failed",
     error: (row.error as string | null) ?? null,
     sentBy: (row.sent_by as string | null) ?? null,
+    providerMessageId: (row.provider_message_id as string | null) ?? null,
+    deliveredAt: (row.delivered_at as string | null) ?? null,
+    openedAt: (row.opened_at as string | null) ?? null,
+    clickedAt: (row.clicked_at as string | null) ?? null,
+    bouncedAt: (row.bounced_at as string | null) ?? null,
+    complainedAt: (row.complained_at as string | null) ?? null,
+    failedAt: (row.failed_at as string | null) ?? null,
+    lastEventAt: (row.last_event_at as string | null) ?? null,
+    lastEventType: (row.last_event_type as string | null) ?? null,
+    lastClickUrl: (row.last_click_url as string | null) ?? null,
     createdAt: row.created_at as string,
   };
 }
@@ -280,6 +321,16 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
       status: row.status as "sent" | "failed",
       error: (row.error as string | null) ?? null,
       sentBy: (row.sent_by as string | null) ?? null,
+      providerMessageId: (row.provider_message_id as string | null) ?? null,
+      deliveredAt: (row.delivered_at as string | null) ?? null,
+      openedAt: (row.opened_at as string | null) ?? null,
+      clickedAt: (row.clicked_at as string | null) ?? null,
+      bouncedAt: (row.bounced_at as string | null) ?? null,
+      complainedAt: (row.complained_at as string | null) ?? null,
+      failedAt: (row.failed_at as string | null) ?? null,
+      lastEventAt: (row.last_event_at as string | null) ?? null,
+      lastEventType: (row.last_event_type as string | null) ?? null,
+      lastClickUrl: (row.last_click_url as string | null) ?? null,
       createdAt: row.created_at as string,
     }));
 
@@ -446,6 +497,43 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
       })
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 
+    const inviteLogs = outreachLogs.filter((log) => log.kind === "invite" && log.status === "sent");
+    const invitedEmails = new Set(inviteLogs.map((log) => log.email.toLowerCase()));
+    const signedUpInviteUsers = users.filter((u) => invitedEmails.has(u.email.toLowerCase()));
+    const signedUpInviteEmails = new Set(signedUpInviteUsers.map((u) => u.email.toLowerCase()));
+    const completedInviteUsers = signedUpInviteUsers.filter((u) => u.interviewCount > 0);
+    const todayOutreachStart = todayStart;
+    const sentToday = inviteLogs.filter((log) => log.createdAt >= todayOutreachStart).length;
+    const bounced = inviteLogs.filter((log) => log.bouncedAt).length;
+    const complained = inviteLogs.filter((log) => log.complainedAt).length;
+    const delivered = inviteLogs.filter((log) => log.deliveredAt).length;
+    const opened = inviteLogs.filter((log) => log.openedAt).length;
+    const clicked = inviteLogs.filter((log) => log.clickedAt).length;
+    const deliverabilityRisk = bounced > 0 || complained > 0;
+    const readyForNextBatch = sentToday < 8 && !deliverabilityRisk;
+    const inviteAnalytics: AdminInviteAnalytics = {
+      invited: invitedEmails.size,
+      signedUp: signedUpInviteEmails.size,
+      completedFirstInterview: completedInviteUsers.length,
+      delivered,
+      opened,
+      clicked,
+      bounced,
+      complained,
+      conversionRate: invitedEmails.size > 0 ? signedUpInviteEmails.size / invitedEmails.size : 0,
+      firstInterviewRate:
+        signedUpInviteEmails.size > 0 ? completedInviteUsers.length / signedUpInviteEmails.size : 0,
+      openRate: delivered > 0 ? opened / delivered : 0,
+      clickRate: delivered > 0 ? clicked / delivered : 0,
+      sentToday,
+      readyForNextBatch,
+      nextBatchReason: deliverabilityRisk
+        ? "Pause: bounce or complaint detected"
+        : sentToday >= 8
+          ? "Pause: today's invite batch is full"
+          : "Ready for a small 5-8 person batch",
+    };
+
     const stats: AdminStats = {
       totalUsers,
       totalInterviews,
@@ -462,6 +550,7 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
       sessions,
       users,
       outreachLogs,
+      inviteAnalytics,
     };
 
     return { ok: true as const, stats };
@@ -527,10 +616,13 @@ export const fetchAdminRecordingUrl = createServerFn({ method: "POST" })
     const authResult = await verifyAdminAccess(data.accessToken);
     if (!authResult.ok) return { ok: false as const, webmUrl: null, mp4Url: null };
 
-    const [webmUrl, mp4Url] = await Promise.all([
-      getPresignedGetUrl(`sessions/${data.userId}/${data.sessionId}/cam.webm`, 3600),
-      getPresignedGetUrl(`sessions/${data.userId}/${data.sessionId}/cam.mp4`, 3600),
-    ]);
+    const params = new URLSearchParams({
+      accessToken: data.accessToken,
+      userId: data.userId,
+      sessionId: data.sessionId,
+    });
+    const webmUrl = `/api/admin-recording?${params.toString()}&ext=webm`;
+    const mp4Url = `/api/admin-recording?${params.toString()}&ext=mp4`;
 
     return { ok: true as const, webmUrl, mp4Url };
   });
@@ -615,6 +707,7 @@ export const sendAdminCheckInEmails = createServerFn({ method: "POST" })
         status: result.ok ? "sent" : "failed",
         error: result.error,
         sentBy: authResult.adminEmail,
+        providerMessageId: result.messageId,
       });
       results.push({
         userId: user.id,
@@ -674,6 +767,7 @@ export const sendAdminInviteEmails = createServerFn({ method: "POST" })
         status: result.ok ? "sent" : "failed",
         error: result.error,
         sentBy: authResult.adminEmail,
+        providerMessageId: result.messageId,
       });
       results.push({
         email: data.emails[i],

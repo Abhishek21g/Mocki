@@ -48,6 +48,17 @@ create table if not exists public.email_outreach_log (
   status text not null check (status in ('sent', 'failed')),
   error text,
   sent_by text,
+  provider_message_id text,
+  delivered_at timestamptz,
+  opened_at timestamptz,
+  clicked_at timestamptz,
+  bounced_at timestamptz,
+  complained_at timestamptz,
+  failed_at timestamptz,
+  last_event_at timestamptz,
+  last_event_type text,
+  last_click_url text,
+  event_payload jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -56,6 +67,9 @@ create index if not exists email_outreach_log_email_kind_idx
 
 create index if not exists email_outreach_log_user_kind_idx
   on public.email_outreach_log (user_id, kind, created_at desc);
+
+create index if not exists email_outreach_log_provider_message_idx
+  on public.email_outreach_log (provider_message_id);
 
 -- =============================================================================
 -- Row Level Security: each user only sees their own rows.

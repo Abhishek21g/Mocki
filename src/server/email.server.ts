@@ -262,7 +262,7 @@ export async function sendWelcomeEmail(email: string, name: string): Promise<voi
   }
 }
 
-export async function sendCheckInEmail(email: string, name: string): Promise<{ ok: boolean; error?: string }> {
+export async function sendCheckInEmail(email: string, name: string): Promise<{ ok: boolean; error?: string; messageId?: string }> {
   const resend = getResendClient();
   if (!resend) return { ok: false, error: "RESEND_API_KEY not set" };
 
@@ -315,7 +315,7 @@ Give it a shot: https://mocki.dev
 — Abhishek
 mocki.dev`;
 
-  const { error } = await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: FROM,
     to: email,
     subject: `hey ${firstName}, still up for that mock interview?`,
@@ -332,10 +332,10 @@ mocki.dev`;
     return { ok: false, error: String(error) };
   }
   console.log(`[email] check-in sent to ${email}`);
-  return { ok: true };
+  return { ok: true, messageId: data?.id };
 }
 
-export async function sendInviteEmail(email: string): Promise<{ ok: boolean; error?: string }> {
+export async function sendInviteEmail(email: string): Promise<{ ok: boolean; error?: string; messageId?: string }> {
   const resend = getResendClient();
   if (!resend) return { ok: false, error: "RESEND_API_KEY not set" };
 
@@ -391,7 +391,7 @@ Also, if you have an interview coming up, reply with the role/company and I'll t
 
 — Abhishek`;
 
-  const { error } = await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: FROM,
     to: email,
     subject: "quick thing for interview prep",
@@ -408,5 +408,5 @@ Also, if you have an interview coming up, reply with the role/company and I'll t
     return { ok: false, error: String(error) };
   }
   console.log(`[email] invite sent to ${email}`);
-  return { ok: true };
+  return { ok: true, messageId: data?.id };
 }

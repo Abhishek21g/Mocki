@@ -283,6 +283,9 @@ function AdminPage() {
             {activeTab === "outreach" && (
               <>
             <section className="fade-up mt-8">
+              <InviteAnalyticsPanel stats={stats} />
+            </section>
+            <section className="fade-up mt-8">
               <OutreachSection
                 users={stats.users}
                 logs={stats.outreachLogs}
@@ -354,6 +357,64 @@ function AdminTabs({
             </button>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function InviteAnalyticsPanel({ stats }: { stats: AdminStats }) {
+  const a = stats.inviteAnalytics;
+  const pct = (v: number) => `${Math.round(v * 100)}%`;
+  const metricCards = [
+    { label: "Invited", value: a.invited },
+    { label: "Signed Up", value: a.signedUp },
+    { label: "First Interview", value: a.completedFirstInterview },
+    { label: "Conversion", value: pct(a.conversionRate) },
+    { label: "Delivered", value: a.delivered || "—" },
+    { label: "Opened", value: a.opened || "—" },
+    { label: "Clicked", value: a.clicked || "—" },
+    { label: "Open / Click", value: a.delivered ? `${pct(a.openRate)} / ${pct(a.clickRate)}` : "webhook off" },
+  ];
+
+  return (
+    <div>
+      <div className="mono mb-4 flex items-center justify-between text-[11px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+        <span>Invite Funnel</span>
+        <span
+          className="rounded-full border px-3 py-1"
+          style={{
+            color: a.readyForNextBatch ? "var(--green)" : "#fbbf24",
+            borderColor: a.readyForNextBatch ? "rgba(118,185,0,0.45)" : "rgba(251,191,36,0.35)",
+            background: a.readyForNextBatch ? "rgba(118,185,0,0.08)" : "rgba(251,191,36,0.08)",
+          }}
+        >
+          {a.readyForNextBatch ? "Ready" : "Pause"}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {metricCards.map((m) => (
+          <div key={m.label} className="gp-card p-4">
+            <div className="mono text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+              {m.label}
+            </div>
+            <div className="mt-2 text-2xl font-semibold" style={{ color: "var(--text)" }}>
+              {m.value}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="gp-card mt-3 p-4 text-sm" style={{ color: "var(--text-2)" }}>
+        <span style={{ color: a.readyForNextBatch ? "var(--green)" : "#fbbf24", fontWeight: 700 }}>
+          {a.nextBatchReason}.
+        </span>
+        <span style={{ color: "var(--text-3)", marginLeft: 8 }}>
+          Sent today: {a.sentToday}. Opens/clicks populate after Resend webhook is enabled.
+        </span>
+        {(a.bounced > 0 || a.complained > 0) && (
+          <span style={{ color: "#f87171", marginLeft: 8 }}>
+            {a.bounced} bounced, {a.complained} complained.
+          </span>
+        )}
       </div>
     </div>
   );
@@ -1982,8 +2043,12 @@ function InviteStatusList({
                 <div style={{ color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {log.email}
                 </div>
-                <div className="mono mt-1 text-[11px]" style={{ color: "var(--text-3)" }}>
-                  sent {new Date(log.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                <div className="mono mt-1 flex flex-wrap gap-2 text-[11px]" style={{ color: "var(--text-3)" }}>
+                  <span>sent {new Date(log.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
+                  {log.deliveredAt && <span>delivered</span>}
+                  {log.openedAt && <span style={{ color: "var(--green)" }}>opened</span>}
+                  {log.clickedAt && <span style={{ color: "var(--green)" }}>clicked</span>}
+                  {log.bouncedAt && <span style={{ color: "#f87171" }}>bounced</span>}
                 </div>
               </div>
               <span
