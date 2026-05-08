@@ -299,6 +299,7 @@ function AdminPage() {
                 accessToken={getAccessToken() ?? ""}
                 logs={stats.outreachLogs}
                 users={stats.users}
+                recoveredEmails={stats.inviteAnalytics.recoveredEmails}
                 onSent={load}
               />
             </section>
@@ -421,26 +422,6 @@ function InviteAnalyticsPanel({ stats }: { stats: AdminStats }) {
           </span>
         )}
       </div>
-      <details className="gp-card mt-3 p-4 text-sm">
-        <summary className="mono cursor-pointer text-[11px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
-          Recovered invite recipients from Vercel logs
-        </summary>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {a.recoveredEmails.map((email) => (
-            <span
-              key={email}
-              className="mono rounded-full px-2.5 py-0.5 text-[11px]"
-              style={{
-                border: "1px solid var(--border)",
-                background: "var(--surface2)",
-                color: "var(--text-2)",
-              }}
-            >
-              {email}
-            </span>
-          ))}
-        </div>
-      </details>
     </div>
   );
 }
@@ -1841,11 +1822,13 @@ function InviteSection({
   accessToken,
   logs,
   users,
+  recoveredEmails,
   onSent,
 }: {
   accessToken: string;
   logs: AdminOutreachLog[];
   users: AdminUser[];
+  recoveredEmails: string[];
   onSent?: () => void;
 }) {
   const [raw, setRaw] = useState("");
@@ -1860,8 +1843,35 @@ function InviteSection({
     .split(/[\n,\s]+/)
     .map((e) => e.trim())
     .filter((e) => e.includes("@"));
-  const sentInvites = new Map(
+  const dbInviteEmails = new Set(
     [...localSentLogs, ...logs]
+      .filter((log) => log.kind === "invite" && log.status === "sent")
+      .map((log) => log.email.toLowerCase()),
+  );
+  const recoveredLogs: AdminOutreachLog[] = recoveredEmails
+    .filter((email) => !dbInviteEmails.has(email.toLowerCase()))
+    .map((email) => ({
+      id: `recovered-${email}`,
+      userId: null,
+      email,
+      kind: "invite",
+      status: "sent",
+      error: null,
+      sentBy: "vercel-log-recovery",
+      providerMessageId: null,
+      deliveredAt: null,
+      openedAt: null,
+      clickedAt: null,
+      bouncedAt: null,
+      complainedAt: null,
+      failedAt: null,
+      lastEventAt: null,
+      lastEventType: null,
+      lastClickUrl: null,
+      createdAt: "2026-05-07T00:00:00.000Z",
+    }));
+  const sentInvites = new Map(
+    [...recoveredLogs, ...localSentLogs, ...logs]
       .filter((log) => !hiddenLogIds.has(log.id))
       .filter((log) => log.kind === "invite" && log.status === "sent")
       .map((log) => [log.email.toLowerCase(), log]),
@@ -1992,7 +2002,7 @@ function InviteSection({
     if (!confirmed || deletingLogId) return;
     setDeletingLogId(log.id);
     try {
-      if (!log.id.startsWith("local-")) {
+      if (!log.id.startsWith("local-") && !log.id.startsWith("recovered-")) {
         const res = await deleteAdminOutreachLog({ data: { accessToken, outreachLogId: log.id } }) as any;
         if (!res.ok) throw new Error(res.reason ?? "Failed to delete invite log");
       }
@@ -2145,7 +2155,7 @@ function InviteSection({
           style={{ color: "var(--text-3)" }}
         >
           <span>Sent Invites</span>
-          <span>{waitingInvites.length} waiting · {convertedInvites.length} signed up</span>
+          <span>{waitingInvites.length} waiting · {convertedInvites.length} signed up · includes recovered logs</span>
         </div>
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
