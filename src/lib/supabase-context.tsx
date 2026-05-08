@@ -18,7 +18,6 @@ type SupabaseAuthState = {
   client: SupabaseClient | null;
   session: Session | null;
   user: User | null;
-  signInWithGoogle: (redirectTo?: string) => Promise<void>;
   signInWithGitHub: (redirectTo?: string) => Promise<void>;
   signInWithMagicLink: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -66,21 +65,6 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signInWithGoogle = useCallback(
-    async (redirectTo?: string) => {
-      if (!client) throw new Error("Supabase is not configured");
-      const target =
-        redirectTo ??
-        (typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined);
-      const { error } = await client.auth.signInWithOAuth({
-        provider: "google",
-        options: target ? { redirectTo: target } : undefined,
-      });
-      if (error) throw error;
-    },
-    [client],
-  );
-
   const signInWithGitHub = useCallback(
     async (redirectTo?: string) => {
       if (!client) throw new Error("Supabase is not configured");
@@ -126,13 +110,12 @@ export function SupabaseAuthProvider({ children }: { children: ReactNode }) {
       client,
       session,
       user: session?.user ?? null,
-      signInWithGoogle,
       signInWithGitHub,
       signInWithMagicLink,
       signOut,
       getAccessToken,
     }),
-    [status, client, session, signInWithGoogle, signInWithGitHub, signInWithMagicLink, signOut, getAccessToken],
+    [status, client, session, signInWithGitHub, signInWithMagicLink, signOut, getAccessToken],
   );
 
   return <SupabaseAuthContext.Provider value={value}>{children}</SupabaseAuthContext.Provider>;

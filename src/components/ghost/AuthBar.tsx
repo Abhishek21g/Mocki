@@ -10,22 +10,11 @@ const ADMIN_EMAILS = new Set(["enaguthiabhishek@gmail.com", "muralikinti@gmail.c
  * Supabase isn't configured so the app stays usable in unconfigured local dev.
  */
 export function AuthBar() {
-  const { status, user, signInWithGoogle, signOut } = useSupabaseAuth();
+  const { status, user, signOut } = useSupabaseAuth();
   const [busy, setBusy] = useState(false);
   const isAdmin = !!user?.email && ADMIN_EMAILS.has(user.email);
 
   if (status === "unconfigured") return null;
-
-  async function handleSignIn() {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await signInWithGoogle();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Sign-in failed");
-      setBusy(false);
-    }
-  }
 
   async function handleSignOut() {
     if (busy) return;
@@ -87,14 +76,12 @@ export function AuthBar() {
         </>
       )}
       {status === "ready" && !user && (
-        <button
-          type="button"
-          onClick={handleSignIn}
-          disabled={busy}
-          className="rounded-md border border-white/10 bg-black/60 px-3 py-1.5 text-white backdrop-blur transition hover:border-white/30 disabled:opacity-60"
+        <Link
+          to="/"
+          className="rounded-md border border-white/10 bg-black/60 px-3 py-1.5 text-white backdrop-blur transition hover:border-white/30"
         >
-          {busy ? "Opening…" : "Login"}
-        </button>
+          Login
+        </Link>
       )}
     </div>
   );
