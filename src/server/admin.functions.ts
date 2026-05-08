@@ -774,6 +774,7 @@ export const sendAdminInviteEmails = createServerFn({ method: "POST" })
         status: result.ok ? "sent" : "failed",
         ok: result.ok,
         error: result.error,
+        sentAt: result.ok ? new Date().toISOString() : undefined,
       });
     }
 

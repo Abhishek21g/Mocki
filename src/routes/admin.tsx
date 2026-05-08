@@ -297,6 +297,7 @@ function AdminPage() {
                 accessToken={getAccessToken() ?? ""}
                 logs={stats.outreachLogs}
                 users={stats.users}
+                onSent={load}
               />
             </section>
               </>
@@ -1816,21 +1817,24 @@ function InviteSection({
   accessToken,
   logs,
   users,
+  onSent,
 }: {
   accessToken: string;
   logs: AdminOutreachLog[];
   users: AdminUser[];
+  onSent?: () => void;
 }) {
   const [raw, setRaw] = useState("");
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState<InviteResult[] | null>(null);
+  const [localSentLogs, setLocalSentLogs] = useState<AdminOutreachLog[]>([]);
 
   const emails = raw
     .split(/[\n,\s]+/)
     .map((e) => e.trim())
     .filter((e) => e.includes("@"));
   const sentInvites = new Map(
-    logs
+    [...localSentLogs, ...logs]
       .filter((log) => log.kind === "invite" && log.status === "sent")
       .map((log) => [log.email.toLowerCase(), log]),
   );
@@ -1849,9 +1853,47 @@ function InviteSection({
     setResults(null);
     try {
       const res = await sendAdminInviteEmails({ data: { accessToken, emails } }) as any;
-      setResults(res.results ?? []);
+      const nextResults = (res.results ?? []) as InviteResult[];
+      setResults(nextResults);
+      const now = new Date().toISOString();
+      const freshSentLogs: AdminOutreachLog[] = nextResults
+        .filter((r) => r.status === "sent" || r.status === "skipped")
+        .map((r) => ({
+          id: `local-${r.email}-${r.sentAt ?? now}`,
+          userId: null,
+          email: r.email,
+          kind: "invite",
+          status: "sent",
+          error: null,
+          sentBy: null,
+          providerMessageId: null,
+          deliveredAt: null,
+          openedAt: null,
+          clickedAt: null,
+          bouncedAt: null,
+          complainedAt: null,
+          failedAt: null,
+          lastEventAt: null,
+          lastEventType: null,
+          lastClickUrl: null,
+          createdAt: r.sentAt ?? now,
+        }));
+      if (freshSentLogs.length > 0) {
+        setLocalSentLogs((prev) => {
+          const seen = new Set(logs.map((log) => log.email.toLowerCase()));
+          const merged = [...prev];
+          for (const log of freshSentLogs) {
+            const key = log.email.toLowerCase();
+            if (!seen.has(key) && !merged.some((existing) => existing.email.toLowerCase() === key)) {
+              merged.push(log);
+            }
+          }
+          return merged;
+        });
+      }
       const sentOrSkipped = (res.results ?? []).every((r: InviteResult) => r.ok);
       if (sentOrSkipped) setRaw("");
+      if (nextResults.some((r) => r.ok)) onSent?.();
     } catch (e) {
       console.error("[invites] send failed", e);
     } finally {
