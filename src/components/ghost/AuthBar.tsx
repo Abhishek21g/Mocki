@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import { showToast } from "@/components/ghost/Toaster";
 
+const ADMIN_EMAILS = new Set(["enaguthiabhishek@gmail.com", "muralikinti@gmail.com"]);
+
 /**
  * Floating auth chrome shown at the top-right of every screen. Hidden when
  * Supabase isn't configured so the app stays usable in unconfigured local dev.
@@ -10,6 +12,7 @@ import { showToast } from "@/components/ghost/Toaster";
 export function AuthBar() {
   const { status, user, signInWithGoogle, signOut } = useSupabaseAuth();
   const [busy, setBusy] = useState(false);
+  const isAdmin = !!user?.email && ADMIN_EMAILS.has(user.email);
 
   if (status === "unconfigured") return null;
 
@@ -51,6 +54,19 @@ export function AuthBar() {
           >
             History
           </Link>
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className="rounded-md border px-3 py-1.5 font-semibold backdrop-blur transition"
+              style={{
+                borderColor: "rgba(118,185,0,0.35)",
+                background: "rgba(118,185,0,0.09)",
+                color: "var(--green)",
+              }}
+            >
+              Admin
+            </Link>
+          )}
           {/* Email — hidden on mobile to save space */}
           <span
             className="hidden max-w-[160px] truncate rounded-md border border-white/10 bg-black/40 px-3 py-1.5 backdrop-blur md:inline"
