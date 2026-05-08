@@ -20,6 +20,7 @@ export async function getBrowserSupabase(): Promise<SupabaseClient | null> {
     cachedConfig = config;
     cachedClient = createClient(config.url, config.anonKey, {
       auth: {
+        flowType: "pkce",
         persistSession: true,
         autoRefreshToken: true,
         // We handle the PKCE code exchange explicitly in /auth/callback.

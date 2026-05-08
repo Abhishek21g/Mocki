@@ -43,7 +43,10 @@ function AuthCallback() {
 
         if (code) {
           const { error: exchangeError } = await sb.auth.exchangeCodeForSession(code);
-          if (exchangeError) throw exchangeError;
+          if (exchangeError) {
+            const { data: existingSession } = await sb.auth.getSession();
+            if (!existingSession.session) throw exchangeError;
+          }
         } else {
           // Implicit flow may put tokens in the URL hash; getSession() resolves it.
           await sb.auth.getSession();
@@ -87,9 +90,23 @@ function AuthCallback() {
           <p className="mt-3 text-sm" style={{ color: "var(--text-2)" }}>
             {error}
           </p>
-          <a href="/" className="mt-6 inline-block underline" style={{ color: "var(--text-1)" }}>
-            Back to home
-          </a>
+          <div className="mt-6 flex flex-col gap-3">
+            <button
+              type="button"
+              className="gp-btn"
+              onClick={async () => {
+                const sb = await getBrowserSupabase();
+                await sb?.auth.signOut().catch(() => undefined);
+                sessionStorage.removeItem("auth:next");
+                window.location.href = "/";
+              }}
+            >
+              Try again
+            </button>
+            <a href="/" className="text-sm underline" style={{ color: "var(--text-2)" }}>
+              Back to home
+            </a>
+          </div>
         </div>
       ) : (
         <div className="flex items-center gap-3" style={{ color: "var(--text-2)" }}>
