@@ -222,7 +222,7 @@ async function logOutreach(
     sentBy: string;
     providerMessageId?: string | null;
   },
-): Promise<void> {
+): Promise<{ ok: boolean; error?: string }> {
   const { error } = await admin.from("email_outreach_log").insert({
     user_id: entry.userId ?? null,
     email: entry.email,
@@ -232,7 +232,26 @@ async function logOutreach(
     sent_by: entry.sentBy,
     provider_message_id: entry.providerMessageId ?? null,
   });
-  if (error) console.error("[admin] failed to log outreach:", error);
+  if (!error) return { ok: true };
+
+  // Older production DBs may not have the Resend analytics migration yet.
+  // Still record the outreach so admins do not lose sent-invite history.
+  if (error.message?.includes("provider_message_id")) {
+    const fallback = await admin.from("email_outreach_log").insert({
+      user_id: entry.userId ?? null,
+      email: entry.email,
+      kind: entry.kind,
+      status: entry.status,
+      error: entry.error ?? null,
+      sent_by: entry.sentBy,
+    });
+    if (!fallback.error) return { ok: true };
+    console.error("[admin] failed to log outreach fallback:", fallback.error);
+    return { ok: false, error: fallback.error.message };
+  }
+
+  console.error("[admin] failed to log outreach:", error);
+  return { ok: false, error: error.message };
 }
 
 async function findSentOutreach(
@@ -735,6 +754,7 @@ export type InviteResult = {
   ok: boolean;
   error?: string;
   sentAt?: string;
+  logError?: string;
 };
 
 export const sendAdminInviteEmails = createServerFn({ method: "POST" })
@@ -761,7 +781,7 @@ export const sendAdminInviteEmails = createServerFn({ method: "POST" })
       }
       if (i > 0) await new Promise((resolve) => setTimeout(resolve, 300));
       const result = await sendInviteEmail(data.emails[i]);
-      await logOutreach(admin, {
+      const logged = await logOutreach(admin, {
         email: data.emails[i],
         kind: "invite",
         status: result.ok ? "sent" : "failed",
@@ -775,6 +795,43 @@ export const sendAdminInviteEmails = createServerFn({ method: "POST" })
         ok: result.ok,
         error: result.error,
         sentAt: result.ok ? new Date().toISOString() : undefined,
+        logError: logged.ok ? undefined : logged.error,
+      });
+    }
+
+    const sent = results.filter((r) => r.status === "sent").length;
+    const failed = results.filter((r) => r.status === "failed").length;
+    const skipped = results.filter((r) => r.status === "skipped").length;
+    return { ok: true as const, sent, failed, skipped, results };
+  });
+
+export const markAdminInviteEmailsSent = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => InviteSchema.parse(d))
+  .handler(async ({ data }) => {
+    const authResult = await verifyAdminAccess(data.accessToken);
+    if (!authResult.ok) return { ok: false as const, reason: authResult.reason, results: [] };
+    const admin = authResult.admin;
+
+    const results: InviteResult[] = [];
+    for (const email of data.emails) {
+      const existing = await findSentOutreach(admin, { kind: "invite", email });
+      if (existing) {
+        results.push({ email, status: "skipped", ok: true, sentAt: existing.createdAt });
+        continue;
+      }
+      const sentAt = new Date().toISOString();
+      const logged = await logOutreach(admin, {
+        email,
+        kind: "invite",
+        status: "sent",
+        sentBy: authResult.adminEmail,
+      });
+      results.push({
+        email,
+        status: logged.ok ? "sent" : "failed",
+        ok: logged.ok,
+        error: logged.error,
+        sentAt: logged.ok ? sentAt : undefined,
       });
     }
 

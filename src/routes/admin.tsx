@@ -9,6 +9,7 @@ import {
   fetchAdminBehavioral,
   sendAdminCheckInEmails,
   sendAdminInviteEmails,
+  markAdminInviteEmailsSent,
   type AdminSession,
   type AdminStats,
   type AdminUser,
@@ -1826,6 +1827,7 @@ function InviteSection({
 }) {
   const [raw, setRaw] = useState("");
   const [sending, setSending] = useState(false);
+  const [marking, setMarking] = useState(false);
   const [results, setResults] = useState<InviteResult[] | null>(null);
   const [localSentLogs, setLocalSentLogs] = useState<AdminOutreachLog[]>([]);
 
@@ -1848,7 +1850,7 @@ function InviteSection({
   const remaining = emails.length - alreadySent;
 
   async function handleSend() {
-    if (!emails.length || sending) return;
+    if (!emails.length || sending || marking) return;
     setSending(true);
     setResults(null);
     try {
@@ -1901,6 +1903,64 @@ function InviteSection({
     }
   }
 
+  async function handleMarkSent() {
+    if (!emails.length || sending || marking) return;
+    setMarking(true);
+    setResults(null);
+    try {
+      const res = await markAdminInviteEmailsSent({ data: { accessToken, emails } }) as any;
+      const nextResults = (res.results ?? []) as InviteResult[];
+      setResults(nextResults);
+      addLocalSentLogs(nextResults);
+      const ok = nextResults.every((r) => r.ok);
+      if (ok) setRaw("");
+      if (nextResults.some((r) => r.ok)) onSent?.();
+    } catch (e) {
+      console.error("[invites] mark sent failed", e);
+    } finally {
+      setMarking(false);
+    }
+  }
+
+  function addLocalSentLogs(nextResults: InviteResult[]) {
+    const now = new Date().toISOString();
+    const freshSentLogs: AdminOutreachLog[] = nextResults
+      .filter((r) => r.status === "sent" || r.status === "skipped")
+      .map((r) => ({
+        id: `local-${r.email}-${r.sentAt ?? now}`,
+        userId: null,
+        email: r.email,
+        kind: "invite",
+        status: "sent",
+        error: null,
+        sentBy: null,
+        providerMessageId: null,
+        deliveredAt: null,
+        openedAt: null,
+        clickedAt: null,
+        bouncedAt: null,
+        complainedAt: null,
+        failedAt: null,
+        lastEventAt: null,
+        lastEventType: null,
+        lastClickUrl: null,
+        createdAt: r.sentAt ?? now,
+      }));
+    if (freshSentLogs.length > 0) {
+      setLocalSentLogs((prev) => {
+        const seen = new Set(logs.map((log) => log.email.toLowerCase()));
+        const merged = [...prev];
+        for (const log of freshSentLogs) {
+          const key = log.email.toLowerCase();
+          if (!seen.has(key) && !merged.some((existing) => existing.email.toLowerCase() === key)) {
+            merged.push(log);
+          }
+        }
+        return merged;
+      });
+    }
+  }
+
   return (
     <div>
       <div
@@ -1910,7 +1970,7 @@ function InviteSection({
         <span>Invite New People</span>
         <button
           onClick={handleSend}
-          disabled={sending || emails.length === 0}
+          disabled={sending || marking || emails.length === 0}
           style={{
             fontSize: 11, padding: "4px 14px", borderRadius: 6, border: "none",
             background: emails.length === 0 ? "var(--surface3)" : "var(--green)",
@@ -1924,9 +1984,21 @@ function InviteSection({
       </div>
 
       <div className="gp-card p-5">
-        <p className="mb-3 text-xs" style={{ color: "var(--text-3)" }}>
-          Paste new emails here. Once an invite is sent, it moves into the sent list below and the composer clears.
-        </p>
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs" style={{ color: "var(--text-3)" }}>
+            Paste new emails here. Sent invites move into the list below and the composer clears.
+          </p>
+          <button
+            type="button"
+            onClick={handleMarkSent}
+            disabled={sending || marking || emails.length === 0}
+            className="mono rounded border px-3 py-1 text-[11px] uppercase tracking-wider disabled:opacity-50"
+            style={{ borderColor: "var(--border)", color: "var(--text-2)", background: "var(--surface2)" }}
+            title="Record these as already emailed without sending again"
+          >
+            {marking ? "Marking…" : `Mark sent (${emails.length})`}
+          </button>
+        </div>
         {emails.length > 0 && (
           <div className="mb-4 rounded-md border p-3" style={{ borderColor: "var(--border)", background: "var(--surface2)" }}>
             <div className="mb-2 flex items-center justify-between text-xs" style={{ color: "var(--text-2)" }}>
