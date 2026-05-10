@@ -286,11 +286,17 @@ export const submitAnswer = createServerFn({ method: "POST" })
 
       const updatedRounds = [...session!.rounds, completedRound];
       const newRoundNumber = session!.currentRound + 1;
+      // Record the topic so both Coordinator and Interviewer can avoid repeating it.
+      const updatedAskedTopics = [
+        ...(session!.askedTopics ?? []),
+        activePlan.focus,
+      ];
       session = await updateSession(data.sessionId, {
         rounds: updatedRounds,
         currentRound: newRoundNumber,
         currentStage: activePlan.stage,
         lastClarified: false,
+        askedTopics: updatedAskedTopics,
       });
 
       if (newRoundNumber >= session.totalRounds) {

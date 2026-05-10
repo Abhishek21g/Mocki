@@ -126,6 +126,13 @@ export type Session = {
   lastClarified: boolean;
   createdAt: number;
   /**
+   * Compact list of every topic/focus that has already been covered across all
+   * completed rounds. Fed to both the Coordinator and Interviewer so they can
+   * avoid repeating the same question area even when the full transcript is
+   * long (Interviewer only sees last 2 rounds by design).
+   */
+  askedTopics: string[];
+  /**
    * Optional Supabase user id (set when the interview was started while signed
    * in). Used to scope persistence and learner-memory updates.
    */
@@ -156,6 +163,7 @@ type SessionInput = Omit<
   | "lastPlan"
   | "lastClarified"
   | "createdAt"
+  | "askedTopics"
   | "userId"
   | "learnerMemoryPrompt"
 > &
@@ -169,6 +177,7 @@ export async function createSession(id: string, data: SessionInput): Promise<voi
     lastQuestion: null,
     lastPlan: null,
     lastClarified: false,
+    askedTopics: [],
     createdAt: Date.now(),
     userId: data.userId ?? null,
     learnerMemoryPrompt: data.learnerMemoryPrompt ?? null,

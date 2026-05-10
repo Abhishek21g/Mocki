@@ -868,6 +868,9 @@ ${memorySection}
 Panel Roster:
 ${interviewerRoster}
 
+Topics Already Covered (DO NOT repeat these — pick a different focus area):
+${session.askedTopics.length > 0 ? session.askedTopics.map((t, i) => `  ${i + 1}. ${t}`).join("\n") : "  None yet — this is the first turn."}
+
 Recent Transcript:
 ${historyText}
 
@@ -928,6 +931,15 @@ export async function runInterviewer(
   plan: Plan,
   session: Session,
 ): Promise<string> {
+  // Full topic history — prevents repeating questions even when the full
+  // transcript is much longer than the 2-round context window below.
+  const coveredTopics =
+    session.askedTopics.length > 0
+      ? session.askedTopics.map((t, i) => `  ${i + 1}. ${t}`).join("\n")
+      : "  None yet.";
+
+  // Only the most recent 2 turns for conversational context (keeps the prompt
+  // tight while the topic list above handles long-term deduplication).
   const recentTranscript = session.rounds
     .slice(-2)
     .map(
@@ -980,10 +992,13 @@ ${session.resume.slice(0, 1800)}
 Job Description:
 ${session.jobDescription.slice(0, 1800)}
 
-Recent Transcript:
+Topics Already Covered (STRICT — do NOT ask about any of these again, even in different wording):
+${coveredTopics}
+
+Recent Transcript (last 2 turns for conversational context):
 ${recentTranscript || "No prior turns yet."}
 
-Say the next natural interviewer utterance now. Output only that utterance.`;
+Say the next natural interviewer utterance now. It MUST be on the focus topic above and MUST NOT repeat any already-covered topic. Output only that utterance.`;
 
   const raw = await callNemotron(INTERVIEWER_SYSTEM, userMessage, 0.75, 260, "Interviewer");
   return cleanQuestionText(raw);
