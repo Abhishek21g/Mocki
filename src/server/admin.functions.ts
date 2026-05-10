@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { createSupabaseAdminClient, getUserIdForToken } from "./supabase.server";
 import { downloadJson } from "./spaces.server";
-import { sendCheckInEmail, sendInviteEmail } from "./email.server";
+import { sendCheckInEmail, sendInviteEmail, sendFeedbackRequestEmail } from "./email.server";
 import type { InterviewSessionPayload } from "./history.server";
 
 const ADMIN_EMAILS = ["enaguthiabhishek@gmail.com", "muralikinti@gmail.com"];
@@ -114,7 +114,7 @@ export type AdminOutreachLog = {
   id: string;
   userId: string | null;
   email: string;
-  kind: "check_in" | "invite";
+  kind: "check_in" | "invite" | "feedback_request";
   status: "sent" | "failed";
   error: string | null;
   sentBy: string | null;
@@ -278,7 +278,7 @@ async function logOutreach(
   entry: {
     userId?: string | null;
     email: string;
-    kind: "check_in" | "invite";
+    kind: "check_in" | "invite" | "feedback_request";
     status: "sent" | "failed";
     error?: string | null;
     sentBy: string;
@@ -318,7 +318,7 @@ async function logOutreach(
 
 async function findSentOutreach(
   admin: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
-  data: { kind: "check_in" | "invite"; email: string; userId?: string | null },
+  data: { kind: "check_in" | "invite" | "feedback_request"; email: string; userId?: string | null },
 ): Promise<AdminOutreachLog | null> {
   let query = admin
     .from("email_outreach_log")
@@ -819,6 +819,59 @@ const CheckInSchema = z.object({
   accessToken: z.string().min(10).max(8000),
   userIds: z.array(z.string().min(1)).min(1).max(500),
 });
+
+export const sendAdminFeedbackRequestEmails = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => CheckInSchema.parse(d))
+  .handler(async ({ data }) => {
+    const authResult = await verifyAdminAccess(data.accessToken);
+    if (!authResult.ok) return { ok: false as const, reason: authResult.reason, results: [] };
+    const admin = authResult.admin;
+
+    const { data: usersData, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
+    if (error) return { ok: false as const, reason: "db_error", results: [] };
+
+    const targetUsers = (usersData?.users ?? []).filter((u) => data.userIds.includes(u.id));
+
+    const results: CheckInResult[] = [];
+    for (let i = 0; i < targetUsers.length; i++) {
+      const user = targetUsers[i];
+      const email = user.email;
+      if (!email) {
+        results.push({ userId: user.id, email: "—", status: "failed", ok: false, error: "no email" });
+        continue;
+      }
+      const name =
+        (user.user_metadata?.full_name as string | undefined) ??
+        (user.user_metadata?.name as string | undefined) ??
+        email.split("@")[0];
+      const existing = await findSentOutreach(admin, {
+        kind: "feedback_request",
+        email,
+        userId: user.id,
+      });
+      if (existing) {
+        results.push({ userId: user.id, email, status: "skipped", ok: true, sentAt: existing.createdAt });
+        continue;
+      }
+      if (i > 0) await new Promise((resolve) => setTimeout(resolve, 300));
+      const result = await sendFeedbackRequestEmail(email, name);
+      await logOutreach(admin, {
+        userId: user.id,
+        email,
+        kind: "feedback_request",
+        status: result.ok ? "sent" : "failed",
+        error: result.error,
+        sentBy: authResult.adminEmail,
+        providerMessageId: result.messageId,
+      });
+      results.push({ userId: user.id, email, status: result.ok ? "sent" : "failed", ok: result.ok, error: result.error });
+    }
+
+    const sent = results.filter((r) => r.status === "sent").length;
+    const failed = results.filter((r) => r.status === "failed").length;
+    const skipped = results.filter((r) => r.status === "skipped").length;
+    return { ok: true as const, sent, failed, skipped, results };
+  });
 
 export type CheckInResult = {
   userId: string;

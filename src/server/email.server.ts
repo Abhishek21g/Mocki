@@ -335,6 +335,77 @@ mocki.dev`;
   return { ok: true, messageId: data?.id };
 }
 
+export async function sendFeedbackRequestEmail(email: string, name: string): Promise<{ ok: boolean; error?: string; messageId?: string }> {
+  const resend = getResendClient();
+  if (!resend) return { ok: false, error: "RESEND_API_KEY not set" };
+
+  const firstName = name?.split(" ")[0] || "there";
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body style="margin:0;padding:0;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111111;">
+  <div style="max-width:520px;margin:40px auto;padding:0 24px;">
+
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#111;">
+      Hey ${firstName},
+    </p>
+
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
+      You finished an interview on Mocki — nice work. How'd it feel?
+    </p>
+
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.7;color:#111;">
+      I'm still building this and your take would genuinely help — did the questions feel realistic? Was the debrief useful? Anything feel off?
+    </p>
+
+    <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#111;">
+      Just hit reply — even one line helps.
+    </p>
+
+    <p style="margin:0;font-size:15px;line-height:1.7;color:#111;">
+      — Abhishek<br/>
+      <span style="color:#888;font-size:13px;">mocki.dev</span>
+    </p>
+
+  </div>
+</body>
+</html>`;
+
+  const text = `Hey ${firstName},
+
+You finished an interview on Mocki — nice work. How'd it feel?
+
+I'm still building this and your take would genuinely help — did the questions feel realistic? Was the debrief useful? Anything feel off?
+
+Just hit reply — even one line helps.
+
+— Abhishek
+mocki.dev`;
+
+  const { data, error } = await resend.emails.send({
+    from: FROM,
+    to: email,
+    subject: `how was the mock interview, ${firstName}?`,
+    replyTo: REPLY_TO,
+    headers: {
+      "List-Unsubscribe": LIST_UNSUBSCRIBE,
+    },
+    html,
+    text,
+  });
+
+  if (error) {
+    console.error("[email] feedback-request failed:", email, error);
+    return { ok: false, error: String(error) };
+  }
+  console.log(`[email] feedback-request sent to ${email}`);
+  return { ok: true, messageId: data?.id };
+}
+
 export async function sendInviteEmail(email: string): Promise<{ ok: boolean; error?: string; messageId?: string }> {
   const resend = getResendClient();
   if (!resend) return { ok: false, error: "RESEND_API_KEY not set" };

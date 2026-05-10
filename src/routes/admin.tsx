@@ -9,6 +9,7 @@ import {
   fetchAdminRecordingUrl,
   fetchAdminBehavioral,
   sendAdminCheckInEmails,
+  sendAdminFeedbackRequestEmails,
   sendAdminInviteEmails,
   markAdminInviteEmailsSent,
   deleteAdminOutreachLog,
@@ -1672,6 +1673,9 @@ function InviteFunnelSection({
       } else if ((stage === 3 || stage === 4) && row.userId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await (sendAdminCheckInEmails as any)({ data: { accessToken, userIds: [row.userId] } });
+      } else if (stage === 5 && row.userId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (sendAdminFeedbackRequestEmails as any)({ data: { accessToken, userIds: [row.userId] } });
       }
     } catch (e) {
       console.error("[funnel] action failed", e);
