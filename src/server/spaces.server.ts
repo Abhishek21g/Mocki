@@ -103,3 +103,32 @@ export async function getPresignedPutUrl(
     return null;
   }
 }
+
+export function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 24);
+}
+
+export function buildStoragePath(
+  date: string,
+  userSlug: string,
+  roleSlug: string,
+  filename: string,
+): string {
+  return `sessions/${date}/${userSlug}/${roleSlug}/${filename}`;
+}
+
+export async function uploadMetadata(
+  baseKey: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  await uploadToSpaces(
+    `${baseKey}/metadata.json`,
+    JSON.stringify(metadata, null, 2),
+    "application/json",
+  );
+}

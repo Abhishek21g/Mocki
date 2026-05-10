@@ -9,7 +9,7 @@ import { primeAudio } from "@/lib/tts";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview.functions";
 import { useTrack } from "@/lib/use-track";
-import { uploadSessionData } from "@/server/upload.functions";
+import { uploadSessionData, uploadSessionMetadata } from "@/server/upload.functions";
 import { useKeystrokeTracker } from "@/hooks/useKeystrokeTracker";
 import { useCamRecorder } from "@/hooks/useCamRecorder";
 import { useBehavioralTracker } from "@/hooks/useBehavioralTracker";
@@ -444,6 +444,14 @@ function InterviewPage() {
               console.log("[upload] cam", res.status, await res.json().catch(() => null));
             }).catch((err) => {
               console.error("[upload] cam failed", err);
+            });
+            // Fire-and-forget: upload session metadata.json
+            uploadSessionMetadata({
+              data: { accessToken, sessionId: sid, browser: navigator.userAgent },
+            }).then((r) => {
+              console.log("[upload] metadata", r);
+            }).catch((err) => {
+              console.error("[upload] metadata failed", err);
             });
           } else {
             console.warn("[upload] skipped — no accessToken or sessionId", { hasToken: !!accessToken, sessionId: state.sessionId });

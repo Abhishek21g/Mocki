@@ -1,7 +1,65 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { uploadToSpaces, getPresignedPutUrl, getPresignedGetUrl, objectExists } from "./spaces.server";
-import { getUserIdForToken } from "./supabase.server";
+import { uploadToSpaces, getPresignedPutUrl, getPresignedGetUrl, objectExists, slugify, uploadMetadata } from "./spaces.server";
+import { getUserIdForToken, createSupabaseAdminClient } from "./supabase.server";
+
+type SessionBase = {
+  newBase: string;
+  userEmail: string;
+  displayName: string;
+  role: string;
+  company: string;
+  interviewType: string;
+  totalRounds: number;
+  currentRound: number;
+  createdAt: string;
+};
+
+async function resolveSessionBase(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  userId: string,
+  sessionId: string,
+): Promise<SessionBase | null> {
+  if (!admin) return null;
+  try {
+    const [sessionRes, userRes] = await Promise.all([
+      admin
+        .from("session_store")
+        .select("data, created_at")
+        .eq("id", sessionId)
+        .eq("user_id", userId)
+        .single(),
+      admin.auth.admin.getUserById(userId),
+    ]);
+
+    const d = sessionRes.data?.data as Record<string, unknown> | null;
+    if (!d) return null;
+
+    const role = (d.role as string) || "unknown";
+    const company = (d.company as string) || "unknown";
+    const interviewType = (d.interview_type as string) || "mixed";
+    const totalRounds = (d.totalRounds as number) ?? 1;
+    const currentRound = (d.currentRound as number) ?? 0;
+    const createdAt = (sessionRes.data?.created_at as string) ?? new Date().toISOString();
+
+    const authUser = userRes.data?.user;
+    const displayName =
+      (authUser?.user_metadata?.full_name as string | undefined) ||
+      (authUser?.user_metadata?.name as string | undefined) ||
+      authUser?.email?.split("@")[0] ||
+      "guest";
+    const userEmail = authUser?.email ?? "";
+
+    const date = createdAt.slice(0, 10);
+    const userSlug = `${slugify(displayName)}__${userId.slice(0, 8)}`;
+    const roleSlug = `${slugify(role)}__${sessionId.slice(0, 8)}`;
+    const newBase = `sessions/${date}/${userSlug}/${roleSlug}`;
+
+    return { newBase, userEmail, displayName, role, company, interviewType, totalRounds, currentRound, createdAt };
+  } catch {
+    return null;
+  }
+}
 
 const UploadResumeSchema = z.object({
   accessToken: z.string().min(10).max(8000),
@@ -58,25 +116,35 @@ export const getSessionRecordingUrl = createServerFn({ method: "POST" })
     const userId = await getUserIdForToken(data.accessToken);
     if (!userId) return { ok: false as const, url: null, ext: null };
 
-    // Try webm first, then mp4
-    const webmKey = `sessions/${userId}/${data.sessionId}/cam.webm`;
-    const mp4Key = `sessions/${userId}/${data.sessionId}/cam.mp4`;
+    const tryKeys = async (
+      webm: string,
+      mp4: string,
+    ): Promise<{ key: string; ext: "webm" | "mp4" } | null> => {
+      if (await objectExists(webm)) return { key: webm, ext: "webm" };
+      if (await objectExists(mp4)) return { key: mp4, ext: "mp4" };
+      return null;
+    };
 
-    let key: string | null = null;
-    let ext: "webm" | "mp4" | null = null;
+    const admin = createSupabaseAdminClient();
+    const base = await resolveSessionBase(admin, userId, data.sessionId);
 
-    if (await objectExists(webmKey)) {
-      key = webmKey;
-      ext = "webm";
-    } else if (await objectExists(mp4Key)) {
-      key = mp4Key;
-      ext = "mp4";
+    let found: { key: string; ext: "webm" | "mp4" } | null = null;
+
+    if (base) {
+      found = await tryKeys(`${base.newBase}/cam.webm`, `${base.newBase}/cam.mp4`);
     }
 
-    if (!key) return { ok: true, url: null, ext: null };
+    if (!found) {
+      found = await tryKeys(
+        `sessions/${userId}/${data.sessionId}/cam.webm`,
+        `sessions/${userId}/${data.sessionId}/cam.mp4`,
+      );
+    }
 
-    const url = await getPresignedGetUrl(key, 3600);
-    return { ok: true, url, ext };
+    if (!found) return { ok: true, url: null, ext: null };
+
+    const url = await getPresignedGetUrl(found.key, 3600);
+    return { ok: true, url, ext: found.ext };
   });
 
 export const uploadSessionData = createServerFn({ method: "POST" })
@@ -87,8 +155,50 @@ export const uploadSessionData = createServerFn({ method: "POST" })
       console.warn("[upload] uploadSessionData: no userId from token");
       return { ok: false as const };
     }
-    const key = `sessions/${userId}/${data.sessionId}/${data.type}.json`;
+
+    const admin = createSupabaseAdminClient();
+    const base = await resolveSessionBase(admin, userId, data.sessionId);
+
+    const key = base
+      ? `${base.newBase}/${data.type}.json`
+      : `sessions/${userId}/${data.sessionId}/${data.type}.json`;
+
     const stored = await uploadToSpaces(key, data.payload, "application/json");
     console.log("[upload] uploadSessionData:", stored ? "ok" : "failed", key);
     return { ok: !!stored };
+  });
+
+const SessionMetadataSchema = z.object({
+  accessToken: z.string().min(10).max(8000),
+  sessionId: z.string().min(8).max(80),
+  browser: z.string().max(500).optional(),
+});
+
+export const uploadSessionMetadata = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => SessionMetadataSchema.parse(d))
+  .handler(async ({ data }) => {
+    const userId = await getUserIdForToken(data.accessToken);
+    if (!userId) return { ok: false as const };
+
+    const admin = createSupabaseAdminClient();
+    const base = await resolveSessionBase(admin, userId, data.sessionId);
+    if (!base) return { ok: false as const };
+
+    const metadata: Record<string, unknown> = {
+      sessionId: data.sessionId,
+      userId,
+      userEmail: base.userEmail,
+      displayName: base.displayName,
+      role: base.role,
+      company: base.company,
+      interviewType: base.interviewType,
+      totalRounds: base.totalRounds,
+      completionStatus: base.currentRound >= base.totalRounds ? "completed" : "abandoned",
+      createdAt: base.createdAt,
+      uploadedAt: new Date().toISOString(),
+      browser: data.browser ?? null,
+    };
+
+    await uploadMetadata(base.newBase, metadata);
+    return { ok: true as const };
   });
