@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { AgentDashboard } from "@/components/agent-dashboard";
-import type { AgentEvent } from "@/components/agent-dashboard/types";
+import type { AgentEvent, ViewerSession } from "@/components/agent-dashboard/types";
 
 export function FloatingAgentToggle({
   eventsCount,
@@ -33,6 +33,7 @@ export function AgentPanel({
   open,
   totalTurns,
   sessionId,
+  session,
   onClose,
 }: {
   events: AgentEvent[];
@@ -40,6 +41,7 @@ export function AgentPanel({
   open: boolean;
   totalTurns: number;
   sessionId: string | null;
+  session?: ViewerSession | null;
   onClose?: () => void;
 }) {
   if (!open) return null;
@@ -115,7 +117,7 @@ export function AgentPanel({
           )}
         </div>
       </div>
-      <AgentDashboard events={events} totalTurns={totalTurns} variant={mode} />
+      <AgentDashboard events={events} totalTurns={totalTurns} variant={mode} session={session} />
     </aside>
   );
 }

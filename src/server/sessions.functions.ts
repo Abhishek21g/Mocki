@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { createSupabaseAdminClient, getUserIdForToken } from "./supabase.server";
 import type { InterviewStage, Plan, Persona, Round, RoleProfile, Session } from "./sessions.server";
+import type { ViewerSession } from "@/components/agent-dashboard/types";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -148,4 +149,68 @@ export const resumeInterview = createServerFn({ method: "POST" })
     };
 
     return { ok: true as const, reason: null, session: resumed };
+  });
+
+// ---------------------------------------------------------------------------
+// getSessionForViewer
+// ---------------------------------------------------------------------------
+
+const ViewerSchema = z.object({
+  sessionId: z.string().min(8).max(80),
+});
+
+export const getSessionForViewer = createServerFn({ method: "POST" })
+  .inputValidator((d: unknown) => ViewerSchema.parse(d))
+  .handler(async ({ data }) => {
+    const admin = createSupabaseAdminClient();
+    if (!admin) return { ok: false as const, session: null };
+
+    const { data: row, error } = await admin
+      .from("session_store")
+      .select("data")
+      .eq("id", data.sessionId)
+      .single();
+
+    if (error || !row) return { ok: false as const, session: null };
+
+    const s = row.data as Session;
+
+    const session: ViewerSession = {
+      role: s.role,
+      company: s.company,
+      interview_type: s.interview_type,
+      currentRound: s.currentRound,
+      totalRounds: s.totalRounds,
+      activeInterviewerId: s.activeInterviewerId ?? null,
+      interviewers: s.interviewers.map((iv) => ({
+        id: iv.id,
+        name: iv.name,
+        title: iv.title,
+        personality: iv.personality,
+        focus: iv.focus,
+      })),
+      currentStage: s.currentStage,
+      currentFocus: s.lastPlan?.focus ?? "",
+      currentDifficulty: s.lastPlan?.difficulty ?? "",
+      currentCoordinatorReason: s.lastPlan?.reason ?? "",
+      currentTurnType: s.lastPlan?.turn_type ?? "",
+      lastQuestion: s.lastQuestion,
+      rounds: s.rounds.map((r) => ({
+        id: r.id,
+        question: r.question,
+        answer: r.answer,
+        interviewerName: r.interviewerName,
+        interviewerId: r.interviewerId,
+        stage: r.stage,
+        turnType: r.turnType,
+        evaluation: {
+          overall: r.evaluation.overall,
+          answer_summary: r.evaluation.answer_summary,
+          strengths: r.evaluation.strengths,
+          weaknesses: r.evaluation.weaknesses,
+        },
+      })),
+    };
+
+    return { ok: true as const, session };
   });

@@ -70,6 +70,53 @@ export type AgentSummary = {
   errorCount: number;
 };
 
+// ---------------------------------------------------------------------------
+// Viewer session — safe subset of Session passed to the Control Room UI.
+// No resume/JD text. Defined client-side so components can import it without
+// touching any *.server.ts boundary.
+// ---------------------------------------------------------------------------
+
+export type ViewerInterviewer = {
+  id: string;
+  name: string;
+  title: string;
+  personality: string;
+  focus: string;
+};
+
+export type ViewerRound = {
+  id: string;
+  question: string;
+  answer: string;
+  interviewerName: string;
+  interviewerId: string;
+  stage: string;
+  turnType: string;
+  evaluation: {
+    overall: number;
+    answer_summary: string;
+    strengths: string[];
+    weaknesses: string[];
+  };
+};
+
+export type ViewerSession = {
+  role: string;
+  company: string;
+  interview_type: string;
+  currentRound: number;
+  totalRounds: number;
+  activeInterviewerId: string | null;
+  interviewers: ViewerInterviewer[];
+  currentStage: string;
+  currentFocus: string;
+  currentDifficulty: string;
+  currentCoordinatorReason: string;
+  currentTurnType: string;
+  lastQuestion: string | null;
+  rounds: ViewerRound[];
+};
+
 export type TurnGroup = {
   turn: number;
   events: AgentEvent[];

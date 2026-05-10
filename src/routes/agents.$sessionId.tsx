@@ -2,8 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { AgentDashboard } from "@/components/agent-dashboard";
-import type { AgentEvent } from "@/components/agent-dashboard/types";
+import type { AgentEvent, ViewerSession } from "@/components/agent-dashboard/types";
 import { fetchAgentLogs } from "@/server/interview.functions";
+import { getSessionForViewer } from "@/server/sessions.functions";
 
 type AgentsSearch = {
   /** Total turns the panel was configured for. Threads through the popout
@@ -34,6 +35,7 @@ function AgentsStandalonePage() {
   const { totalTurns: searchTotalTurns } = Route.useSearch();
 
   const [events, setEvents] = useState<AgentEvent[]>([]);
+  const [session, setSession] = useState<ViewerSession | null>(null);
   const [polling, setPolling] = useState<"connecting" | "live" | "stalled">(
     "connecting",
   );
@@ -67,6 +69,28 @@ function AgentsStandalonePage() {
 
     void tick();
     const id = setInterval(tick, 800);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [sessionId]);
+
+  // Poll session state every 3 s to keep control room cards up to date.
+  useEffect(() => {
+    if (!sessionId) return;
+    let alive = true;
+
+    const fetchSession = async () => {
+      try {
+        const res = await getSessionForViewer({ data: { sessionId } });
+        if (alive && res.ok && res.session) setSession(res.session);
+      } catch {
+        // silently ignore — session polling is best-effort
+      }
+    };
+
+    void fetchSession();
+    const id = setInterval(fetchSession, 3000);
     return () => {
       alive = false;
       clearInterval(id);
@@ -145,6 +169,7 @@ function AgentsStandalonePage() {
             events={events}
             totalTurns={totalTurns}
             variant="standalone"
+            session={session}
           />
         </section>
 

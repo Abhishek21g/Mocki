@@ -33,7 +33,7 @@ import { WebcamFeed } from "@/components/interview/WebcamFeed";
 import { useTTS } from "@/hooks/useTTS";
 import { useSpeech } from "@/hooks/useSpeech";
 
-import type { AgentEvent } from "@/components/agent-dashboard/types";
+import type { AgentEvent, ViewerSession } from "@/components/agent-dashboard/types";
 
 const AVATAR_ENABLED_STORAGE_KEY = "mocki:avatarEnabled";
 
@@ -347,6 +347,43 @@ function InterviewPage() {
   const roleProfile = state.roleProfile;
   const showInlineAgents = showAgents && canInlineAgents;
   const showDrawerAgents = showAgents && !canInlineAgents;
+
+  const viewerSession: ViewerSession = {
+    role: setup.role,
+    company: setup.company,
+    interview_type: setup.interview_type,
+    currentRound: state.currentRound,
+    totalRounds: state.totalRounds,
+    activeInterviewerId: state.activeInterviewer.id ?? null,
+    interviewers: state.interviewers.map((iv) => ({
+      id: iv.id,
+      name: iv.name,
+      title: iv.title,
+      personality: iv.personality,
+      focus: iv.focus,
+    })),
+    currentStage: state.currentStage,
+    currentFocus: state.currentFocus,
+    currentDifficulty: state.currentDifficulty,
+    currentCoordinatorReason: state.currentCoordinatorReason,
+    currentTurnType: state.currentTurnType,
+    lastQuestion: state.currentQuestion || null,
+    rounds: state.rounds.map((r) => ({
+      id: r.id,
+      question: r.question,
+      answer: r.answer,
+      interviewerName: r.interviewerName,
+      interviewerId: r.interviewerId,
+      stage: r.stage,
+      turnType: r.turnType,
+      evaluation: {
+        overall: r.evaluation.overall,
+        answer_summary: r.evaluation.answer_summary,
+        strengths: r.evaluation.strengths,
+        weaknesses: r.evaluation.weaknesses,
+      },
+    })),
+  };
 
   async function handleSubmit() {
     if (!answer.trim() || controlsDisabled) return;
@@ -718,6 +755,7 @@ function InterviewPage() {
               open={showAgents}
               totalTurns={state.totalRounds}
               sessionId={state.sessionId}
+              session={viewerSession}
             />
           )}
         </div>
@@ -738,6 +776,7 @@ function InterviewPage() {
           open
           totalTurns={state.totalRounds}
           sessionId={state.sessionId}
+          session={viewerSession}
           onClose={() => setShowAgents(false)}
         />
       )}
