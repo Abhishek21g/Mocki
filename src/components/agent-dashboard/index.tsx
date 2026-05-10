@@ -67,7 +67,7 @@ export function AgentDashboard({
         </>
       )}
 
-      <EventStream events={events} variant={variant} />
+      {showDebug && <EventStream events={events} variant={variant} />}
     </div>
   );
 }
