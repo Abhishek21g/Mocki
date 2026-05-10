@@ -19,6 +19,7 @@ import {
   type ScoreDistributionBucket,
   type CheckInResult,
   type InviteResult,
+  type EnrichedInviteRow,
 } from "@/server/admin.functions";
 import type { BehavioralPayload } from "@/hooks/useBehavioralTracker";
 
@@ -286,13 +287,10 @@ function AdminPage() {
             {activeTab === "outreach" && (
               <>
             <section className="fade-up mt-8">
-              <InviteAnalyticsPanel stats={stats} />
-            </section>
-            <section className="fade-up mt-8">
-              <OutreachSection
-                users={stats.users}
-                logs={stats.outreachLogs}
+              <InviteFunnelSection
+                rows={stats.enrichedInviteRows}
                 accessToken={getAccessToken() ?? ""}
+                onRefresh={load}
               />
             </section>
             <section className="fade-up mt-8">
@@ -1609,7 +1607,260 @@ function BehavioralSection({ data, loading }: { data: BehavioralPayload | null; 
 }
 
 // ---------------------------------------------------------------------------
-// Outreach section
+// Invite funnel section
+// ---------------------------------------------------------------------------
+
+const FUNNEL_STAGES = [
+  "Invited", "Opened", "Clicked", "Signed Up", "Started", "Completed", "Feedback",
+] as const;
+
+function getFurthestStage(row: EnrichedInviteRow): number {
+  if (row.feedbackGiven) return 6;
+  if (row.sessionCompleted) return 5;
+  if (row.sessionStarted) return 4;
+  if (row.signedUp) return 3;
+  if (row.clicked) return 2;
+  if (row.opened) return 1;
+  return 0;
+}
+
+type FunnelFilterId = "all" | "waiting" | "clicked_not_signed" | "signed_no_session" | "abandoned" | "completed" | "feedback";
+
+interface FunnelCardDef {
+  id: FunnelFilterId;
+  label: string;
+  count: number;
+  filter: (r: EnrichedInviteRow) => boolean;
+}
+
+function buildFunnelCards(rows: EnrichedInviteRow[]): FunnelCardDef[] {
+  return [
+    { id: "all", label: "Total Sent", count: rows.length, filter: () => true },
+    { id: "waiting", label: "Waiting to Open", count: rows.filter((r) => r.delivered && !r.opened).length, filter: (r) => r.delivered && !r.opened },
+    { id: "clicked_not_signed", label: "Clicked, Not Signed", count: rows.filter((r) => r.clicked && !r.signedUp).length, filter: (r) => r.clicked && !r.signedUp },
+    { id: "signed_no_session", label: "Signed, No Session", count: rows.filter((r) => r.signedUp && !r.sessionStarted).length, filter: (r) => r.signedUp && !r.sessionStarted },
+    { id: "abandoned", label: "Started & Abandoned", count: rows.filter((r) => r.sessionStarted && !r.sessionCompleted).length, filter: (r) => r.sessionStarted && !r.sessionCompleted },
+    { id: "completed", label: "Completed", count: rows.filter((r) => r.sessionCompleted).length, filter: (r) => r.sessionCompleted },
+    { id: "feedback", label: "Gave Feedback", count: rows.filter((r) => r.feedbackGiven).length, filter: (r) => r.feedbackGiven },
+  ];
+}
+
+function InviteFunnelSection({
+  rows,
+  accessToken,
+  onRefresh,
+}: {
+  rows: EnrichedInviteRow[];
+  accessToken: string;
+  onRefresh: () => void;
+}) {
+  const [activeFilter, setActiveFilter] = useState<FunnelFilterId>("all");
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const cards = buildFunnelCards(rows);
+  const activeCard = cards.find((c) => c.id === activeFilter)!;
+  const filteredRows = rows.filter(activeCard.filter);
+
+  async function handleAction(row: EnrichedInviteRow) {
+    if (actionLoading) return;
+    setActionLoading(row.email);
+    try {
+      const stage = getFurthestStage(row);
+      if (stage <= 2) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (sendAdminInviteEmails as any)({ data: { accessToken, emails: [row.email] } });
+      } else if ((stage === 3 || stage === 4) && row.userId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (sendAdminCheckInEmails as any)({ data: { accessToken, userIds: [row.userId] } });
+      }
+    } catch (e) {
+      console.error("[funnel] action failed", e);
+    } finally {
+      setActionLoading(null);
+      onRefresh();
+    }
+  }
+
+  return (
+    <div>
+      <div className="mono mb-4 text-[11px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+        Invite Funnel
+      </div>
+
+      {/* Stat cards row */}
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+        {cards.map((card) => {
+          const active = card.id === activeFilter;
+          return (
+            <button
+              key={card.id}
+              onClick={() => setActiveFilter(active ? "all" : card.id)}
+              className="w-full rounded-xl border p-4 text-left transition-all"
+              style={{
+                borderColor: active ? "rgba(118,185,0,0.55)" : "var(--border)",
+                background: active ? "rgba(118,185,0,0.08)" : "var(--surface2)",
+                cursor: "pointer",
+              }}
+            >
+              <div
+                className="mono text-[10px] uppercase tracking-wider"
+                style={{ color: active ? "var(--green)" : "var(--text-3)" }}
+              >
+                {card.label}
+              </div>
+              <div
+                className="mt-2 text-2xl font-bold tabular-nums"
+                style={{ color: active ? "var(--green)" : "var(--text)" }}
+              >
+                {card.count}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* People table */}
+      <div
+        className="mono mb-3 flex items-center justify-between text-[11px] uppercase tracking-wider"
+        style={{ color: "var(--text-3)" }}
+      >
+        <span>
+          {activeFilter === "all" ? "All Invited People" : activeCard.label} ({filteredRows.length})
+        </span>
+      </div>
+
+      <div className="gp-card overflow-hidden p-0">
+        <div
+          className="mono grid gap-3 px-5 py-2 text-[10px] uppercase tracking-wider"
+          style={{
+            color: "var(--text-3)",
+            background: "var(--surface2)",
+            gridTemplateColumns: "1.8fr 2fr 1fr 1fr",
+          }}
+        >
+          <span>Email</span>
+          <span>Stage</span>
+          <span>Last Activity</span>
+          <span>Action</span>
+        </div>
+        {filteredRows.length === 0 ? (
+          <div className="p-6 text-sm" style={{ color: "var(--text-3)" }}>
+            No people in this stage yet.
+          </div>
+        ) : (
+          <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+            {filteredRows.map((row) => (
+              <InvitePersonRow
+                key={row.email}
+                row={row}
+                actionLoading={actionLoading === row.email}
+                onAction={() => handleAction(row)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InviteStageBar({ row }: { row: EnrichedInviteRow }) {
+  const furthest = getFurthestStage(row);
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+        {FUNNEL_STAGES.map((_, i) => (
+          <div
+            key={i}
+            title={FUNNEL_STAGES[i]}
+            style={{
+              width: 7,
+              height: 7,
+              borderRadius: "50%",
+              flexShrink: 0,
+              background: i <= furthest ? "var(--green)" : "rgba(255,255,255,0.08)",
+              border: `1px solid ${i <= furthest ? "rgba(118,185,0,0.7)" : "var(--border)"}`,
+            }}
+          />
+        ))}
+      </div>
+      <span className="mono text-[11px]" style={{ color: "var(--text-2)" }}>
+        {FUNNEL_STAGES[furthest]}
+      </span>
+    </div>
+  );
+}
+
+function InvitePersonRow({
+  row,
+  actionLoading,
+  onAction,
+}: {
+  row: EnrichedInviteRow;
+  actionLoading: boolean;
+  onAction: () => void;
+}) {
+  const stage = getFurthestStage(row);
+
+  type ActionDef = { label: string; style: React.CSSProperties };
+  let action: ActionDef | null = null;
+  if (stage <= 1) {
+    action = {
+      label: "Resend invite",
+      style: { color: "var(--text-2)", borderColor: "var(--border)", background: "var(--surface2)" },
+    };
+  } else if (stage === 2) {
+    action = {
+      label: "Follow up",
+      style: { color: "#fbbf24", borderColor: "rgba(251,191,36,0.35)", background: "rgba(251,191,36,0.07)" },
+    };
+  } else if (stage === 3) {
+    action = {
+      label: "Nudge to start",
+      style: { color: "var(--green)", borderColor: "rgba(118,185,0,0.45)", background: "rgba(118,185,0,0.07)" },
+    };
+  } else if (stage === 4) {
+    action = {
+      label: "Resume email",
+      style: { color: "#60a5fa", borderColor: "rgba(96,165,250,0.35)", background: "rgba(96,165,250,0.07)" },
+    };
+  } else if (stage === 5) {
+    action = {
+      label: "Request feedback",
+      style: { color: "var(--text-3)", borderColor: "var(--border)", background: "var(--surface2)" },
+    };
+  }
+
+  return (
+    <div
+      className="grid items-center gap-3 px-5 py-3"
+      style={{ gridTemplateColumns: "1.8fr 2fr 1fr 1fr", borderColor: "var(--border)" }}
+    >
+      <span className="truncate text-sm" style={{ color: "var(--text)" }}>{row.email}</span>
+      <InviteStageBar row={row} />
+      <span className="mono text-[11px]" style={{ color: "var(--text-3)" }}>
+        {row.lastActivityAt ? fmtDateShort(row.lastActivityAt) : "—"}
+      </span>
+      <span>
+        {stage === 6 ? (
+          <span className="mono text-[11px]" style={{ color: "#86efac" }}>✓ Done</span>
+        ) : action ? (
+          <button
+            onClick={onAction}
+            disabled={actionLoading || (stage >= 3 && !row.userId)}
+            className="mono rounded border px-2.5 py-1 text-[10px] uppercase tracking-wider disabled:opacity-40"
+            style={action.style}
+          >
+            {actionLoading ? "…" : action.label}
+          </button>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Outreach section (check-in emails for signed-up but inactive users)
 // ---------------------------------------------------------------------------
 
 function OutreachSection({

@@ -152,6 +152,21 @@ export type AdminInviteAnalytics = {
   nextBatchReason: string;
 };
 
+export type EnrichedInviteRow = {
+  email: string;
+  logId: string;
+  sentAt: string;
+  delivered: boolean;
+  opened: boolean;
+  clicked: boolean;
+  signedUp: boolean;
+  sessionStarted: boolean;
+  sessionCompleted: boolean;
+  feedbackGiven: boolean;
+  userId: string | null;
+  lastActivityAt: string | null;
+};
+
 export type AdminStats = {
   // counts
   totalUsers: number;
@@ -173,6 +188,7 @@ export type AdminStats = {
   users: AdminUser[];
   outreachLogs: AdminOutreachLog[];
   inviteAnalytics: AdminInviteAnalytics;
+  enrichedInviteRows: EnrichedInviteRow[];
 };
 
 // ---------------------------------------------------------------------------
@@ -185,6 +201,16 @@ function buildEmailLookup(allUsers: { id: string; email?: string }[]): Record<st
     if (u.email) map[u.id] = u.email;
   }
   return map;
+}
+
+function inviteRowStage(row: EnrichedInviteRow): number {
+  if (row.feedbackGiven) return 6;
+  if (row.sessionCompleted) return 5;
+  if (row.sessionStarted) return 4;
+  if (row.signedUp) return 3;
+  if (row.clicked) return 2;
+  if (row.opened) return 1;
+  return 0;
 }
 
 function extractRounds(payload: InterviewSessionPayload | null): AdminRoundSummary[] {
@@ -596,6 +622,94 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
           : "Ready for a small 5-8 person batch",
     };
 
+    // --- Enriched invite rows for funnel UI ---
+    const userByEmail: Record<string, AdminUser> = {};
+    for (const u of users) {
+      if (u.email !== "—") userByEmail[u.email.toLowerCase()] = u;
+    }
+
+    const sessionsByUserId: Record<string, any[]> = {};
+    for (const s of allSessions) {
+      const uid = s.user_id as string | null;
+      if (!uid) continue;
+      if (!sessionsByUserId[uid]) sessionsByUserId[uid] = [];
+      sessionsByUserId[uid].push(s);
+    }
+
+    // Build latest invite log per email (from DB logs)
+    const latestInviteByEmail = new Map<string, AdminOutreachLog>();
+    for (const log of inviteLogs) {
+      const key = log.email.toLowerCase();
+      const prev = latestInviteByEmail.get(key);
+      if (!prev || log.createdAt > prev.createdAt) latestInviteByEmail.set(key, log);
+    }
+    // Merge recovered emails as stub logs where not already in DB
+    for (const email of RECOVERED_INVITE_EMAILS) {
+      const key = email.toLowerCase();
+      if (!latestInviteByEmail.has(key)) {
+        latestInviteByEmail.set(key, {
+          id: `recovered-${email}`,
+          userId: null,
+          email,
+          kind: "invite",
+          status: "sent",
+          error: null,
+          sentBy: "recovered",
+          providerMessageId: null,
+          deliveredAt: null,
+          openedAt: null,
+          clickedAt: null,
+          bouncedAt: null,
+          complainedAt: null,
+          failedAt: null,
+          lastEventAt: null,
+          lastEventType: null,
+          lastClickUrl: null,
+          createdAt: "2026-05-07T00:00:00.000Z",
+        });
+      }
+    }
+
+    const enrichedInviteRows: EnrichedInviteRow[] = Array.from(latestInviteByEmail.values()).map((log) => {
+      const emailKey = log.email.toLowerCase();
+      const user = userByEmail[emailKey];
+      const userId = user?.id ?? log.userId ?? null;
+      const userSessions = userId ? (sessionsByUserId[userId] ?? []) : [];
+      const completedSessions = userSessions.filter((s) => s.overall_score !== null);
+
+      const candidates = [
+        log.createdAt,
+        log.deliveredAt,
+        log.openedAt,
+        log.clickedAt,
+        log.lastEventAt,
+        user?.lastSignIn ?? null,
+        user?.lastInterview ?? null,
+      ].filter((d): d is string => Boolean(d));
+
+      return {
+        email: log.email,
+        logId: log.id,
+        sentAt: log.createdAt,
+        delivered: Boolean(log.deliveredAt),
+        opened: Boolean(log.openedAt),
+        clicked: Boolean(log.clickedAt),
+        signedUp: Boolean(user),
+        sessionStarted: userSessions.length > 0,
+        sessionCompleted: completedSessions.length > 0,
+        feedbackGiven: false,
+        userId,
+        lastActivityAt: candidates.length > 0 ? candidates.reduce((a, b) => (a > b ? a : b)) : null,
+      };
+    });
+    enrichedInviteRows.sort((a, b) => {
+      const diff = inviteRowStage(b) - inviteRowStage(a);
+      if (diff !== 0) return diff;
+      const la = a.lastActivityAt ?? "";
+      const lb = b.lastActivityAt ?? "";
+      return la < lb ? 1 : la > lb ? -1 : 0;
+    });
+
     const stats: AdminStats = {
       totalUsers,
       totalInterviews,
@@ -613,6 +727,7 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
       users,
       outreachLogs,
       inviteAnalytics,
+      enrichedInviteRows,
     };
 
     return { ok: true as const, stats };
