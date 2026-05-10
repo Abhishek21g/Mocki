@@ -17,6 +17,7 @@ import { useAudioAnalyzer } from "@/hooks/useAudioAnalyzer";
 import { useCameraAnalyzer } from "@/hooks/useCameraAnalyzer";
 import { ConsentModal, type ConsentChoices } from "@/components/interview/ConsentModal";
 import { TutorialOverlay, shouldShowTutorial } from "@/components/interview/TutorialOverlay";
+import { FeedbackModal } from "@/components/interview/FeedbackModal";
 import { cn } from "@/lib/utils";
 
 import { TopBar } from "@/components/interview/TopBar";
@@ -65,6 +66,7 @@ function InterviewPage() {
   const [camStream, setCamStream] = useState<MediaStream | null>(null);
   const [consent, setConsent] = useState<ConsentChoices | null>(null);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const { getPayload: getKeystrokes } = useKeystrokeTracker(!!state.sessionId);
   const { getBlob: getCamBlob } = useCamRecorder(camStream);
   const { onQuestionShown, onAnswerSubmitted, onKeyDown: onAnswerKeyDown, onPaste: onAnswerPaste, getPayload: getBehavioral, locationRef } = useBehavioralTracker(consent ?? { microphone: false, camera: false, location: false });
@@ -447,7 +449,7 @@ function InterviewPage() {
             console.warn("[upload] skipped — no accessToken or sessionId", { hasToken: !!accessToken, sessionId: state.sessionId });
           }
 
-          nav({ to: "/report" });
+          setTimeout(() => setShowFeedbackModal(true), 3000);
         } catch (e) {
           showToast(e instanceof Error ? e.message : "Failed to generate report");
           setGenerating(false);
@@ -498,6 +500,16 @@ function InterviewPage() {
       )}
       {showTutorial && consent !== null && (
         <TutorialOverlay onDone={() => setShowTutorial(false)} />
+      )}
+      {showFeedbackModal && (
+        <FeedbackModal
+          sessionId={state.sessionId!}
+          accessToken={getAccessToken() ?? ""}
+          onClose={() => {
+            setShowFeedbackModal(false);
+            nav({ to: "/report" });
+          }}
+        />
       )}
       <TopBar
         role={setup.role}
