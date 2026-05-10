@@ -14,6 +14,7 @@ import { getLogs, markTurnBoundary, pushLog, withSessionLog } from "./agent-log.
 import { createSession, getInterviewerById, getSession, updateSession } from "./sessions.server";
 import { getUserIdForToken } from "./supabase.server";
 import { incrementInterviewsUsed } from "./billing.server";
+import { trackEvent } from "./analytics.server";
 import {
   buildUpdatedMemoryFromReport,
   emptyLearnerMemory,
@@ -141,6 +142,19 @@ export const startInterview = createServerFn({ method: "POST" })
         userId,
         learnerMemoryPrompt,
       });
+
+      // Track interview_started immediately after the session row exists.
+      trackEvent({
+        eventName: "interview_started",
+        userId,
+        sessionId,
+        properties: {
+          role: data.role,
+          company: data.company,
+          interview_type: data.interview_type,
+          total_rounds: data.totalRounds,
+        },
+      }).catch(() => undefined);
 
       const session = (await getSession(sessionId))!;
       // Setup events above (RoleProfile, Memory, PanelGen, etc.) sit on
@@ -299,7 +313,34 @@ export const submitAnswer = createServerFn({ method: "POST" })
         askedTopics: updatedAskedTopics,
       });
 
+      // Track every answered round (server-side, so it's reliable even if
+      // the client disconnects before the response arrives).
+      trackEvent({
+        eventName: "answer_submitted",
+        userId: session.userId,
+        sessionId: data.sessionId,
+        properties: {
+          round_number: newRoundNumber,
+          score: evaluation.overall,
+          stage: activePlan.stage,
+          turn_type: activePlan.turn_type,
+          topic: activePlan.focus,
+        },
+      }).catch(() => undefined);
+
       if (newRoundNumber >= session.totalRounds) {
+        trackEvent({
+          eventName: "interview_completed",
+          userId: session.userId,
+          sessionId: data.sessionId,
+          properties: {
+            total_rounds: session.totalRounds,
+            role: session.role,
+            company: session.company,
+            interview_type: session.interview_type,
+          },
+        }).catch(() => undefined);
+
         return {
           evaluation,
           completedRound,

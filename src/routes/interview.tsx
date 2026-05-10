@@ -8,6 +8,7 @@ import { createAvatarController, type AvatarController, type AvatarStatus } from
 import { primeAudio } from "@/lib/tts";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import { fetchAgentLogs, generateReport, submitAnswer } from "@/server/interview.functions";
+import { useTrack } from "@/lib/use-track";
 import { uploadSessionData } from "@/server/upload.functions";
 import { useKeystrokeTracker } from "@/hooks/useKeystrokeTracker";
 import { useCamRecorder } from "@/hooks/useCamRecorder";
@@ -133,10 +134,32 @@ function InterviewPage() {
     window.localStorage.setItem(AVATAR_ENABLED_STORAGE_KEY, String(avatarEnabled));
   }, [avatarEnabled]);
 
+  const track = useTrack();
   const currentQuestion = state.currentQuestion;
   const activeInterviewerId = state.activeInterviewer?.id;
   const activeVoice = state.activeInterviewer?.voice;
   const sessionId = state.sessionId;
+
+  // Fire interview_abandoned when the user navigates away mid-session.
+  // Uses a ref so the handler always sees fresh state without re-registering.
+  const sessionIdRef = useRef(sessionId);
+  const roundsRef = useRef(state.currentRound ?? 0);
+  const isDoneRef = useRef(false);
+  useEffect(() => { sessionIdRef.current = sessionId; }, [sessionId]);
+  useEffect(() => { roundsRef.current = state.currentRound ?? 0; }, [state.currentRound]);
+  useEffect(() => {
+    function onUnload() {
+      if (sessionIdRef.current && !isDoneRef.current) {
+        track("interview_abandoned", {
+          session_id: sessionIdRef.current,
+          rounds_completed: roundsRef.current,
+        });
+      }
+    }
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const speakingBlocked = loadingAnswer || loadingNext || generating || isHoldingTalk;
 
   // Safari autoplay fix: called from a real user gesture so the browser
@@ -360,6 +383,7 @@ function InterviewPage() {
       });
 
       if (res.done) {
+        isDoneRef.current = true; // prevent interview_abandoned from firing on unload
         setLoadingAnswer(false);
         setGenerating(true);
         try {

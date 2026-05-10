@@ -13,6 +13,7 @@ import {
 } from "@/lib/ghost-utils";
 import { fetchPublicReport } from "@/server/public-report.functions";
 import type { InterviewSessionPayload } from "@/server/history.server";
+import { useTrack } from "@/lib/use-track";
 
 export const Route = createFileRoute("/report/$sessionId")({
   head: () => ({
@@ -26,19 +27,21 @@ function PublicReportPage() {
   const [report, setReport] = useState<InterviewSessionPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const track = useTrack();
 
   useEffect(() => {
     fetchPublicReport({ data: { sessionId } })
       .then((res) => {
         if (res.ok && res.payload) {
           setReport(res.payload);
+          track("report_viewed", { session_id: sessionId });
         } else {
           setNotFound(true);
         }
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
-  }, [sessionId]);
+  }, [sessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
