@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
@@ -8,6 +8,8 @@ import { extractPdfText, PdfExtractionError } from "@/lib/pdf";
 import { useSupabaseAuth } from "@/lib/supabase-context";
 import { primeAudio } from "@/lib/tts";
 import { startInterview } from "@/server/interview.functions";
+import { getAbandonedSessions, resumeInterview } from "@/server/sessions.functions";
+import type { AbandonedSession } from "@/server/sessions.functions";
 import { UpgradeModal } from "@/components/UpgradeModal";
 import { useTrack } from "@/lib/use-track";
 
@@ -39,11 +41,75 @@ function SetupPage() {
 
   const isSignedIn = status === "ready" && !!user;
 
+  const [abandonedSession, setAbandonedSession] = useState<AbandonedSession | null>(null);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [resumeLoading, setResumeLoading] = useState(false);
+
+  useEffect(() => {
+    if (status !== "ready" || !user) return;
+    const token = getAccessToken();
+    if (!token) return;
+    getAbandonedSessions({ data: { accessToken: token } })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((res: any) => {
+        if (res.ok && res.sessions.length > 0) setAbandonedSession(res.sessions[0]);
+      })
+      .catch(() => undefined);
+  }, [status, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const valid = role.trim() && company.trim() && jobDescription.trim() && resume.trim();
 
   // Not signed in → show login page
   if (status === "ready" && !user) {
     return <LoginPage signInWithGoogle={signInWithGoogle} signInWithGitHub={signInWithGitHub} signInWithMagicLink={signInWithMagicLink} />;
+  }
+
+  async function handleResume() {
+    if (!abandonedSession || resumeLoading) return;
+    setResumeLoading(true);
+    try {
+      const token = getAccessToken();
+      if (!token) return;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await resumeInterview({ data: { accessToken: token, sessionId: abandonedSession.sessionId } }) as any;
+      if (!res.ok) {
+        showToast("Could not resume interview — please start a new one.");
+        setBannerDismissed(true);
+        return;
+      }
+      const s = res.session;
+      store.set({
+        sessionId: s.sessionId,
+        setupData: {
+          role: s.role,
+          company: s.company,
+          jobDescription: s.jobDescription,
+          interview_type: s.interview_type,
+          resume: s.resume,
+          roleProfile: s.roleProfile,
+        },
+        interviewers: s.interviewers,
+        activeInterviewer: s.activeInterviewer,
+        panelType: "structured",
+        roleProfile: s.roleProfile,
+        currentQuestion: s.currentQuestion ?? "",
+        currentFocus: s.lastPlan?.focus ?? "",
+        currentDifficulty: s.lastPlan?.difficulty ?? "",
+        currentCoordinatorReason: s.lastPlan?.reason ?? "",
+        currentStage: s.currentStage,
+        currentTurnType: s.lastPlan?.turn_type ?? "new_question",
+        currentRound: s.currentRound,
+        totalRounds: s.totalRounds,
+        rounds: s.rounds,
+        lastEvaluation: null,
+        lastClarification: null,
+        report: null,
+      });
+      nav({ to: "/interview" });
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to resume interview");
+      setResumeLoading(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -131,6 +197,52 @@ function SetupPage() {
             </p>
           )}
         </header>
+
+        {isSignedIn && !bannerDismissed && abandonedSession && (
+          <div
+            className="fade-up mb-5 w-full rounded-xl border p-4"
+            style={{
+              borderColor: "rgba(118,185,0,0.35)",
+              background: "rgba(118,185,0,0.06)",
+              animationDelay: "30ms",
+            }}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
+                  You have an unfinished interview
+                </p>
+                <p className="mono mt-1 text-[11px]" style={{ color: "var(--text-3)" }}>
+                  {abandonedSession.role} at {abandonedSession.company}
+                  {" · "}Round {abandonedSession.currentRound + 1}/{abandonedSession.totalRounds}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void handleResume()}
+                  disabled={resumeLoading}
+                  className="gp-btn px-4 py-1.5 text-sm disabled:opacity-60"
+                >
+                  {resumeLoading ? (
+                    <><span className="gp-spinner" /> Resuming…</>
+                  ) : (
+                    "Resume →"
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBannerDismissed(true)}
+                  className="rounded p-1 text-sm transition-opacity hover:opacity-70"
+                  style={{ color: "var(--text-3)" }}
+                  aria-label="Dismiss"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <form
           onSubmit={handleSubmit}
