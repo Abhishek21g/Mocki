@@ -21,6 +21,7 @@ import {
   type CheckInResult,
   type InviteResult,
   type EnrichedInviteRow,
+  type SessionIntegrity,
 } from "@/server/admin.functions";
 import type { BehavioralPayload } from "@/hooks/useBehavioralTracker";
 
@@ -712,6 +713,91 @@ function ExpandIcon({ open }: { open: boolean }) {
 }
 
 // ---------------------------------------------------------------------------
+// Integrity badge
+// ---------------------------------------------------------------------------
+
+function IntegrityBadge({ integrity, onClick }: { integrity: SessionIntegrity | null; onClick: () => void }) {
+  if (!integrity) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        className="mono rounded border px-2 py-0.5 text-[10px]"
+        style={{ borderColor: "var(--border)", color: "var(--text-3)", background: "transparent" }}
+      >
+        —
+      </button>
+    );
+  }
+  const flagCount = integrity.integrity_flags.length;
+  if (flagCount === 0) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        className="mono rounded border px-2 py-0.5 text-[10px]"
+        style={{ borderColor: "rgba(74,222,128,0.35)", color: "#4ade80", background: "rgba(74,222,128,0.07)" }}
+      >
+        Clean
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="mono rounded border px-2 py-0.5 text-[10px]"
+      style={{ borderColor: "rgba(251,191,36,0.4)", color: "#fbbf24", background: "rgba(251,191,36,0.08)" }}
+    >
+      ⚠ {flagCount} flag{flagCount > 1 ? "s" : ""}
+    </button>
+  );
+}
+
+function IntegrityDetail({ integrity }: { integrity: SessionIntegrity | null }) {
+  if (!integrity) {
+    return (
+      <p className="text-xs" style={{ color: "var(--text-3)" }}>No integrity data for this session.</p>
+    );
+  }
+  const FLAG_LABELS: Record<string, string> = {
+    name_mismatch: "Name mismatch",
+    email_mismatch: "Email mismatch",
+    paste_heavy: "Paste-heavy",
+    no_camera: "No camera",
+  };
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+        <span style={{ color: "var(--text-3)" }}>Account email</span>
+        <span style={{ color: "var(--text-2)" }}>{integrity.account_email ?? "—"}</span>
+        <span style={{ color: "var(--text-3)" }}>Resume name</span>
+        <span style={{ color: "var(--text-2)" }}>{integrity.resume_candidate_name ?? "—"}</span>
+        <span style={{ color: "var(--text-3)" }}>Resume email</span>
+        <span style={{ color: "var(--text-2)" }}>{integrity.resume_candidate_email ?? "—"}</span>
+        <span style={{ color: "var(--text-3)" }}>Tab switches</span>
+        <span style={{ color: "var(--text-2)" }}>{integrity.tab_switches}</span>
+      </div>
+      {integrity.integrity_flags.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {integrity.integrity_flags.map((flag) => (
+            <span
+              key={flag}
+              className="mono rounded border px-2 py-0.5 text-[10px]"
+              style={{ borderColor: "rgba(251,191,36,0.4)", color: "#fbbf24", background: "rgba(251,191,36,0.08)" }}
+            >
+              {FLAG_LABELS[flag] ?? flag}
+            </span>
+          ))}
+        </div>
+      ) : (
+        <span className="text-xs" style={{ color: "#4ade80" }}>No flags — looks clean.</span>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // All Sessions Table
 // ---------------------------------------------------------------------------
 
@@ -730,7 +816,7 @@ function AllSessionsTable({ sessions, accessToken }: { sessions: AdminSession[];
     <div className="divide-y" style={{ borderColor: "var(--border)" }}>
       {/* Table header */}
       <div
-        className="mono grid grid-cols-[1fr_1.2fr_1fr_0.8fr_0.7fr_0.8fr] gap-3 px-5 py-2 text-[10px] uppercase tracking-wider"
+        className="mono grid grid-cols-[1fr_1.2fr_1fr_0.8fr_0.7fr_0.8fr_0.7fr] gap-3 px-5 py-2 text-[10px] uppercase tracking-wider"
         style={{ color: "var(--text-3)", background: "var(--surface2)" }}
       >
         <span>Date</span>
@@ -739,6 +825,7 @@ function AllSessionsTable({ sessions, accessToken }: { sessions: AdminSession[];
         <span>Type</span>
         <span>Score</span>
         <span>Hire</span>
+        <span>Trust</span>
       </div>
 
       {sessions.map((s) => {
@@ -748,7 +835,7 @@ function AllSessionsTable({ sessions, accessToken }: { sessions: AdminSession[];
           <div key={s.id} style={{ borderColor: "var(--border)" }}>
             {/* Row */}
             <button
-              className="grid w-full grid-cols-[1fr_1.2fr_1fr_0.8fr_0.7fr_0.8fr] items-center gap-3 px-5 py-3 text-left transition-colors"
+              className="grid w-full grid-cols-[1fr_1.2fr_1fr_0.8fr_0.7fr_0.8fr_0.7fr] items-center gap-3 px-5 py-3 text-left transition-colors"
               style={{
                 background: open ? "var(--surface2)" : "transparent",
               }}
@@ -781,6 +868,9 @@ function AllSessionsTable({ sessions, accessToken }: { sessions: AdminSession[];
               </span>
               <span>
                 <HireBadge decision={s.hire_decision} />
+              </span>
+              <span>
+                <IntegrityBadge integrity={s.integrity} onClick={() => setExpandedId(open ? null : s.id)} />
               </span>
             </button>
 
@@ -856,6 +946,19 @@ function SessionDetail({ session: s, open, accessToken }: { session: AdminSessio
               No recording for this session
             </div>
           )}
+        </div>
+
+        {/* Trust & Context */}
+        <div className="mb-5">
+          <div className="mono mb-2 text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+            Trust &amp; Context
+          </div>
+          <div
+            className="rounded-xl border p-4"
+            style={{ borderColor: "var(--border)", background: "rgba(255,255,255,0.02)" }}
+          >
+            <IntegrityDetail integrity={s.integrity} />
+          </div>
         </div>
 
         {/* Behavioral analytics */}

@@ -2,6 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { uploadToSpaces, getPresignedPutUrl, getPresignedGetUrl, objectExists, slugify, uploadMetadata } from "./spaces.server";
 import { getUserIdForToken, createSupabaseAdminClient } from "./supabase.server";
+import { extractResumeSignals } from "./resume-signals.server";
+import { saveIntegrityRecord } from "./integrity.functions";
 
 type SessionBase = {
   newBase: string;
@@ -13,6 +15,7 @@ type SessionBase = {
   totalRounds: number;
   currentRound: number;
   createdAt: string;
+  resume: string;
 };
 
 async function resolveSessionBase(
@@ -41,6 +44,7 @@ async function resolveSessionBase(
     const totalRounds = (d.totalRounds as number) ?? 1;
     const currentRound = (d.currentRound as number) ?? 0;
     const createdAt = (sessionRes.data?.created_at as string) ?? new Date().toISOString();
+    const resume = (d.resume as string) || "";
 
     const authUser = userRes.data?.user;
     const displayName =
@@ -55,7 +59,7 @@ async function resolveSessionBase(
     const roleSlug = `${slugify(role)}__${sessionId.slice(0, 8)}`;
     const newBase = `sessions/${date}/${userSlug}/${roleSlug}`;
 
-    return { newBase, userEmail, displayName, role, company, interviewType, totalRounds, currentRound, createdAt };
+    return { newBase, userEmail, displayName, role, company, interviewType, totalRounds, currentRound, createdAt, resume };
   } catch {
     return null;
   }
@@ -172,6 +176,9 @@ const SessionMetadataSchema = z.object({
   accessToken: z.string().min(10).max(8000),
   sessionId: z.string().min(8).max(80),
   browser: z.string().max(500).optional(),
+  paste_count: z.number().int().nonnegative().optional(),
+  tab_switches: z.number().int().nonnegative().optional(),
+  camera_consent: z.boolean().optional(),
 });
 
 export const uploadSessionMetadata = createServerFn({ method: "POST" })
@@ -184,10 +191,40 @@ export const uploadSessionMetadata = createServerFn({ method: "POST" })
     const base = await resolveSessionBase(admin, userId, data.sessionId);
     if (!base) return { ok: false as const };
 
+    // --- Integrity signals ---
+    const signals = extractResumeSignals(base.resume);
+
+    const accountEmail = base.userEmail || null;
+    const accountName = base.displayName !== "guest" ? base.displayName : null;
+
+    const nameMismatch = (() => {
+      if (!signals.candidate_name || !accountName) return false;
+      const resumeWords = signals.candidate_name.toLowerCase().split(/\s+/);
+      const accountWords = accountName.toLowerCase().split(/\s+/);
+      return !resumeWords.some((w) => accountWords.includes(w));
+    })();
+
+    const emailMismatch = !!(
+      signals.candidate_email &&
+      accountEmail &&
+      signals.candidate_email.toLowerCase() !== accountEmail.toLowerCase()
+    );
+
+    const pasteCount = data.paste_count ?? 0;
+    const tabSwitches = data.tab_switches ?? 0;
+    const pasteHeavy = pasteCount > 3;
+    const noCamera = data.camera_consent === false;
+
+    const integrityFlags: string[] = [];
+    if (nameMismatch) integrityFlags.push("name_mismatch");
+    if (emailMismatch) integrityFlags.push("email_mismatch");
+    if (pasteHeavy) integrityFlags.push("paste_heavy");
+    if (noCamera) integrityFlags.push("no_camera");
+
     const metadata: Record<string, unknown> = {
       sessionId: data.sessionId,
       userId,
-      userEmail: base.userEmail,
+      userEmail: accountEmail,
       displayName: base.displayName,
       role: base.role,
       company: base.company,
@@ -197,8 +234,35 @@ export const uploadSessionMetadata = createServerFn({ method: "POST" })
       createdAt: base.createdAt,
       uploadedAt: new Date().toISOString(),
       browser: data.browser ?? null,
+      // Integrity fields
+      resume_candidate_name: signals.candidate_name,
+      resume_candidate_email: signals.candidate_email,
+      account_email: accountEmail,
+      name_mismatch: nameMismatch,
+      email_mismatch: emailMismatch,
+      paste_heavy: pasteHeavy,
+      no_camera: noCamera,
+      paste_count: pasteCount,
+      tab_switches: tabSwitches,
+      integrity_flags: integrityFlags,
     };
 
     await uploadMetadata(base.newBase, metadata);
+
+    // Fire-and-forget: persist to DB
+    saveIntegrityRecord({
+      session_id: data.sessionId,
+      user_id: userId,
+      account_email: accountEmail,
+      resume_candidate_name: signals.candidate_name,
+      resume_candidate_email: signals.candidate_email,
+      name_mismatch: nameMismatch,
+      email_mismatch: emailMismatch,
+      paste_heavy: pasteHeavy,
+      no_camera: noCamera,
+      tab_switches: tabSwitches,
+      integrity_flags: integrityFlags,
+    }).catch((err) => console.error("[integrity] save error:", err));
+
     return { ok: true as const };
   });

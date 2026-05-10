@@ -445,9 +445,17 @@ function InterviewPage() {
             }).catch((err) => {
               console.error("[upload] cam failed", err);
             });
-            // Fire-and-forget: upload session metadata.json
+            // Fire-and-forget: upload session metadata.json + integrity signals
+            const _behavioralSummary = getBehavioral();
             uploadSessionMetadata({
-              data: { accessToken, sessionId: sid, browser: navigator.userAgent },
+              data: {
+                accessToken,
+                sessionId: sid,
+                browser: navigator.userAgent,
+                paste_count: _behavioralSummary.summary.totalPastes,
+                tab_switches: _behavioralSummary.summary.totalTabSwitches,
+                camera_consent: consent?.camera ?? false,
+              },
             }).then((r) => {
               console.log("[upload] metadata", r);
             }).catch((err) => {

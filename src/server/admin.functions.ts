@@ -71,6 +71,18 @@ export type AdminRoundSummary = {
   question: string;
 };
 
+export type SessionIntegrity = {
+  name_mismatch: boolean;
+  email_mismatch: boolean;
+  paste_heavy: boolean;
+  no_camera: boolean;
+  tab_switches: number;
+  integrity_flags: string[];
+  account_email: string | null;
+  resume_candidate_name: string | null;
+  resume_candidate_email: string | null;
+};
+
 export type AdminSession = {
   id: string;
   userId: string;
@@ -91,6 +103,7 @@ export type AdminSession = {
   interviewers: { name: string; title: string; focus: string }[];
   resume: string;
   jobDescription: string;
+  integrity: SessionIntegrity | null;
 };
 
 export type AdminUser = {
@@ -341,7 +354,7 @@ async function findSentOutreach(
     id: row.id as string,
     userId: (row.user_id as string | null) ?? null,
     email: (row.email as string | null) ?? data.email,
-    kind: row.kind as "check_in" | "invite",
+    kind: row.kind as "check_in" | "invite" | "feedback_request",
     status: row.status as "sent" | "failed",
     error: (row.error as string | null) ?? null,
     sentBy: (row.sent_by as string | null) ?? null,
@@ -386,6 +399,27 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
       return { ok: false as const, reason: "db_error" as string };
     }
 
+    // Fetch integrity records for all sessions
+    const sessionIds = allSessions.map((s) => s.id as string);
+    const { data: integrityRows } = await admin
+      .from("session_integrity")
+      .select("*")
+      .in("session_id", sessionIds.length > 0 ? sessionIds : [""]);
+    const integrityMap = new Map<string, SessionIntegrity>();
+    for (const row of integrityRows ?? []) {
+      integrityMap.set(row.session_id as string, {
+        name_mismatch: (row.name_mismatch as boolean) ?? false,
+        email_mismatch: (row.email_mismatch as boolean) ?? false,
+        paste_heavy: (row.paste_heavy as boolean) ?? false,
+        no_camera: (row.no_camera as boolean) ?? false,
+        tab_switches: (row.tab_switches as number) ?? 0,
+        integrity_flags: (row.integrity_flags as string[]) ?? [],
+        account_email: (row.account_email as string | null) ?? null,
+        resume_candidate_name: (row.resume_candidate_name as string | null) ?? null,
+        resume_candidate_email: (row.resume_candidate_email as string | null) ?? null,
+      });
+    }
+
     const { data: outreachData, error: outreachError } = await admin
       .from("email_outreach_log")
       .select("*")
@@ -398,7 +432,7 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
       id: row.id as string,
       userId: (row.user_id as string | null) ?? null,
       email: (row.email as string | null) ?? "—",
-      kind: row.kind as "check_in" | "invite",
+      kind: row.kind as "check_in" | "invite" | "feedback_request",
       status: row.status as "sent" | "failed",
       error: (row.error as string | null) ?? null,
       sentBy: (row.sent_by as string | null) ?? null,
@@ -545,6 +579,7 @@ export const fetchAdminStats = createServerFn({ method: "POST" })
         interviewers,
         resume: payload?.resume ?? "",
         jobDescription: payload?.jobDescription ?? "",
+        integrity: integrityMap.get(s.id as string) ?? null,
       };
     });
 
@@ -776,6 +811,7 @@ export const fetchAdminSession = createServerFn({ method: "POST" })
       interviewers,
       resume: payload?.resume ?? "",
       jobDescription: payload?.jobDescription ?? "",
+      integrity: null,
     };
 
     return { ok: true as const, session };
