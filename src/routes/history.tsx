@@ -24,7 +24,7 @@ export const Route = createFileRoute("/history")({
 });
 
 function HistoryPage() {
-  const { status, user, getAccessToken } = useSupabaseAuth();
+  const { status, user, signInWithGoogle, getAccessToken } = useSupabaseAuth();
   const navigate = useNavigate();
   const [items, setItems] = useState<HistoryListItem[] | null>(null);
   const [memory, setMemory] = useState<LearnerMemory | null>(null);
@@ -137,12 +137,9 @@ function HistoryPage() {
       <div className="gp-card max-w-md p-8 text-center">
         <h1 className="text-xl font-semibold">Sign in to view your dashboard</h1>
         <p className="mt-3 text-sm" style={{ color: "var(--text-2)" }}>Sessions are scoped to your Google account.</p>
-        <div className="mt-6">
-          <GoogleSignInButton
-            text="signin_with"
-            onError={() => showToast("Sign-in failed — please try again")}
-          />
-        </div>
+        <button type="button" className="gp-btn mt-6 w-full" onClick={() => signInWithGoogle().catch(() => showToast("Sign-in failed"))}>
+          Sign in with Google
+        </button>
         <Link to="/" className="mt-4 inline-block text-xs underline" style={{ color: "var(--text-3)" }}>Back home</Link>
       </div>
     </Centered>
