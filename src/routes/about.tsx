@@ -72,10 +72,20 @@ function AboutPage() {
         <section className="gp-card mb-10 p-6 fade-up" style={{ animationDelay: "40ms" }}>
           <h1 className="text-2xl font-bold">Built to make mock interviews easier to get</h1>
           <p className="mt-4 text-sm leading-7" style={{ color: "var(--text-2)" }}>
-            Mocki was started by Abhishek Enaguthi, a Computer Science student at Oregon State
-            University focused on AI systems, compilers, GPU programming, and high-performance
-            computing. His public work spans AI systems software, NVIDIA Omniverse automation for
-            HPC optimization, Supercomputing 24, and product engineering at Oregon State.
+            Mocki was started by{" "}
+            <a
+              href="https://www.linkedin.com/in/abhishekenaguthi/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold underline decoration-[color:var(--green)] underline-offset-4 transition hover:text-white"
+              style={{ color: "var(--green)" }}
+            >
+              Abhishek Enaguthi
+            </a>
+            , a Computer Science student at Oregon State University focused on AI systems,
+            compilers, GPU programming, and high-performance computing. His public work spans AI
+            systems software, NVIDIA Omniverse automation for HPC optimization, Supercomputing 24,
+            and product engineering at Oregon State.
           </p>
           <p className="mt-4 text-sm leading-7" style={{ color: "var(--text-2)" }}>
             The idea is simple: good mock interviews are hard to schedule, hard to repeat, and
@@ -125,9 +135,15 @@ function AboutPage() {
                   >
                     {member.initial}
                   </div>
-                  <div>
-                    <div className="font-semibold text-sm">{member.name}</div>
-                  </div>
+                  <a
+                    href={member.linkedin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm font-semibold transition hover:text-white"
+                    style={{ color: "var(--text)" }}
+                  >
+                    {member.name}
+                  </a>
                 </div>
                 <a
                   href={member.linkedin}
