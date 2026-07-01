@@ -15,19 +15,19 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "Multi-agent AI interviews that make you genuinely better. Powered by NVIDIA Nemotron.",
+          "Resume-aware AI mock interviews with a three-person panel, realistic follow-ups, and a practical debrief report.",
       },
       { property: "og:title", content: "Mocki — AI Mock Interviews" },
       {
         property: "og:description",
         content:
-          "Multi-agent AI interviews that make you genuinely better. Powered by NVIDIA Nemotron.",
+          "Resume-aware AI mock interviews with a three-person panel, realistic follow-ups, and a practical debrief report.",
       },
       { name: "twitter:title", content: "Mocki — AI Mock Interviews" },
       {
         name: "twitter:description",
         content:
-          "Multi-agent AI interviews that make you genuinely better. Powered by NVIDIA Nemotron.",
+          "Resume-aware AI mock interviews with a three-person panel, realistic follow-ups, and a practical debrief report.",
       },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },

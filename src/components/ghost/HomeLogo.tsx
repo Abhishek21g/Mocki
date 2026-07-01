@@ -27,7 +27,11 @@ export function HomeLogo({
       style={{ color: "var(--green)" }}
       aria-label="Go to Mocki home"
     >
-      <img src="/Mocki.png" alt="Mocki" className="inline-block h-[1.4em] w-auto mr-2 align-middle" />
+      <img
+        src="/Mocki.png"
+        alt="Mocki"
+        className="inline-block h-[1.4em] w-auto mr-2 align-middle"
+      />
       Mocki
     </button>
   );

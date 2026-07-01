@@ -3,13 +3,20 @@ import { useEffect, useState } from "react";
 import { getBrowserSupabase } from "@/lib/supabase-client";
 import { maybeSendWelcomeEmail } from "@/server/welcome.functions";
 
-const ALLOWED_POST_AUTH_PATHS = new Set(["/", "/history", "/interview", "/report", "/admin"]);
+const ALLOWED_POST_AUTH_PATHS = new Set([
+  "/",
+  "/about",
+  "/history",
+  "/interview",
+  "/report",
+  "/admin",
+]);
 
 function normalizeNextPath(rawNext: string | null) {
   if (!rawNext) return "/" as const;
   if (!rawNext.startsWith("/") || rawNext.startsWith("//")) return "/" as const;
   if (!ALLOWED_POST_AUTH_PATHS.has(rawNext)) return "/" as const;
-  return rawNext as "/" | "/history" | "/interview" | "/report" | "/admin";
+  return rawNext as "/" | "/about" | "/history" | "/interview" | "/report" | "/admin";
 }
 
 export const Route = createFileRoute("/auth/callback")({

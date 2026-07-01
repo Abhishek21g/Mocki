@@ -5,8 +5,12 @@ import { HomeLogo } from "@/components/ghost/HomeLogo";
 export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
-      { title: "About — Mocki" },
-      { name: "description", content: "Meet the team behind Mocki, built at BeaverHacks 2026." },
+      { title: "About - Mocki" },
+      {
+        name: "description",
+        content:
+          "Meet Abhishek Enaguthi and the team behind Mocki, a resume-aware AI mock interview platform.",
+      },
     ],
   }),
   component: AboutPage,
@@ -59,12 +63,42 @@ function AboutPage() {
             🏆 BeaverHacks 2026 — NVIDIA Track Winner
           </div>
           <p className="mt-4 text-base md:text-lg" style={{ color: "var(--text-2)" }}>
-            Mocki is a multi-agent AI mock interview platform powered by NVIDIA Nemotron.
-            Six specialized AI agents — Coordinator, Panel Generator, Interviewer, Clarifier,
-            Evaluator, and Reporter — work together to simulate a real panel interview that
-            adapts to your resume and target role in real time.
+            Mocki is a multi-agent AI mock interview platform powered by NVIDIA Nemotron. Six
+            specialized AI agents work together to simulate a real panel interview that adapts to
+            your resume and target role in real time.
           </p>
         </header>
+
+        <section className="gp-card mb-10 p-6 fade-up" style={{ animationDelay: "40ms" }}>
+          <h1 className="text-2xl font-bold">Built to make mock interviews easier to get</h1>
+          <p className="mt-4 text-sm leading-7" style={{ color: "var(--text-2)" }}>
+            Mocki was started by Abhishek Enaguthi, a Computer Science student at Oregon State
+            University focused on AI systems, compilers, GPU programming, and high-performance
+            computing. His public work spans AI systems software, NVIDIA Omniverse automation for
+            HPC optimization, Supercomputing 24, and product engineering at Oregon State.
+          </p>
+          <p className="mt-4 text-sm leading-7" style={{ color: "var(--text-2)" }}>
+            The idea is simple: good mock interviews are hard to schedule, hard to repeat, and
+            rarely specific to the resume and job description in front of you. Mocki gives
+            candidates another serious rep with a panel that asks follow-ups, evaluates answers, and
+            turns the session into a concrete practice plan.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            {["OSU Computer Science", "AI systems", "GPU and HPC", "Interview prep"].map((item) => (
+              <span
+                key={item}
+                className="rounded-full border px-3 py-1 text-xs font-medium"
+                style={{
+                  borderColor: "var(--border)",
+                  color: "var(--text-2)",
+                  background: "var(--surface2)",
+                }}
+              >
+                {item}
+              </span>
+            ))}
+          </div>
+        </section>
 
         {/* Team */}
         <section className="fade-up" style={{ animationDelay: "60ms" }}>
@@ -146,12 +180,16 @@ function AboutPage() {
         <FeedbackForm />
 
         {/* Footer */}
-        <footer className="mt-12 text-center text-xs flex flex-col gap-2" style={{ color: "var(--text-3)" }}>
+        <footer
+          className="mt-12 text-center text-xs flex flex-col gap-2"
+          style={{ color: "var(--text-3)" }}
+        >
           <Link to="/" className="hover:text-white transition-colors">
             ← Back to Mocki
           </Link>
           <p style={{ color: "var(--text-3)" }}>
-            By using Mocki, you agree that anonymized interview data may be used to improve the product.
+            By using Mocki, you agree that anonymized interview data may be used to improve the
+            product.
           </p>
         </footer>
       </div>
@@ -213,7 +251,10 @@ function FeedbackForm() {
 
           {/* Star rating */}
           <div className="flex flex-col gap-1">
-            <span className="mono text-[11px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+            <span
+              className="mono text-[11px] uppercase tracking-wider"
+              style={{ color: "var(--text-3)" }}
+            >
               Overall rating
             </span>
             <div className="flex gap-2">
@@ -233,7 +274,10 @@ function FeedbackForm() {
 
           {/* Message */}
           <div className="flex flex-col gap-1">
-            <span className="mono text-[11px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+            <span
+              className="mono text-[11px] uppercase tracking-wider"
+              style={{ color: "var(--text-3)" }}
+            >
               Your thoughts
             </span>
             <textarea
@@ -248,7 +292,10 @@ function FeedbackForm() {
 
           {/* Email (optional) */}
           <div className="flex flex-col gap-1">
-            <span className="mono text-[11px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
+            <span
+              className="mono text-[11px] uppercase tracking-wider"
+              style={{ color: "var(--text-3)" }}
+            >
               Email <span style={{ opacity: 0.5 }}>(optional — if you want a reply)</span>
             </span>
             <input
@@ -265,7 +312,13 @@ function FeedbackForm() {
             className="gp-btn w-full"
             disabled={!rating || !message.trim() || loading}
           >
-            {loading ? <><span className="gp-spinner" /> Sending…</> : "Send feedback →"}
+            {loading ? (
+              <>
+                <span className="gp-spinner" /> Sending…
+              </>
+            ) : (
+              "Send feedback →"
+            )}
           </button>
         </form>
       )}
