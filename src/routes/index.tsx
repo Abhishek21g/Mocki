@@ -9,7 +9,6 @@ import {
   PanelsTopLeft,
   Sparkles,
   Target,
-  UserRound,
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -517,28 +516,18 @@ function SetupPage() {
           </div>
         </section>
 
-        <section className="mx-auto grid max-w-7xl gap-8 px-5 py-20 md:px-8 lg:grid-cols-[1fr_0.75fr] lg:items-center">
-          <div>
+        <section className="mx-auto max-w-7xl px-5 py-20 md:px-8">
+          <div className="max-w-3xl">
             <SectionHeading
               title="Made by builders who needed better reps"
               body="Mocki was built at BeaverHacks by a team focused on making interview practice more realistic, repeatable, and useful."
             />
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-7">
               <Link to="/about" className="gp-btn gp-btn-outline px-6">
                 About the builders
               </Link>
-              <a
-                href="https://enaguthi.com"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-[52px] items-center justify-center rounded-[10px] border px-6 text-sm font-semibold transition hover:border-white/30 hover:text-white"
-                style={{ borderColor: "var(--border2)", color: "var(--text-2)" }}
-              >
-                enaguthi.com
-              </a>
             </div>
           </div>
-          <FounderCard compact />
         </section>
       </main>
     </div>
@@ -806,52 +795,6 @@ function StatusNote({
       }}
     >
       {children}
-    </div>
-  );
-}
-
-function FounderCard({ compact = false }: { compact?: boolean }) {
-  return (
-    <div
-      className="rounded-lg border p-6"
-      style={{ borderColor: "var(--border)", background: "var(--surface)" }}
-    >
-      <div className="flex items-start gap-4">
-        <div
-          className="flex h-14 w-14 items-center justify-center rounded-lg text-black"
-          style={{ background: "var(--green)" }}
-        >
-          <UserRound className="h-7 w-7" />
-        </div>
-        <div>
-          <h3 className="text-xl font-bold">Abhishek Enaguthi</h3>
-          <p className="mt-1 text-sm" style={{ color: "var(--text-2)" }}>
-            CS student, AI systems builder, and one of the builders behind Mocki.
-          </p>
-        </div>
-      </div>
-      {!compact && (
-        <p className="mt-5 text-sm leading-6" style={{ color: "var(--text-2)" }}>
-          Mocki grew out of a simple problem: realistic mock interviews are hard to schedule, hard
-          to repeat, and hard to make specific to your background. The goal is to make serious
-          practice available whenever a candidate needs one more rep.
-        </p>
-      )}
-      <div className="mt-5 flex flex-wrap gap-2">
-        {["OSU Computer Science", "AI systems", "GPU and HPC", "Interview prep"].map((item) => (
-          <span
-            key={item}
-            className="rounded-md border px-3 py-1 text-xs"
-            style={{
-              borderColor: "var(--border)",
-              color: "var(--text-2)",
-              background: "var(--surface2)",
-            }}
-          >
-            {item}
-          </span>
-        ))}
-      </div>
     </div>
   );
 }
