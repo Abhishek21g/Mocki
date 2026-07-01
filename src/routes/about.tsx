@@ -9,7 +9,7 @@ export const Route = createFileRoute("/about")({
       {
         name: "description",
         content:
-          "Meet Abhishek Enaguthi and the team behind Mocki, a resume-aware AI mock interview platform.",
+          "Meet the team behind Mocki, a resume-aware AI mock interview platform built at BeaverHacks 2026.",
       },
     ],
   }),
@@ -72,26 +72,12 @@ function AboutPage() {
         <section className="gp-card mb-10 p-6 fade-up" style={{ animationDelay: "40ms" }}>
           <h1 className="text-2xl font-bold">Built to make mock interviews easier to get</h1>
           <p className="mt-4 text-sm leading-7" style={{ color: "var(--text-2)" }}>
-            Mocki was started by{" "}
-            <a
-              href="https://www.linkedin.com/in/abhishekenaguthi/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold underline decoration-[color:var(--green)] underline-offset-4 transition hover:text-white"
-              style={{ color: "var(--green)" }}
-            >
-              Abhishek Enaguthi
-            </a>
-            , a Computer Science student at Oregon State University focused on AI systems,
-            compilers, GPU programming, and high-performance computing. His public work spans AI
-            systems software, NVIDIA Omniverse automation for HPC optimization, Supercomputing 24,
-            and product engineering at Oregon State.
-          </p>
-          <p className="mt-4 text-sm leading-7" style={{ color: "var(--text-2)" }}>
-            The idea is simple: good mock interviews are hard to schedule, hard to repeat, and
-            rarely specific to the resume and job description in front of you. Mocki gives
-            candidates another serious rep with a panel that asks follow-ups, evaluates answers, and
-            turns the session into a concrete practice plan.
+            Mocki was built as a team project at BeaverHacks 2026 for candidates who need more
+            realistic interview practice than a static question bank can provide. Good mock
+            interviews are hard to schedule, hard to repeat, and rarely specific to the resume and
+            job description in front of you. Mocki gives candidates another serious rep with a panel
+            that asks follow-ups, evaluates answers, and turns the session into a concrete practice
+            plan.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             {["OSU Computer Science", "AI systems", "GPU and HPC", "Interview prep"].map((item) => (
