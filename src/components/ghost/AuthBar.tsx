@@ -67,9 +67,9 @@ export function AuthBar() {
               Admin
             </Link>
           )}
-          {/* Email — hidden on mobile to save space */}
+          {/* Email is noisy in the landing nav and takes enough width to collide with page links. */}
           <span
-            className="hidden max-w-[160px] truncate rounded-md border border-white/10 bg-black/40 px-3 py-1.5 backdrop-blur md:inline"
+            className="hidden max-w-[160px] truncate rounded-md border border-white/10 bg-black/40 px-3 py-1.5 backdrop-blur xl:inline"
             style={{ color: "var(--text-2)" }}
             title={user.email ?? user.id}
           >

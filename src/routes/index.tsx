@@ -606,7 +606,7 @@ const interviewLengths = [
 function LandingNav() {
   return (
     <header className="fixed left-0 right-0 top-0 z-30 border-b border-white/5 bg-black/55 backdrop-blur">
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 pr-[160px] md:px-8 md:pr-[260px]">
+      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 pr-[140px] md:px-8 lg:pr-[360px] xl:pr-[520px]">
         <HomeLogo resetOnClick={false} className="text-xl" />
         <div
           className="hidden items-center gap-6 text-sm md:flex"
