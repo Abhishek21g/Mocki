@@ -264,10 +264,14 @@ function SetupPage() {
           </div>
         </section>
 
-        <section id="panel" ref={panelRef} className="relative h-[320vh] bg-[oklch(0.12_0.02_258)]">
-          <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+        <section
+          id="panel"
+          ref={panelRef}
+          className="relative min-h-screen bg-[oklch(0.12_0.02_258)] px-6 py-24 sm:px-10 lg:py-32"
+        >
+          <div className="flex min-h-[calc(100vh-12rem)] items-center overflow-hidden">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_72%_45%,oklch(0.74_0.12_75_/_0.12),transparent_32%),radial-gradient(circle_at_24%_70%,oklch(0.55_0.14_264_/_0.18),transparent_34%)]" />
-            <div className="relative mx-auto grid w-full max-w-[1180px] items-center gap-12 px-6 sm:px-10 lg:grid-cols-[360px_1fr] lg:gap-[70px]">
+            <div className="relative mx-auto grid w-full max-w-[1180px] items-center gap-12 lg:grid-cols-[360px_1fr] lg:gap-[70px]">
               <div>
                 <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.14em] text-[oklch(0.6_0.03_80)]">
                   Three-person panel
@@ -310,53 +314,53 @@ function SetupPage() {
                 </div>
               </div>
 
-              <div className="landing-panel-stage relative h-[520px]">
-                {panelists.map((panelist) => (
-                  <div
-                    key={panelist.name}
-                    className="absolute inset-0 flex flex-col items-center justify-center gap-9 px-6 text-center sm:px-12 lg:flex-row lg:text-left"
-                    style={{
-                      opacity: panelist.opacity,
-                      transform: `translateY(${panelist.offset}px) scale(${panelist.scale})`,
-                      pointerEvents: "none",
-                    }}
-                  >
+              <div className="landing-panel-stage relative min-h-[520px]">
+                {panelists
+                  .filter((panelist) => panelist.active)
+                  .map((panelist) => (
                     <div
-                      className="landing-panel-orb flex h-[178px] w-[178px] shrink-0 items-center justify-center rounded-full sm:h-[220px] sm:w-[220px]"
+                      key={panelist.name}
+                      className="absolute inset-0 flex flex-col items-center justify-center gap-9 px-6 text-center sm:px-12 lg:flex-row lg:text-left"
                       style={{
-                        background: panelist.avatarBg,
-                        boxShadow: `0 24px 80px ${panelist.glowColor}`,
+                        transform: `translateY(${panelist.offset}px) scale(${panelist.scale})`,
                       }}
                     >
-                      <span className="font-['Instrument_Serif',serif] text-[76px] text-[oklch(0.98_0.01_80)] sm:text-[96px]">
-                        {panelist.initial}
-                      </span>
-                    </div>
-                    <div className="max-w-[460px]">
-                      <div className="mb-4 font-['Instrument_Serif',serif] text-[15px] tracking-[0.05em] text-[oklch(0.55_0.03_80)]">
-                        {panelist.indexLabel}
-                      </div>
-                      <h3 className="mb-4 font-['Instrument_Serif',serif] text-[clamp(3.6rem,8vw,5.5rem)] font-normal leading-none">
-                        {panelist.name}
-                      </h3>
                       <div
-                        className="mb-5 text-sm font-semibold uppercase tracking-[0.08em]"
-                        style={{ color: panelist.roleColor }}
+                        className="landing-panel-orb flex h-[178px] w-[178px] shrink-0 items-center justify-center rounded-full sm:h-[220px] sm:w-[220px]"
+                        style={{
+                          background: panelist.avatarBg,
+                          boxShadow: `0 24px 80px ${panelist.glowColor}`,
+                        }}
                       >
-                        {panelist.role}
+                        <span className="font-['Instrument_Serif',serif] text-[76px] text-[oklch(0.98_0.01_80)] sm:text-[96px]">
+                          {panelist.initial}
+                        </span>
                       </div>
-                      <p className="m-0 text-[17px] leading-[1.6] text-[oklch(0.7_0.025_80)]">
-                        {panelist.desc}
-                      </p>
-                      <div className="mt-8 h-1.5 overflow-hidden rounded-full bg-[oklch(0.3_0.025_258)]">
+                      <div className="max-w-[460px]">
+                        <div className="mb-4 font-['Instrument_Serif',serif] text-[15px] tracking-[0.05em] text-[oklch(0.55_0.03_80)]">
+                          {panelist.indexLabel}
+                        </div>
+                        <h3 className="mb-4 font-['Instrument_Serif',serif] text-[clamp(3.6rem,8vw,5.5rem)] font-normal leading-none">
+                          {panelist.name}
+                        </h3>
                         <div
-                          className="h-full rounded-full bg-[oklch(0.74_0.12_75)] transition-[width] duration-200"
-                          style={{ width: panelist.progressWidth }}
-                        />
+                          className="mb-5 text-sm font-semibold uppercase tracking-[0.08em]"
+                          style={{ color: panelist.roleColor }}
+                        >
+                          {panelist.role}
+                        </div>
+                        <p className="m-0 text-[17px] leading-[1.6] text-[oklch(0.78_0.025_80)]">
+                          {panelist.desc}
+                        </p>
+                        <div className="mt-8 h-1.5 overflow-hidden rounded-full bg-[oklch(0.3_0.025_258)]">
+                          <div
+                            className="h-full rounded-full bg-[oklch(0.74_0.12_75)] transition-[width] duration-200"
+                            style={{ width: panelist.progressWidth }}
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           </div>
@@ -365,10 +369,10 @@ function SetupPage() {
         <section
           id="how"
           ref={howRef}
-          className="relative h-[400vh] border-t border-[oklch(0.3_0.025_258)]"
+          className="relative min-h-screen border-t border-[oklch(0.3_0.025_258)] px-6 py-24 sm:px-10 lg:py-32"
         >
-          <div className="sticky top-0 flex h-screen items-center overflow-hidden">
-            <div className="mx-auto grid w-full max-w-[1180px] items-center gap-12 px-6 sm:px-10 lg:grid-cols-[320px_1fr] lg:gap-[60px]">
+          <div className="flex min-h-[calc(100vh-12rem)] items-center overflow-hidden">
+            <div className="mx-auto grid w-full max-w-[1180px] items-center gap-12 lg:grid-cols-[320px_1fr] lg:gap-[60px]">
               <div>
                 <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[oklch(0.6_0.03_80)]">
                   Process
@@ -391,26 +395,28 @@ function SetupPage() {
                 </div>
               </div>
 
-              <div className="relative h-[280px]">
-                {processSteps.map((step) => (
-                  <div
-                    key={step.num}
-                    className="absolute inset-0"
-                    style={{
-                      opacity: step.opacity,
-                      transform: `translateY(${step.offset}px)`,
-                      pointerEvents: "none",
-                    }}
-                  >
-                    <div className="mb-3.5 font-['Instrument_Serif',serif] text-[26px] text-[oklch(0.55_0.05_80)]">
-                      {step.num}
+              <div className="landing-process-stage relative min-h-[360px]">
+                {processSteps
+                  .filter((step) => step.active)
+                  .map((step) => (
+                    <div
+                      key={step.num}
+                      className="absolute inset-0 flex flex-col justify-center p-8 sm:p-12"
+                      style={{
+                        transform: `translateY(${step.offset}px)`,
+                      }}
+                    >
+                      <div className="mb-3.5 font-['Instrument_Serif',serif] text-[26px] text-[oklch(0.74_0.12_75)]">
+                        {step.num}
+                      </div>
+                      <h3 className="mb-4 text-[32px] font-bold text-[oklch(0.96_0.012_80)]">
+                        {step.title}
+                      </h3>
+                      <p className="m-0 max-w-[540px] text-lg leading-[1.6] text-[oklch(0.78_0.025_80)]">
+                        {step.desc}
+                      </p>
                     </div>
-                    <h3 className="mb-4 text-[32px] font-bold">{step.title}</h3>
-                    <p className="m-0 max-w-[540px] text-lg leading-[1.6] text-[oklch(0.68_0.025_80)]">
-                      {step.desc}
-                    </p>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           </div>
@@ -746,15 +752,17 @@ const interviewLengths = [
 ] as const;
 
 function buildProcessSteps(progress: number) {
+  const activeIndex = Math.round(progress * (processStepDefs.length - 1));
   return processStepDefs.map((step, i) => {
     const local = progress * (processStepDefs.length - 1) - i;
-    const opacity = Math.max(0, 1 - Math.abs(local) * 1.6);
+    const opacity = i === activeIndex ? 1 : 0;
     const offset = Math.max(-1, Math.min(1, local)) * 26;
-    const active = opacity > 0.5;
+    const active = i === activeIndex;
     return {
       ...step,
+      active,
       opacity,
-      offset,
+      offset: active ? 0 : offset,
       railColor: active ? "oklch(0.74 0.12 75)" : "oklch(0.5 0.03 80)",
       railLine: active ? "oklch(0.74 0.12 75)" : "oklch(0.3 0.025 258)",
     };
@@ -762,11 +770,12 @@ function buildProcessSteps(progress: number) {
 }
 
 function buildPanelists(progress: number) {
+  const activeIndex = Math.round(progress * (panelistDefs.length - 1));
   return panelistDefs.map((panelist, i) => {
     const local = progress * (panelistDefs.length - 1) - i;
-    const opacity = Math.max(0, 1 - Math.abs(local) * 1.6);
+    const opacity = i === activeIndex ? 1 : 0;
     const offset = Math.max(-1, Math.min(1, local)) * 26;
-    const active = opacity > 0.5;
+    const active = i === activeIndex;
     return {
       ...panelist,
       indexLabel: `0${i + 1} / 0${panelistDefs.length}`,
@@ -776,9 +785,9 @@ function buildPanelists(progress: number) {
       active,
       glowColor: `oklch(0.55 0.14 ${panelist.hue} / 0.34)`,
       opacity,
-      offset,
+      offset: active ? 0 : offset,
       scale: active ? 1 : 0.96,
-      progressWidth: `${Math.min(100, Math.max(0, (i + Math.max(0, Math.min(1, local))) * 50))}%`,
+      progressWidth: `${Math.min(100, Math.max(8, (activeIndex + 1) * 33.333))}%`,
     };
   });
 }
