@@ -264,54 +264,71 @@ function SetupPage() {
           </div>
         </section>
 
-        <section id="panel" ref={panelRef} className="relative h-[300vh] bg-[oklch(0.12_0.02_258)]">
+        <section id="panel" ref={panelRef} className="relative h-[320vh] bg-[oklch(0.12_0.02_258)]">
           <div className="sticky top-0 flex h-screen items-center overflow-hidden">
-            <div className="mx-auto grid w-full max-w-[1180px] items-center gap-12 px-6 sm:px-10 lg:grid-cols-[320px_1fr] lg:gap-[60px]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_72%_45%,oklch(0.74_0.12_75_/_0.12),transparent_32%),radial-gradient(circle_at_24%_70%,oklch(0.55_0.14_264_/_0.18),transparent_34%)]" />
+            <div className="relative mx-auto grid w-full max-w-[1180px] items-center gap-12 px-6 sm:px-10 lg:grid-cols-[360px_1fr] lg:gap-[70px]">
               <div>
                 <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.14em] text-[oklch(0.6_0.03_80)]">
-                  Panel
+                  Three-person panel
                 </div>
-                <h2 className="mb-9 font-['Instrument_Serif',serif] text-[42px] font-normal leading-[1.1]">
-                  Meet the panel
+                <h2 className="mb-4 font-['Instrument_Serif',serif] text-[48px] font-normal leading-[1.02]">
+                  Scroll through the interview room.
                 </h2>
-                <div className="flex flex-col gap-[18px]">
+                <p className="mb-8 max-w-[310px] text-[15px] leading-[1.65] text-[oklch(0.68_0.025_80)]">
+                  Mocki does not feel like a static question bank. The panel rotates like a real
+                  loop: practitioner, hiring manager, then recruiter.
+                </p>
+                <div className="flex flex-col gap-3">
                   {panelists.map((panelist) => (
-                    <div key={panelist.name} className="flex items-center gap-3.5">
+                    <div
+                      key={panelist.name}
+                      className="landing-panel-rail-card"
+                      data-active={panelist.active}
+                    >
                       <div
-                        className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full"
+                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
                         style={{ background: panelist.avatarBg }}
                       >
-                        <span className="font-['Instrument_Serif',serif] text-sm text-[oklch(0.98_0.01_80)]">
+                        <span className="font-['Instrument_Serif',serif] text-xl text-[oklch(0.98_0.01_80)]">
                           {panelist.initial}
                         </span>
                       </div>
-                      <span
-                        className="text-[15px] font-semibold"
-                        style={{ color: panelist.railColor }}
-                      >
-                        {panelist.name}
-                      </span>
+                      <div>
+                        <span
+                          className="block text-[15px] font-semibold"
+                          style={{ color: panelist.railColor }}
+                        >
+                          {panelist.name}
+                        </span>
+                        <span className="mt-0.5 block text-xs uppercase tracking-[0.08em] text-[oklch(0.55_0.025_80)]">
+                          {panelist.role}
+                        </span>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="relative h-[360px] sm:h-[300px]">
+              <div className="landing-panel-stage relative h-[520px]">
                 {panelists.map((panelist) => (
                   <div
                     key={panelist.name}
-                    className="absolute inset-0 flex flex-col items-start gap-7 sm:flex-row sm:items-center sm:gap-14"
+                    className="absolute inset-0 flex flex-col items-center justify-center gap-9 px-6 text-center sm:px-12 lg:flex-row lg:text-left"
                     style={{
                       opacity: panelist.opacity,
-                      transform: `translateY(${panelist.offset}px)`,
+                      transform: `translateY(${panelist.offset}px) scale(${panelist.scale})`,
                       pointerEvents: "none",
                     }}
                   >
                     <div
-                      className="flex h-[128px] w-[128px] shrink-0 items-center justify-center rounded-full sm:h-40 sm:w-40"
-                      style={{ background: panelist.avatarBg }}
+                      className="landing-panel-orb flex h-[178px] w-[178px] shrink-0 items-center justify-center rounded-full sm:h-[220px] sm:w-[220px]"
+                      style={{
+                        background: panelist.avatarBg,
+                        boxShadow: `0 24px 80px ${panelist.glowColor}`,
+                      }}
                     >
-                      <span className="font-['Instrument_Serif',serif] text-[54px] text-[oklch(0.98_0.01_80)] sm:text-[62px]">
+                      <span className="font-['Instrument_Serif',serif] text-[76px] text-[oklch(0.98_0.01_80)] sm:text-[96px]">
                         {panelist.initial}
                       </span>
                     </div>
@@ -319,7 +336,7 @@ function SetupPage() {
                       <div className="mb-4 font-['Instrument_Serif',serif] text-[15px] tracking-[0.05em] text-[oklch(0.55_0.03_80)]">
                         {panelist.indexLabel}
                       </div>
-                      <h3 className="mb-4 font-['Instrument_Serif',serif] text-[clamp(3rem,8vw,3.5rem)] font-normal leading-none">
+                      <h3 className="mb-4 font-['Instrument_Serif',serif] text-[clamp(3.6rem,8vw,5.5rem)] font-normal leading-none">
                         {panelist.name}
                       </h3>
                       <div
@@ -331,6 +348,12 @@ function SetupPage() {
                       <p className="m-0 text-[17px] leading-[1.6] text-[oklch(0.7_0.025_80)]">
                         {panelist.desc}
                       </p>
+                      <div className="mt-8 h-1.5 overflow-hidden rounded-full bg-[oklch(0.3_0.025_258)]">
+                        <div
+                          className="h-full rounded-full bg-[oklch(0.74_0.12_75)] transition-[width] duration-200"
+                          style={{ width: panelist.progressWidth }}
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -597,9 +620,14 @@ function SetupPage() {
             Mocki is free to use. If it helped you prep, a small donation keeps the panel running
             for the next candidate.
           </p>
-          <Link to="/about" className="landing-primary-button">
-            About the builders
-          </Link>
+          <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <a href="#" className="landing-primary-button">
+              Buy us a coffee
+            </a>
+            <Link to="/about" className="landing-secondary-button">
+              About the builders
+            </Link>
+          </div>
         </section>
 
         <footer className="border-t border-[oklch(0.3_0.025_258)] px-10 py-[26px] text-center">
@@ -719,7 +747,7 @@ const interviewLengths = [
 
 function buildProcessSteps(progress: number) {
   return processStepDefs.map((step, i) => {
-    const local = progress * processStepDefs.length - i;
+    const local = progress * (processStepDefs.length - 1) - i;
     const opacity = Math.max(0, 1 - Math.abs(local) * 1.6);
     const offset = Math.max(-1, Math.min(1, local)) * 26;
     const active = opacity > 0.5;
@@ -735,7 +763,7 @@ function buildProcessSteps(progress: number) {
 
 function buildPanelists(progress: number) {
   return panelistDefs.map((panelist, i) => {
-    const local = progress * panelistDefs.length - i;
+    const local = progress * (panelistDefs.length - 1) - i;
     const opacity = Math.max(0, 1 - Math.abs(local) * 1.6);
     const offset = Math.max(-1, Math.min(1, local)) * 26;
     const active = opacity > 0.5;
@@ -745,8 +773,12 @@ function buildPanelists(progress: number) {
       avatarBg: `oklch(0.55 0.14 ${panelist.hue})`,
       roleColor: active ? `oklch(0.78 0.1 ${panelist.hue})` : "oklch(0.55 0.025 80)",
       railColor: active ? "oklch(0.9 0.02 80)" : "oklch(0.5 0.025 80)",
+      active,
+      glowColor: `oklch(0.55 0.14 ${panelist.hue} / 0.34)`,
       opacity,
       offset,
+      scale: active ? 1 : 0.96,
+      progressWidth: `${Math.min(100, Math.max(0, (i + Math.max(0, Math.min(1, local))) * 50))}%`,
     };
   });
 }

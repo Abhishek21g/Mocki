@@ -180,6 +180,15 @@ h6,
     transform: translateX(-50%);
   }
 }
+@keyframes mocki-avatar-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
 
 .fade-up {
   animation: fadeUp 0.4s ease forwards;
@@ -311,6 +320,30 @@ h6,
 .landing-primary-button:active:not(:disabled) {
   transform: translateY(0);
 }
+.landing-secondary-button {
+  display: inline-flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid oklch(0.35 0.025 258);
+  border-radius: 4px;
+  background: transparent;
+  color: oklch(0.86 0.02 80);
+  padding: 14px 24px;
+  font-family: "Public Sans", sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.landing-secondary-button:hover {
+  border-color: oklch(0.74 0.12 75);
+  background: oklch(0.74 0.12 75 / 0.08);
+  color: oklch(0.95 0.012 80);
+}
 .landing-small-button {
   border-radius: 4px;
   border: 0;
@@ -330,6 +363,57 @@ h6,
 }
 .landing-nav-link:hover {
   color: oklch(0.74 0.12 75);
+}
+.landing-panel-stage {
+  border: 1px solid oklch(0.3 0.025 258);
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, oklch(0.19 0.025 258 / 0.92), oklch(0.1 0.02 258 / 0.96)),
+    radial-gradient(circle at 50% 28%, oklch(0.95 0.012 80 / 0.12), transparent 42%);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.08),
+    0 40px 120px oklch(0 0 0 / 0.4);
+}
+.landing-panel-stage::before {
+  content: "";
+  position: absolute;
+  inset: 22px;
+  border: 1px solid oklch(0.74 0.12 75 / 0.18);
+  border-radius: 6px;
+  pointer-events: none;
+}
+.landing-panel-rail-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid oklch(0.3 0.025 258);
+  border-radius: 8px;
+  background: oklch(0.16 0.02 258 / 0.58);
+  opacity: 0.56;
+  padding: 14px;
+  transition:
+    opacity 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+.landing-panel-rail-card[data-active="true"] {
+  border-color: oklch(0.74 0.12 75);
+  background: oklch(0.74 0.12 75 / 0.1);
+  opacity: 1;
+  transform: translateX(6px);
+}
+.landing-panel-orb {
+  animation: mocki-avatar-float 4.5s ease-in-out infinite;
+  position: relative;
+}
+.landing-panel-orb::after {
+  content: "";
+  position: absolute;
+  inset: -18px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: oklch(0.95 0.012 80 / 0.18);
 }
 .landing-line-input {
   width: 100%;
