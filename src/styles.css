@@ -344,6 +344,11 @@ h6,
   background: oklch(0.74 0.12 75 / 0.08);
   color: oklch(0.95 0.012 80);
 }
+.landing-bmc-image {
+  display: block;
+  height: 60px;
+  width: 217px;
+}
 .landing-small-button {
   border-radius: 4px;
   border: 0;

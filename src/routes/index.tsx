@@ -191,7 +191,7 @@ function SetupPage() {
   const processSteps = buildProcessSteps(howProgress);
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[oklch(0.15_0.02_258)] font-['Public_Sans',sans-serif] text-[oklch(0.95_0.012_80)]">
+    <div className="min-h-screen bg-[oklch(0.15_0.02_258)] font-['Public_Sans',sans-serif] text-[oklch(0.95_0.012_80)]">
       {upgradeModal && accessTokenForModal && (
         <UpgradeModal
           interviewsUsed={upgradeModal.interviewsUsed}
@@ -264,12 +264,8 @@ function SetupPage() {
           </div>
         </section>
 
-        <section
-          id="panel"
-          ref={panelRef}
-          className="relative min-h-screen bg-[oklch(0.12_0.02_258)] px-6 py-24 sm:px-10 lg:py-32"
-        >
-          <div className="flex min-h-[calc(100vh-12rem)] items-center overflow-hidden">
+        <section id="panel" ref={panelRef} className="relative h-[240vh] bg-[oklch(0.12_0.02_258)]">
+          <div className="sticky top-0 flex h-screen items-center overflow-hidden px-6 py-10 sm:px-10 lg:py-12">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_72%_45%,oklch(0.74_0.12_75_/_0.12),transparent_32%),radial-gradient(circle_at_24%_70%,oklch(0.55_0.14_264_/_0.18),transparent_34%)]" />
             <div className="relative mx-auto grid w-full max-w-[1180px] items-center gap-12 lg:grid-cols-[360px_1fr] lg:gap-[70px]">
               <div>
@@ -314,7 +310,7 @@ function SetupPage() {
                 </div>
               </div>
 
-              <div className="landing-panel-stage relative min-h-[520px]">
+              <div className="landing-panel-stage relative h-[min(520px,72vh)] min-h-[440px]">
                 {panelists
                   .filter((panelist) => panelist.active)
                   .map((panelist) => (
@@ -369,9 +365,9 @@ function SetupPage() {
         <section
           id="how"
           ref={howRef}
-          className="relative min-h-screen border-t border-[oklch(0.3_0.025_258)] px-6 py-24 sm:px-10 lg:py-32"
+          className="relative h-[280vh] border-t border-[oklch(0.3_0.025_258)]"
         >
-          <div className="flex min-h-[calc(100vh-12rem)] items-center overflow-hidden">
+          <div className="sticky top-0 flex h-screen items-center overflow-hidden px-6 py-10 sm:px-10 lg:py-12">
             <div className="mx-auto grid w-full max-w-[1180px] items-center gap-12 lg:grid-cols-[320px_1fr] lg:gap-[60px]">
               <div>
                 <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[oklch(0.6_0.03_80)]">
@@ -627,8 +623,17 @@ function SetupPage() {
             for the next candidate.
           </p>
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <a href="#" className="landing-primary-button">
-              Buy us a coffee
+            <a
+              href="https://www.buymeacoffee.com/enaguthi"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Buy me a coffee"
+            >
+              <img
+                src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"
+                alt="Buy Me a Coffee"
+                className="landing-bmc-image"
+              />
             </a>
             <Link to="/about" className="landing-secondary-button">
               About the builders
