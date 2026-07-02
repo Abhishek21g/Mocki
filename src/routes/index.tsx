@@ -1,16 +1,4 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import {
-  ArrowRight,
-  Brain,
-  BriefcaseBusiness,
-  CheckCircle2,
-  FileText,
-  Mic,
-  PanelsTopLeft,
-  Sparkles,
-  Target,
-  Zap,
-} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { HomeLogo } from "@/components/ghost/HomeLogo";
 import { showToast } from "@/components/ghost/Toaster";
@@ -55,6 +43,32 @@ function SetupPage() {
   const [abandonedSession, setAbandonedSession] = useState<AbandonedSession | null>(null);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
+  const panelRef = useRef<HTMLElement | null>(null);
+  const howRef = useRef<HTMLElement | null>(null);
+  const [panelProgress, setPanelProgress] = useState(0);
+  const [howProgress, setHowProgress] = useState(0);
+
+  useEffect(() => {
+    let frame = 0;
+    const updateScrollEffects = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const vh = window.innerHeight || document.documentElement.clientHeight;
+        setPanelProgress(progressForElement(panelRef.current, vh));
+        setHowProgress(progressForElement(howRef.current, vh));
+      });
+    };
+
+    updateScrollEffects();
+    window.addEventListener("scroll", updateScrollEffects, { passive: true });
+    window.addEventListener("resize", updateScrollEffects, { passive: true });
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", updateScrollEffects);
+      window.removeEventListener("resize", updateScrollEffects);
+    };
+  }, []);
 
   useEffect(() => {
     if (status !== "ready" || !user) return;
@@ -173,9 +187,11 @@ function SetupPage() {
   }
 
   const accessTokenForModal = getAccessToken();
+  const panelists = buildPanelists(panelProgress);
+  const processSteps = buildProcessSteps(howProgress);
 
   return (
-    <div className="grid-bg min-h-screen overflow-hidden">
+    <div className="min-h-screen overflow-hidden bg-[oklch(0.15_0.02_258)] font-['Public_Sans',sans-serif] text-[oklch(0.95_0.012_80)]">
       {upgradeModal && accessTokenForModal && (
         <UpgradeModal
           interviewsUsed={upgradeModal.interviewsUsed}
@@ -186,349 +202,409 @@ function SetupPage() {
       <LandingNav />
 
       <main>
-        <section className="mx-auto grid min-h-[calc(100vh-40px)] max-w-7xl items-center gap-12 px-5 pb-16 pt-28 md:px-8 lg:grid-cols-[minmax(0,1fr)_520px] lg:pt-32">
-          <div className="fade-up">
-            <h1 className="max-w-4xl text-5xl font-extrabold tracking-tight md:text-7xl">
-              Practice interviews with an AI panel that reads your resume.
-            </h1>
-            <p
-              className="mt-6 max-w-2xl text-lg leading-8 md:text-xl"
-              style={{ color: "var(--text-2)" }}
+        <section className="mx-auto max-w-[1180px] px-6 py-24 text-center sm:px-10 md:pb-[90px] md:pt-[100px]">
+          <div className="mb-[26px] text-[13px] font-semibold uppercase tracking-[0.14em] text-[oklch(0.6_0.03_80)]">
+            An interview practice tool
+          </div>
+          <h1 className="mx-auto mb-7 max-w-[880px] font-['Instrument_Serif',serif] text-[clamp(3.35rem,9vw,4.75rem)] font-normal leading-[1.05] tracking-normal">
+            Practice interviews with a panel that reads your resume.
+          </h1>
+          <p className="mx-auto mb-10 max-w-[560px] text-lg leading-[1.65] text-[oklch(0.68_0.025_80)]">
+            Mocki turns your resume and target job description into a realistic panel interview:
+            three AI interviewers, natural follow-ups, voice practice, and a final debrief you can
+            actually use.
+          </p>
+          <div className="mb-[70px] flex flex-col items-center justify-center gap-5 sm:flex-row sm:gap-7">
+            <a className="landing-primary-button" href="#start">
+              Start a mock interview
+            </a>
+            <a
+              href="#panel"
+              className="border-b border-[oklch(0.5_0.02_80)] text-[15px] font-semibold text-[oklch(0.95_0.012_80)] transition hover:border-[oklch(0.74_0.12_75)] hover:text-[oklch(0.74_0.12_75)]"
             >
-              Mocki turns your resume and target job description into a realistic panel interview:
-              three AI interviewers, natural follow-ups, voice practice, and a final debrief you can
-              actually use.
-            </p>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a href="#start" className="gp-btn px-7">
-                Start a mock interview <ArrowRight className="h-4 w-4" />
-              </a>
-              <a
-                href="#how-it-works"
-                className="inline-flex h-[52px] items-center justify-center rounded-[10px] border px-7 text-sm font-semibold transition hover:border-white/30 hover:text-white"
-                style={{ borderColor: "var(--border2)", color: "var(--text-2)" }}
+              Meet the panel
+            </a>
+          </div>
+          <div className="mx-auto grid max-w-[680px] grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-0">
+            {heroStats.map((stat, index) => (
+              <div
+                key={stat.label}
+                className="text-center sm:px-11"
+                style={{
+                  borderRight:
+                    index < heroStats.length - 1 ? "1px solid oklch(0.3 0.025 258)" : "none",
+                }}
               >
-                See how it works
-              </a>
-            </div>
-
-            <div className="mt-10 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-3">
-              {heroStats.map((stat) => (
-                <div
-                  key={stat.label}
-                  className="rounded-lg border p-4"
-                  style={{
-                    borderColor: "var(--border)",
-                    background: "rgba(15,15,15,0.72)",
-                  }}
-                >
-                  <div className="mono text-2xl font-bold" style={{ color: "var(--green)" }}>
-                    {stat.value}
-                  </div>
-                  <div className="mt-1 text-sm" style={{ color: "var(--text-2)" }}>
-                    {stat.label}
-                  </div>
+                <div className="font-['Instrument_Serif',serif] text-[40px] leading-none">
+                  {stat.value}
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <ProductPreview />
-        </section>
-
-        <section
-          id="how-it-works"
-          className="border-y py-20"
-          style={{ borderColor: "var(--border)", background: "rgba(15,15,15,0.55)" }}
-        >
-          <div className="mx-auto max-w-7xl px-5 md:px-8">
-            <SectionHeading
-              title="How Mocki works"
-              body="A short setup becomes a complete interview loop: context, conversation, evaluation, and a plan for the next rep."
-            />
-            <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-4">
-              {steps.map((step, index) => (
-                <FeaturePanel
-                  key={step.title}
-                  icon={step.icon}
-                  title={step.title}
-                  body={step.body}
-                  index={index + 1}
-                />
-              ))}
-            </div>
+                <div className="mt-1 text-[13px] font-medium text-[oklch(0.6_0.025_80)]">
+                  {stat.label}
+                </div>
+              </div>
+            ))}
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-5 py-20 md:px-8">
-          <div className="mb-16">
-            <SectionHeading
-              title="Practice for the interviews candidates are actually seeing"
-              body="Mocki is shaped for high-pressure technical and behavioral loops across AI, systems, finance, and product-heavy engineering roles."
-            />
-            <div className="mt-8 flex flex-wrap gap-3">
-              {targetCompanies.map((company) => (
+        <section className="bg-[oklch(0.93_0.02_80)] py-[46px] text-[oklch(0.35_0.025_70)]">
+          <p className="mb-7 text-center text-[12.5px] font-semibold uppercase tracking-[0.1em] text-[oklch(0.42_0.025_70)]">
+            Practice for the interviews candidates are actually seeing
+          </p>
+          <div className="landing-marquee-mask overflow-hidden">
+            <div className="mocki-marquee-track flex w-max">
+              {[...targetCompanies, ...targetCompanies].map((company, index) => (
                 <span
-                  key={company}
-                  className="rounded-md border px-4 py-2 text-sm font-semibold"
-                  style={{
-                    borderColor: "var(--border)",
-                    background: "rgba(15,15,15,0.78)",
-                    color: "var(--text-2)",
-                  }}
+                  key={`${company}-${index}`}
+                  className="inline-block shrink-0 px-[34px] font-['Instrument_Serif',serif] text-xl"
                 >
                   {company}
                 </span>
               ))}
             </div>
           </div>
+        </section>
 
-          <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
-            <SectionHeading
-              title="Built for the messy middle of interview prep"
-              body="Mocki is for the moment when generic question banks stop helping and you need practice that reacts to your actual background."
-            />
-            <div className="grid gap-4">
-              {features.map((feature) => (
-                <div
-                  key={feature.title}
-                  className="grid gap-4 rounded-lg border p-5 md:grid-cols-[44px_minmax(0,1fr)]"
-                  style={{ borderColor: "var(--border)", background: "var(--surface)" }}
-                >
-                  <div
-                    className="flex h-11 w-11 items-center justify-center rounded-lg"
-                    style={{ background: "var(--green-dim)", color: "var(--green)" }}
-                  >
-                    <feature.icon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold">{feature.title}</h3>
-                    <p className="mt-2 text-sm leading-6" style={{ color: "var(--text-2)" }}>
-                      {feature.body}
-                    </p>
-                  </div>
+        <section id="panel" ref={panelRef} className="relative h-[300vh] bg-[oklch(0.12_0.02_258)]">
+          <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+            <div className="mx-auto grid w-full max-w-[1180px] items-center gap-12 px-6 sm:px-10 lg:grid-cols-[320px_1fr] lg:gap-[60px]">
+              <div>
+                <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.14em] text-[oklch(0.6_0.03_80)]">
+                  Panel
                 </div>
-              ))}
+                <h2 className="mb-9 font-['Instrument_Serif',serif] text-[42px] font-normal leading-[1.1]">
+                  Meet the panel
+                </h2>
+                <div className="flex flex-col gap-[18px]">
+                  {panelists.map((panelist) => (
+                    <div key={panelist.name} className="flex items-center gap-3.5">
+                      <div
+                        className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full"
+                        style={{ background: panelist.avatarBg }}
+                      >
+                        <span className="font-['Instrument_Serif',serif] text-sm text-[oklch(0.98_0.01_80)]">
+                          {panelist.initial}
+                        </span>
+                      </div>
+                      <span
+                        className="text-[15px] font-semibold"
+                        style={{ color: panelist.railColor }}
+                      >
+                        {panelist.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative h-[360px] sm:h-[300px]">
+                {panelists.map((panelist) => (
+                  <div
+                    key={panelist.name}
+                    className="absolute inset-0 flex flex-col items-start gap-7 sm:flex-row sm:items-center sm:gap-14"
+                    style={{
+                      opacity: panelist.opacity,
+                      transform: `translateY(${panelist.offset}px)`,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <div
+                      className="flex h-[128px] w-[128px] shrink-0 items-center justify-center rounded-full sm:h-40 sm:w-40"
+                      style={{ background: panelist.avatarBg }}
+                    >
+                      <span className="font-['Instrument_Serif',serif] text-[54px] text-[oklch(0.98_0.01_80)] sm:text-[62px]">
+                        {panelist.initial}
+                      </span>
+                    </div>
+                    <div className="max-w-[460px]">
+                      <div className="mb-4 font-['Instrument_Serif',serif] text-[15px] tracking-[0.05em] text-[oklch(0.55_0.03_80)]">
+                        {panelist.indexLabel}
+                      </div>
+                      <h3 className="mb-4 font-['Instrument_Serif',serif] text-[clamp(3rem,8vw,3.5rem)] font-normal leading-none">
+                        {panelist.name}
+                      </h3>
+                      <div
+                        className="mb-5 text-sm font-semibold uppercase tracking-[0.08em]"
+                        style={{ color: panelist.roleColor }}
+                      >
+                        {panelist.role}
+                      </div>
+                      <p className="m-0 text-[17px] leading-[1.6] text-[oklch(0.7_0.025_80)]">
+                        {panelist.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
 
         <section
-          id="start"
-          className="border-y py-20"
-          style={{
-            borderColor: "var(--border)",
-            background: "linear-gradient(180deg, rgba(118,185,0,0.06), rgba(8,8,8,0.2))",
-          }}
+          id="how"
+          ref={howRef}
+          className="relative h-[400vh] border-t border-[oklch(0.3_0.025_258)]"
         >
-          <div className="mx-auto grid max-w-7xl gap-10 px-5 md:px-8 lg:grid-cols-[0.8fr_1fr] lg:items-start">
-            <div>
-              <SectionHeading
-                title="Start with the role you are chasing"
-                body="Paste the job description, upload your resume PDF, and Mocki assembles a panel tuned to the company, role, interview length, and interview type."
-              />
-              <div className="mt-8 grid gap-3">
-                {status === "ready" && user && (
-                  <StatusNote tone="success">
-                    Memory enabled. This session can build on your prior interview history.
-                  </StatusNote>
-                )}
-                {status === "ready" && !user && (
-                  <StatusNote>
-                    Sign in from the top right to save history and let Mocki learn across sessions.
-                  </StatusNote>
-                )}
-                <StatusNote>Powered by NVIDIA Nemotron for the multi-agent pipeline.</StatusNote>
+          <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+            <div className="mx-auto grid w-full max-w-[1180px] items-center gap-12 px-6 sm:px-10 lg:grid-cols-[320px_1fr] lg:gap-[60px]">
+              <div>
+                <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[oklch(0.6_0.03_80)]">
+                  Process
+                </div>
+                <h2 className="mb-9 font-['Instrument_Serif',serif] text-[42px] font-normal leading-[1.1]">
+                  How Mocki works
+                </h2>
+                <div className="flex flex-col gap-4">
+                  {processSteps.map((step) => (
+                    <div key={step.num} className="flex items-center gap-3.5">
+                      <span
+                        className="font-['Instrument_Serif',serif] text-xl"
+                        style={{ color: step.railColor }}
+                      >
+                        {step.num}
+                      </span>
+                      <span className="h-px flex-1" style={{ background: step.railLine }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="relative h-[280px]">
+                {processSteps.map((step) => (
+                  <div
+                    key={step.num}
+                    className="absolute inset-0"
+                    style={{
+                      opacity: step.opacity,
+                      transform: `translateY(${step.offset}px)`,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    <div className="mb-3.5 font-['Instrument_Serif',serif] text-[26px] text-[oklch(0.55_0.05_80)]">
+                      {step.num}
+                    </div>
+                    <h3 className="mb-4 text-[32px] font-bold">{step.title}</h3>
+                    <p className="m-0 max-w-[540px] text-lg leading-[1.6] text-[oklch(0.68_0.025_80)]">
+                      {step.desc}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
+          </div>
+        </section>
 
-            <div>
-              {isSignedIn && !bannerDismissed && abandonedSession && (
-                <div
-                  className="fade-up mb-5 w-full rounded-xl border p-4"
-                  style={{
-                    borderColor: "rgba(118,185,0,0.35)",
-                    background: "rgba(118,185,0,0.06)",
-                    animationDelay: "30ms",
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold" style={{ color: "var(--text)" }}>
-                        You have an unfinished interview
-                      </p>
-                      <p className="mono mt-1 text-[11px]" style={{ color: "var(--text-3)" }}>
-                        {abandonedSession.role} at {abandonedSession.company}
-                        {" · "}Round {abandonedSession.currentRound + 1}/
-                        {abandonedSession.totalRounds}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void handleResume()}
-                        disabled={resumeLoading}
-                        className="gp-btn px-4 py-1.5 text-sm disabled:opacity-60"
-                      >
-                        {resumeLoading ? (
-                          <>
-                            <span className="gp-spinner" /> Resuming...
-                          </>
-                        ) : (
-                          "Resume"
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setBannerDismissed(true)}
-                        className="rounded p-1 text-sm transition-opacity hover:opacity-70"
-                        style={{ color: "var(--text-3)" }}
-                        aria-label="Dismiss"
-                      >
-                        x
-                      </button>
-                    </div>
+        <section className="px-6 py-[100px] sm:px-10">
+          <div className="mx-auto max-w-[1180px]">
+            <div className="grid gap-12 lg:grid-cols-[320px_1fr] lg:gap-[60px]">
+              <div>
+                <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[oklch(0.6_0.03_80)]">
+                  Approach
+                </div>
+                <h2 className="mb-5 font-['Instrument_Serif',serif] text-[42px] font-normal leading-[1.1]">
+                  Built for the messy middle of interview prep
+                </h2>
+                <p className="m-0 text-[15.5px] leading-[1.6] text-[oklch(0.68_0.025_80)]">
+                  For the moment when generic question banks stop helping and you need practice that
+                  reacts to your actual background.
+                </p>
+              </div>
+              <div>
+                {features.map((feature) => (
+                  <div key={feature.title} className="border-t border-[oklch(0.3_0.025_258)] py-7">
+                    <h3 className="mb-2 text-lg font-bold">{feature.title}</h3>
+                    <p className="m-0 max-w-[560px] text-[15.5px] leading-[1.6] text-[oklch(0.68_0.025_80)]">
+                      {feature.desc}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="start" className="bg-[oklch(0.1_0.02_258)] px-6 py-24 sm:px-10">
+          <div className="mx-auto max-w-[720px]">
+            <div className="mb-11 text-center">
+              <div className="mb-3.5 text-[13px] font-semibold uppercase tracking-[0.1em] text-[oklch(0.6_0.03_80)]">
+                Get started
+              </div>
+              <h2 className="mb-[18px] font-['Instrument_Serif',serif] text-[42px] font-normal leading-[1.1] text-[oklch(0.96_0.01_80)]">
+                Start with the role you are chasing
+              </h2>
+              <p className="mx-auto m-0 max-w-[520px] text-base leading-[1.6] text-[oklch(0.68_0.025_80)]">
+                Paste the job description, upload your resume PDF, and Mocki assembles a panel tuned
+                to the company, role, interview length, and interview type.
+              </p>
+            </div>
+
+            {isSignedIn && !bannerDismissed && abandonedSession && (
+              <div className="mb-6 border border-[oklch(0.74_0.12_75_/_0.45)] bg-[oklch(0.74_0.12_75_/_0.08)] p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[oklch(0.96_0.01_80)]">
+                      You have an unfinished interview
+                    </p>
+                    <p className="mt-1 text-[11px] text-[oklch(0.62_0.025_80)]">
+                      {abandonedSession.role} at {abandonedSession.company}
+                      {" · "}Round {abandonedSession.currentRound + 1}/
+                      {abandonedSession.totalRounds}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleResume()}
+                      disabled={resumeLoading}
+                      className="landing-small-button disabled:opacity-60"
+                    >
+                      {resumeLoading ? "Resuming..." : "Resume"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBannerDismissed(true)}
+                      className="px-2 text-sm text-[oklch(0.62_0.025_80)] transition hover:text-[oklch(0.95_0.012_80)]"
+                      aria-label="Dismiss"
+                    >
+                      x
+                    </button>
                   </div>
                 </div>
-              )}
+              </div>
+            )}
 
-              <form
-                onSubmit={handleSubmit}
-                className="gp-card w-full p-6 shadow-[0_0_40px_rgba(118,185,0,0.08)] md:p-8 fade-up"
-                style={{ animationDelay: "60ms" }}
-              >
-                <div className="flex flex-col gap-5">
-                  <Field label="Job Role">
-                    <input
-                      className="gp-input"
-                      placeholder="e.g. Software Engineer Intern"
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      disabled={loading}
-                    />
-                  </Field>
-                  <Field label="Company">
-                    <input
-                      className="gp-input"
-                      placeholder="e.g. Google, Meta, Apple..."
-                      value={company}
-                      onChange={(e) => setCompany(e.target.value)}
-                      disabled={loading}
-                    />
-                  </Field>
-                  <Field label="Job Description">
-                    <textarea
-                      className="gp-input"
-                      rows={6}
-                      style={{ resize: "vertical", lineHeight: 1.6 }}
-                      placeholder="Paste the job description or role requirements here so the panel can tailor its questions."
-                      value={jobDescription}
-                      onChange={(e) => setJobDescription(e.target.value)}
-                      disabled={loading}
-                    />
-                  </Field>
-                  <Field label="Interview Type">
-                    <select
-                      className="gp-input"
-                      value={interviewType}
-                      onChange={(e) => setInterviewType(e.target.value)}
-                      disabled={loading}
-                    >
-                      <option value="technical">
-                        Role Skills (Job Scenarios + Problem Solving)
-                      </option>
-                      <option value="behavioral">Behavioral (Experience + Teamwork)</option>
-                      <option value="mixed">Mixed (Panel Style)</option>
-                    </select>
-                  </Field>
-                  <Field label="Interview Length">
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      {interviewLengths.map(({ val, label, sub }) => (
-                        <button
-                          key={val}
-                          type="button"
-                          disabled={loading}
-                          onClick={() => setTotalRounds(val)}
-                          className="rounded-xl border p-3 text-left transition-all"
-                          style={{
-                            borderColor: totalRounds === val ? "var(--green)" : "var(--border)",
-                            background:
-                              totalRounds === val ? "rgba(118,185,0,0.08)" : "var(--surface2)",
-                            opacity: loading ? 0.7 : 1,
-                          }}
-                        >
-                          <div
-                            className="text-sm font-semibold"
-                            style={{
-                              color: totalRounds === val ? "var(--green)" : "var(--text-1)",
-                            }}
-                          >
-                            {label}
-                          </div>
-                          <div className="mt-0.5 text-[11px]" style={{ color: "var(--text-3)" }}>
-                            {sub}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </Field>
-                  <Field label="Your Resume" htmlElement="div">
-                    <ResumeDropzone
-                      disabled={loading}
-                      onParsed={(text) => setResume(text)}
-                      onFileRaw={(file) => {
-                        const token = getAccessToken();
-                        if (!token) return;
-                        const tempId = crypto.randomUUID();
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          const b64 = (reader.result as string).split(",")[1];
-                          import("@/server/upload.functions").then(({ uploadResumePdf }) => {
-                            uploadResumePdf({
-                              data: {
-                                accessToken: token,
-                                fileName: file.name,
-                                fileBase64: b64,
-                                sessionId: tempId,
-                              },
-                            }).catch(() => undefined);
-                          });
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-                  </Field>
-                  <button type="submit" className="gp-btn w-full" disabled={!valid || loading}>
-                    {loading ? (
-                      <>
-                        <span className="gp-spinner" /> Assembling your panel...
-                      </>
-                    ) : (
-                      <>
-                        Launch Mock Panel <ArrowRight className="h-4 w-4" />
-                      </>
-                    )}
-                  </button>
+            <form onSubmit={handleSubmit} className="border-t border-[oklch(0.3_0.025_258)] pt-9">
+              <div className="mb-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <LineField label="Job Role">
+                  <input
+                    className="landing-line-input"
+                    placeholder="e.g. Software Engineer Intern"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    disabled={loading}
+                  />
+                </LineField>
+                <LineField label="Company">
+                  <input
+                    className="landing-line-input"
+                    placeholder="e.g. NVIDIA"
+                    value={company}
+                    onChange={(e) => setCompany(e.target.value)}
+                    disabled={loading}
+                  />
+                </LineField>
+              </div>
+
+              <LineField className="mb-[26px]" label="Job Description">
+                <textarea
+                  className="landing-line-input"
+                  rows={3}
+                  placeholder="Paste the job description here"
+                  value={jobDescription}
+                  onChange={(e) => setJobDescription(e.target.value)}
+                  disabled={loading}
+                />
+              </LineField>
+
+              <div className="mb-[26px]">
+                <div className="mb-2.5 text-[13px] font-semibold text-[oklch(0.7_0.025_80)]">
+                  Interview Type
                 </div>
-              </form>
-            </div>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                  {interviewTypes.map((type) => (
+                    <button
+                      key={type.value}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setInterviewType(type.value)}
+                      className="landing-choice-button"
+                      data-selected={interviewType === type.value}
+                    >
+                      {type.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-[26px]">
+                <div className="mb-2.5 text-[13px] font-semibold text-[oklch(0.7_0.025_80)]">
+                  Interview Length
+                </div>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                  {interviewLengths.map(({ val, label, sub }) => (
+                    <button
+                      key={val}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setTotalRounds(val)}
+                      className="landing-length-button"
+                      data-selected={totalRounds === val}
+                    >
+                      <span className="block text-sm font-bold">{label}</span>
+                      <span className="mt-[3px] block text-xs text-[oklch(0.62_0.025_80)]">
+                        {sub}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-[30px]">
+                <div className="mb-2.5 text-[13px] font-semibold text-[oklch(0.7_0.025_80)]">
+                  Your Resume
+                </div>
+                <ResumeDropzone
+                  disabled={loading}
+                  onParsed={(text) => setResume(text)}
+                  onFileRaw={(file) => {
+                    const token = getAccessToken();
+                    if (!token) return;
+                    const tempId = crypto.randomUUID();
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const b64 = (reader.result as string).split(",")[1];
+                      import("@/server/upload.functions").then(({ uploadResumePdf }) => {
+                        uploadResumePdf({
+                          data: {
+                            accessToken: token,
+                            fileName: file.name,
+                            fileBase64: b64,
+                            sessionId: tempId,
+                          },
+                        }).catch(() => undefined);
+                      });
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="landing-primary-button w-full disabled:cursor-not-allowed disabled:opacity-55"
+                disabled={!valid || loading}
+              >
+                {loading ? "Assembling your panel..." : "Launch Mock Panel"}
+              </button>
+            </form>
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-5 py-20 md:px-8">
-          <div className="max-w-3xl">
-            <SectionHeading
-              title="Made by builders who needed better reps"
-              body="Mocki was built at BeaverHacks by a team focused on making interview practice more realistic, repeatable, and useful."
-            />
-            <div className="mt-7">
-              <Link to="/about" className="gp-btn gp-btn-outline px-6">
-                About the builders
-              </Link>
-            </div>
-          </div>
+        <section id="about" className="px-6 pb-[60px] pt-[90px] text-center sm:px-10">
+          <h2 className="mb-4 font-['Instrument_Serif',serif] text-3xl font-normal">
+            Keeping Mocki free to practice with
+          </h2>
+          <p className="mx-auto mb-[26px] max-w-[480px] text-[15.5px] leading-[1.6] text-[oklch(0.68_0.025_80)]">
+            Mocki is free to use. If it helped you prep, a small donation keeps the panel running
+            for the next candidate.
+          </p>
+          <Link to="/about" className="landing-primary-button">
+            About the builders
+          </Link>
         </section>
+
+        <footer className="border-t border-[oklch(0.3_0.025_258)] px-10 py-[26px] text-center">
+          <span className="text-[13px] text-[oklch(0.5_0.025_80)]">Mocki · 2026</span>
+        </footer>
       </main>
     </div>
   );
@@ -540,49 +616,77 @@ const heroStats = [
   { value: "1", label: "debrief plan" },
 ];
 
-const steps = [
+function progressForElement(el: HTMLElement | null, vh: number) {
+  if (!el) return 0;
+  const rect = el.getBoundingClientRect();
+  const total = rect.height - vh;
+  const progress = total > 0 ? -rect.top / total : 0;
+  return Math.max(0, Math.min(1, progress));
+}
+
+const processStepDefs = [
   {
-    icon: FileText,
+    num: "01",
     title: "Upload context",
-    body: "Add your resume PDF and the job description so the panel has the same material a real recruiter would read.",
+    desc: "Add your resume PDF and the job description so the panel has the same material a real recruiter would read.",
   },
   {
-    icon: PanelsTopLeft,
+    num: "02",
     title: "Meet the panel",
-    body: "Mocki creates a practitioner, hiring manager, and recruiter tuned to your target role.",
+    desc: "Mocki creates a practitioner, hiring manager, and recruiter tuned to your target role.",
   },
   {
-    icon: Mic,
+    num: "03",
     title: "Answer live",
-    body: "Type or speak your answers while the panel asks follow-ups instead of jumping through a static quiz.",
+    desc: "Type or speak your answers while the panel asks follow-ups instead of jumping through a static quiz.",
   },
   {
-    icon: Target,
+    num: "04",
     title: "Review the debrief",
-    body: "Get a score, strengths, weak spots, drill questions, and a study plan for the next practice session.",
+    desc: "Get a score, strengths, weak spots, drill questions, and a study plan for the next practice session.",
   },
 ];
 
 const features = [
   {
-    icon: Brain,
     title: "Resume-aware questions",
-    body: "The interview can ask about your actual projects, likely gaps, and the skills named in the job description.",
+    desc: "The interview can ask about your actual projects, likely gaps, and the skills named in the job description.",
   },
   {
-    icon: Zap,
     title: "Real follow-ups",
-    body: "A coordinator and clarifier keep the conversation coherent, challenging vague answers when it matters.",
+    desc: "A coordinator and clarifier keep the conversation coherent, challenging vague answers when it matters.",
   },
   {
-    icon: CheckCircle2,
     title: "Actionable scoring",
-    body: "Each session ends with strengths, weaknesses, missed concepts, practice questions, and a focused study plan.",
+    desc: "Each session ends with strengths, weaknesses, missed concepts, practice questions, and a focused study plan.",
   },
   {
-    icon: BriefcaseBusiness,
     title: "Built for internships and new-grad roles",
-    body: "Use it for software engineering, behavioral, mixed panels, career fairs, and last-mile interview prep.",
+    desc: "Use it for software engineering, behavioral, mixed panels, career fairs, and last-mile interview prep.",
+  },
+];
+
+const panelistDefs = [
+  {
+    name: "Maya",
+    role: "Practitioner",
+    initial: "M",
+    desc: "Digs into your technical decisions and the tradeoffs behind them.",
+    hue: 264,
+  },
+  {
+    name: "Jordan",
+    role: "Hiring Manager",
+    initial: "J",
+    desc: "Weighs how you'd operate on a real team, not just the right answer.",
+    hue: 155,
+  },
+  {
+    name: "Avery",
+    role: "Recruiter",
+    initial: "A",
+    desc: "Keeps the conversation moving and checks for fit against the role.",
+    hue: 40,
   },
 ];
 
@@ -595,6 +699,16 @@ const targetCompanies = [
   "Anduril",
   "Google DeepMind",
   "Bloomberg",
+  "IMC",
+  "Jane Street",
+  "Citadel",
+  "Hudson River Trading",
+];
+
+const interviewTypes = [
+  { value: "technical", label: "Role Skills" },
+  { value: "behavioral", label: "Behavioral" },
+  { value: "mixed", label: "Mixed Panel" },
 ];
 
 const interviewLengths = [
@@ -603,199 +717,80 @@ const interviewLengths = [
   { val: 6, label: "Full Panel", sub: "6 questions · ~25 min" },
 ] as const;
 
+function buildProcessSteps(progress: number) {
+  return processStepDefs.map((step, i) => {
+    const local = progress * processStepDefs.length - i;
+    const opacity = Math.max(0, 1 - Math.abs(local) * 1.6);
+    const offset = Math.max(-1, Math.min(1, local)) * 26;
+    const active = opacity > 0.5;
+    return {
+      ...step,
+      opacity,
+      offset,
+      railColor: active ? "oklch(0.74 0.12 75)" : "oklch(0.5 0.03 80)",
+      railLine: active ? "oklch(0.74 0.12 75)" : "oklch(0.3 0.025 258)",
+    };
+  });
+}
+
+function buildPanelists(progress: number) {
+  return panelistDefs.map((panelist, i) => {
+    const local = progress * panelistDefs.length - i;
+    const opacity = Math.max(0, 1 - Math.abs(local) * 1.6);
+    const offset = Math.max(-1, Math.min(1, local)) * 26;
+    const active = opacity > 0.5;
+    return {
+      ...panelist,
+      indexLabel: `0${i + 1} / 0${panelistDefs.length}`,
+      avatarBg: `oklch(0.55 0.14 ${panelist.hue})`,
+      roleColor: active ? `oklch(0.78 0.1 ${panelist.hue})` : "oklch(0.55 0.025 80)",
+      railColor: active ? "oklch(0.9 0.02 80)" : "oklch(0.5 0.025 80)",
+      opacity,
+      offset,
+    };
+  });
+}
+
 function LandingNav() {
   return (
-    <header className="fixed left-0 right-0 top-0 z-30 border-b border-white/5 bg-black/55 backdrop-blur">
-      <nav className="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 pr-[140px] md:px-8 lg:pr-[360px] xl:pr-[520px]">
-        <HomeLogo resetOnClick={false} className="text-xl" />
-        <div
-          className="hidden items-center gap-6 text-sm md:flex"
-          style={{ color: "var(--text-2)" }}
-        >
-          <a href="#how-it-works" className="transition hover:text-white">
-            How it works
-          </a>
-          <a href="#start" className="transition hover:text-white">
-            Start
-          </a>
-          <Link to="/about" className="transition hover:text-white">
-            About
-          </Link>
-        </div>
-      </nav>
-    </header>
-  );
-}
-
-function ProductPreview() {
-  return (
-    <div
-      className="fade-up rounded-lg border p-4 shadow-[0_24px_80px_rgba(0,0,0,0.35)]"
-      style={{
-        borderColor: "var(--border)",
-        background: "linear-gradient(180deg, rgba(22,22,22,0.96), rgba(10,10,10,0.96))",
-        animationDelay: "80ms",
-      }}
-    >
-      <div
-        className="flex items-center justify-between border-b pb-3"
-        style={{ borderColor: "var(--border)" }}
+    <nav className="mx-auto flex max-w-[1180px] items-center justify-between border-b border-[oklch(0.3_0.025_258)] px-6 py-[30px] pr-[150px] sm:px-10 lg:pr-[360px] xl:pr-[520px]">
+      <Link
+        to="/"
+        className="font-['Instrument_Serif',serif] text-2xl tracking-normal text-[oklch(0.95_0.012_80)]"
       >
-        <div>
-          <div
-            className="mono text-[11px] uppercase tracking-wider"
-            style={{ color: "var(--text-3)" }}
-          >
-            Live panel
-          </div>
-          <div className="mt-1 font-semibold">Software Engineer Intern at NVIDIA</div>
-        </div>
-        <div
-          className="rounded-md px-2.5 py-1 text-xs font-semibold text-black"
-          style={{ background: "var(--green)" }}
-        >
-          Round 3/6
-        </div>
+        Mocki
+      </Link>
+      <div className="hidden items-center gap-[34px] md:flex">
+        <a className="landing-nav-link" href="#panel">
+          Meet the panel
+        </a>
+        <a className="landing-nav-link" href="#start">
+          Start
+        </a>
+        <Link className="landing-nav-link" to="/about">
+          About
+        </Link>
       </div>
-
-      <div className="mt-4 grid gap-3">
-        {[
-          ["Maya", "Practitioner", "active"],
-          ["Jordan", "Hiring Manager", ""],
-          ["Avery", "Recruiter", ""],
-        ].map(([name, title, active]) => (
-          <div
-            key={name}
-            className="flex items-center gap-3 rounded-lg border p-3"
-            style={{
-              borderColor: active ? "rgba(118,185,0,0.55)" : "var(--border)",
-              background: active ? "rgba(118,185,0,0.08)" : "var(--surface2)",
-            }}
-          >
-            <div
-              className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-black"
-              style={{
-                background: active ? "var(--green)" : "#3a3a3a",
-                color: active ? "#000" : "var(--text)",
-              }}
-            >
-              {name.slice(0, 1)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold">{name}</div>
-              <div className="text-xs" style={{ color: "var(--text-2)" }}>
-                {title}
-              </div>
-            </div>
-            {active && <Sparkles className="h-4 w-4" style={{ color: "var(--green)" }} />}
-          </div>
-        ))}
-      </div>
-
-      <div
-        className="mt-4 rounded-lg border p-4"
-        style={{ borderColor: "var(--border)", background: "#0b0b0b" }}
-      >
-        <div
-          className="mono text-[11px] uppercase tracking-wider"
-          style={{ color: "var(--green)" }}
-        >
-          Current question
-        </div>
-        <p className="mt-2 text-sm leading-6">
-          You mentioned optimizing a model pipeline. Walk me through the bottleneck you found and
-          the tradeoff you made to improve latency.
-        </p>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <PreviewMetric label="Resume match" value="Strong" />
-        <PreviewMetric label="Debrief score" value="8.4/10" />
-      </div>
-    </div>
+    </nav>
   );
 }
 
-function PreviewMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div
-      className="rounded-lg border p-3"
-      style={{ borderColor: "var(--border)", background: "var(--surface2)" }}
-    >
-      <div className="mono text-[10px] uppercase tracking-wider" style={{ color: "var(--text-3)" }}>
-        {label}
-      </div>
-      <div className="mt-1 font-semibold" style={{ color: "var(--green)" }}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function SectionHeading({ title, body }: { title: string; body: string }) {
-  return (
-    <div>
-      <h2 className="max-w-3xl text-3xl font-bold tracking-tight md:text-5xl">{title}</h2>
-      <p className="mt-4 max-w-2xl text-base leading-7" style={{ color: "var(--text-2)" }}>
-        {body}
-      </p>
-    </div>
-  );
-}
-
-function FeaturePanel({
-  icon: Icon,
-  title,
-  body,
-  index,
-}: {
-  icon: typeof FileText;
-  title: string;
-  body: string;
-  index: number;
-}) {
-  return (
-    <div
-      className="rounded-lg border p-5"
-      style={{ borderColor: "var(--border)", background: "var(--surface)" }}
-    >
-      <div className="flex items-center justify-between">
-        <div
-          className="flex h-11 w-11 items-center justify-center rounded-lg"
-          style={{ background: "var(--green-dim)", color: "var(--green)" }}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="mono text-xs" style={{ color: "var(--text-3)" }}>
-          {String(index).padStart(2, "0")}
-        </div>
-      </div>
-      <h3 className="mt-5 text-lg font-semibold">{title}</h3>
-      <p className="mt-3 text-sm leading-6" style={{ color: "var(--text-2)" }}>
-        {body}
-      </p>
-    </div>
-  );
-}
-
-function StatusNote({
+function LineField({
+  label,
   children,
-  tone = "muted",
+  className = "",
 }: {
+  label: string;
   children: React.ReactNode;
-  tone?: "muted" | "success";
+  className?: string;
 }) {
   return (
-    <div
-      className="rounded-lg border px-4 py-3 text-sm"
-      style={{
-        borderColor: tone === "success" ? "rgba(118,185,0,0.45)" : "var(--border)",
-        background: tone === "success" ? "rgba(118,185,0,0.08)" : "rgba(15,15,15,0.68)",
-        color: tone === "success" ? "var(--green)" : "var(--text-2)",
-      }}
-    >
+    <label className={`block ${className}`}>
+      <span className="mb-2 block text-[13px] font-semibold text-[oklch(0.7_0.025_80)]">
+        {label}
+      </span>
       {children}
-    </div>
+    </label>
   );
 }
 
@@ -856,18 +851,18 @@ function ResumeDropzone({
        * keeps the explicit click/keydown handlers below as the sole trigger.
        */}
       <div
-        className="rounded-xl border-2 border-dashed p-5 transition-all duration-200"
+        className="rounded-[4px] border border-dashed p-[26px] text-center transition-all duration-200"
         role="button"
         tabIndex={disabled ? -1 : 0}
         style={{
-          borderColor: isDragging ? "var(--green)" : "var(--border)",
-          background: isDragging ? "rgba(118,185,0,0.07)" : "var(--surface2)",
+          borderColor: isDragging ? "oklch(0.74 0.12 75)" : "oklch(0.35 0.025 258)",
+          background: isDragging ? "oklch(0.74 0.12 75 / 0.08)" : "transparent",
           opacity: disabled ? 0.7 : 1,
           cursor: disabled || isParsing ? "not-allowed" : "pointer",
           boxShadow: isDragging
-            ? "0 0 0 3px rgba(118,185,0,0.15)"
+            ? "0 0 0 3px oklch(0.74 0.12 75 / 0.14)"
             : isPressed
-              ? "0 0 0 2px rgba(118,185,0,0.12)"
+              ? "0 0 0 2px oklch(0.74 0.12 75 / 0.1)"
               : "none",
           transform: isPressed ? "scale(0.995)" : "scale(1)",
         }}
@@ -925,17 +920,15 @@ function ResumeDropzone({
         <div className="text-sm">
           {!fileName && !isParsing && (
             <>
-              <p className="font-medium">Drop your resume PDF here</p>
-              <p className="mt-1 text-xs" style={{ color: "var(--text-3)" }}>
-                PDF only - max 10MB
-              </p>
+              <p className="font-semibold text-[oklch(0.85_0.015_80)]">Drop your resume PDF here</p>
+              <p className="mt-1 text-[12.5px] text-[oklch(0.6_0.025_80)]">PDF only · max 10MB</p>
               <div className="mt-3">
                 <span
-                  className="inline-flex rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
+                  className="inline-flex rounded-[4px] border px-3 py-1.5 text-xs font-medium transition-colors"
                   style={{
-                    borderColor: "rgba(118,185,0,0.45)",
-                    color: "var(--green)",
-                    background: "rgba(118,185,0,0.08)",
+                    borderColor: "oklch(0.74 0.12 75 / 0.45)",
+                    color: "oklch(0.85 0.1 75)",
+                    background: "oklch(0.74 0.12 75 / 0.08)",
                   }}
                 >
                   Click to choose PDF
@@ -945,24 +938,24 @@ function ResumeDropzone({
           )}
 
           {isParsing && (
-            <p className="flex items-center gap-2 font-medium">
+            <p className="flex items-center justify-center gap-2 font-medium text-[oklch(0.85_0.015_80)]">
               <span className="gp-spinner" /> Parsing {fileName ?? "resume.pdf"}...
             </p>
           )}
 
           {!isParsing && fileName && (
             <div>
-              <p className="font-medium">{fileName}</p>
-              <p className="mt-1 text-xs" style={{ color: "var(--text-3)" }}>
+              <p className="font-semibold text-[oklch(0.85_0.015_80)]">{fileName}</p>
+              <p className="mt-1 text-xs text-[oklch(0.6_0.025_80)]">
                 {pages} page{pages === 1 ? "" : "s"} parsed - {charCount} chars extracted
               </p>
               <div className="mt-3">
                 <span
-                  className="inline-flex rounded-md border px-3 py-1.5 text-xs font-medium transition-colors"
+                  className="inline-flex rounded-[4px] border px-3 py-1.5 text-xs font-medium transition-colors"
                   style={{
-                    borderColor: "var(--border)",
-                    color: "var(--text-2)",
-                    background: "var(--surface3)",
+                    borderColor: "oklch(0.35 0.025 258)",
+                    color: "oklch(0.8 0.02 80)",
+                    background: "transparent",
                   }}
                 >
                   Click to replace PDF
