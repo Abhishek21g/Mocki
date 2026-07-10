@@ -147,8 +147,7 @@ function AboutPage() {
                   href={member.linkedin}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="landing-panel-rail-card min-h-[96px]"
-                  data-active={member.name === "Abhishek Enaguthi"}
+                  className="landing-panel-rail-card landing-team-card min-h-[96px]"
                 >
                   <div
                     className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full"

@@ -416,6 +416,9 @@ h6,
   opacity: 1;
   transform: translateX(6px);
 }
+.landing-team-card {
+  opacity: 1;
+}
 .landing-panel-orb {
   animation: mocki-avatar-float 4.5s ease-in-out infinite;
   position: relative;
