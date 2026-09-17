@@ -2,6 +2,8 @@
 
 # NVIDIA NIM API key — get one from https://build.nvidia.com/.
 NVIDIA_API_KEY=paste_your_nvidia_key_here
+# Optional override. Defaults to nvidia/nemotron-3.5-lightning-30b-a3b.
+# NVIDIA_NIM_MODEL=nvidia/nemotron-3.5-lightning-30b-a3b
 
 # Supabase — get from your Supabase project settings (API).
 # Required for sign-in, history persistence, and learner memory features.

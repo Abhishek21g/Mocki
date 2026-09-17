@@ -3,14 +3,15 @@ import { resolve } from "node:path";
 import { pushLog, currentSessionId } from "./agent-log.server";
 
 const NIM_BASE_URL = "https://integrate.api.nvidia.com/v1";
-const MODEL = "nvidia/nvidia-nemotron-nano-9b-v2";
+/** Hosted NIM successor after `nvidia/nvidia-nemotron-nano-9b-v2` reached EOL. */
+const DEFAULT_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b";
 
 /**
- * Estimated USD cost per 1 million tokens for {@link MODEL}.
+ * Estimated USD cost per 1 million tokens for {@link DEFAULT_MODEL}.
  *
  * These are reasonable build.nvidia.com paid-tier estimates for the
- * Nemotron Nano 9B class. Used purely for the in-app cost meter on the
- * agent dashboard; not a billing source of truth.
+ * Nemotron 3.5 Lightning 30B-A3B class. Used purely for the in-app cost
+ * meter on the agent dashboard; not a billing source of truth.
  */
 const COST_PER_M_INPUT_USD = 0.2;
 const COST_PER_M_OUTPUT_USD = 0.4;
@@ -55,6 +56,11 @@ function loadProjectDevVars() {
 
 loadProjectDevVars();
 
+function resolveModel(): string {
+  const fromEnv = process.env.NVIDIA_NIM_MODEL?.trim();
+  return fromEnv || DEFAULT_MODEL;
+}
+
 /** Sleep for `ms` milliseconds. */
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -94,6 +100,7 @@ export async function callNemotron(
 ): Promise<string> {
   const apiKey = process.env.NVIDIA_API_KEY;
   if (!apiKey) throw new Error("NVIDIA_API_KEY is not configured");
+  const model = resolveModel();
   const sid = currentSessionId();
   const corrId = crypto.randomUUID();
   const t0 = Date.now();
@@ -101,9 +108,9 @@ export async function callNemotron(
     pushLog(sid, {
       agent,
       phase: "start",
-      message: `Calling ${MODEL}`,
+      message: `Calling ${model}`,
       corrId,
-      model: MODEL,
+      model,
       meta: { temperature, maxTokens, prompt: userMessage.slice(0, 220) },
     });
 
@@ -114,14 +121,15 @@ export async function callNemotron(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model,
       messages: [
-        { role: "system", content: "/no_think " + systemPrompt },
+        { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
       ],
       temperature,
       max_tokens: maxTokens,
-      chat_template_kwargs: { thinking: false },
+      stream: false,
+      chat_template_kwargs: { enable_thinking: false, thinking: false },
     }),
   });
 
@@ -134,7 +142,7 @@ export async function callNemotron(
         message: `API error ${res.status}${res.status === 429 ? " (rate limited — retries exhausted)" : ""}`,
         corrId,
         latencyMs: Date.now() - t0,
-        model: MODEL,
+        model,
         meta: { body: t.slice(0, 200) },
       });
     const msg = res.status === 429
@@ -156,7 +164,7 @@ export async function callNemotron(
         message: "Empty response from model",
         corrId,
         latencyMs: Date.now() - t0,
-        model: MODEL,
+        model,
       });
     throw new Error("AI model returned empty response");
   }
@@ -174,7 +182,7 @@ export async function callNemotron(
       inputTokens,
       outputTokens,
       costUsd,
-      model: MODEL,
+      model,
       meta: {
         // Keep the legacy `tokens` field so any pre-dashboard consumers (e.g.
         // the existing event-list UI) don't lose info during the migration.

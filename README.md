@@ -13,7 +13,7 @@ real time.
 
 - **TanStack Start** (React 19, file-based routing, server functions)
 - **Vite 7** + **Tailwind CSS v4**
-- **NVIDIA Nemotron** (`nvidia-nemotron-nano-9b-v2`) via the NIM API
+- **NVIDIA Nemotron** (`nemotron-3.5-lightning-30b-a3b`) via the NIM API
 - **Cloudflare Workers** runtime for production SSR
 
 ## Getting started

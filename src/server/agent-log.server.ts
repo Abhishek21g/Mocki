@@ -31,7 +31,7 @@ export type AgentLogEvent = {
   inputTokens?: number;
   outputTokens?: number;
   costUsd?: number;
-  /** Nemotron model id (e.g. `nvidia/nvidia-nemotron-nano-9b-v2`). */
+  /** Nemotron model id (e.g. `nvidia/nemotron-3.5-lightning-30b-a3b`). */
   model?: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   meta?: Record<string, any>;

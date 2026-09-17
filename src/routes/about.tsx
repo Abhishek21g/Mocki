@@ -183,7 +183,7 @@ function AboutPage() {
             </div>
             <div>
               {[
-                "NVIDIA Nemotron Nano 9B",
+                "NVIDIA Nemotron 3.5 Lightning",
                 "NVIDIA Magpie TTS",
                 "NVIDIA Riva ASR",
                 "TanStack Start",
